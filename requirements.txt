@@ -1,0 +1,36 @@
+torch --index-url https://download.pytorch.org/whl/cu124
+torchvision --index-url https://download.pytorch.org/whl/cu124
+torchaudio --index-url https://download.pytorch.org/whl/cu124
+xformers --index-url https://download.pytorch.org/whl/cu124
+
+accelerate
+diffusers
+transformers
+tensorboard
+tensorboardX
+rouge-score
+seaborn
+
+# common
+vllm==0.7.1
+openai>=0.28.1,<=1.65.5
+packaging
+numpy
+tqdm
+datasets==2.14.6
+
+# math_eval
+sympy==1.13.1
+word2number
+Pebble
+timeout-decorator
+latex2sympy2==1.9.1
+
+# livecodebench
+psutil
+
+# ifeval
+absl-py
+langdetect
+immutabledict
+nltk
