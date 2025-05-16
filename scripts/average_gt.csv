@@ -1,0 +1,2 @@
+file,cc1_emotional_stability,cc2_linguistic_consistency,cc3_action_intention_alignment,dc1_adjacent_similarity,dc2_qa_relevance,dc3_topic_concentration,pr1_scene_similarity,pr2_event_coherence,regex_parsing_successful
+output_benchmark_v4_gt_100.csv,0.708109143035732,0.9221208498082698,0.8989300278476883,0.8454528446959837,0.8478956934326115,0.9124774176718365,0.9214251186090164,0.8987907877834986,1.0
