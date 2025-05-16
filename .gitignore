@@ -6,6 +6,10 @@ __pycache__/
 # C extensions
 *.so
 
+# Results
+scripts/ablation_scatter_charts/
+scripts/genres_charts_0515/
+scripts/genres_csv_0515/
 # Distribution / packaging
 .Python
 build/

@@ -38,10 +38,10 @@ def save_genre_csvs(genre_to_rows, header, output_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Filter CSV by genre and output to separate files")
-    parser.add_argument('--info_json', default='/data/nas/mingzhe/code-release/MovieLLM/data/ground_truth/gt_100_info.json')
+    parser.add_argument('--info_json', default='CML-Bench/gt_100_info.json')
     # parser.add_argument('--csv', default='/data/nas/mingzhe/code-release/MovieLLM/scripts/output_benchmark_v5_gt.csv')
-    parser.add_argument('--csv', default='/data/nas/mingzhe/code-release/MovieLLM/scripts/results/0515_gt/output_benchmark_v4_gt_100.csv')
-    parser.add_argument('--output_dir', default='./genres_csv_0515', help='Output directory')
+    parser.add_argument('--csv', default='scripts/results/gt/output_benchmark_v4_gt_100.csv')
+    parser.add_argument('--output_dir', default='scripts/genres_csv_0515', help='Output directory')
     args = parser.parse_args()
 
     imdbid_to_genres = load_imdbid_to_genres(args.info_json)

@@ -142,8 +142,8 @@ def plot_boxplot_mean_by_genre(genre_to_scores, metrics, group_name, out_path):
 def main():
     import argparse
     parser = argparse.ArgumentParser(description="Draw boxplots with error bars for DC/CC/PR metrics by genre.")
-    parser.add_argument('--input_dir', default='./genres_csv_0515', help='Input csv directory')
-    parser.add_argument('--output_dir', default='./genres_charts_0515', help='Output image directory')
+    parser.add_argument('--input_dir', default='./scripts/genres_csv_0515', help='Input csv directory')
+    parser.add_argument('--output_dir', default='./scripts/genres_charts_0515', help='Output image directory')
     global args
     args = parser.parse_args()
     os.makedirs(args.output_dir, exist_ok=True)
