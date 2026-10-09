@@ -20,6 +20,11 @@ PARSER_VERSION = "text_screenplay_v1"
 
 _HEADING_CORE = r"(?:INT|EXT|INT\.?\s*/\s*EXT|EXT\.?\s*/\s*INT|I\s*/\s*E|E\s*/\s*I|INTERIOR|EXTERIOR|EST)"
 HEADING_LINE_RE = re.compile(rf"^(?:(\d{{1,4}}[A-Z]{{0,3}})[.)]?\s+)?({_HEADING_CORE}(?:[.:\-\s].*)?)$")
+# Location sluglines without INT./EXT. ("THE HIGHWAY - DAY"); MovieSum keeps these as stage directions too.
+_SLUG_TOD_RE = re.compile(
+    r"^(?:\d{1,4}[A-Z]{0,3}[.)]?\s+)?([A-Z0-9][A-Z0-9 .,'&/()\-]{2,60}?\s*(?:-|--|\u2013|\u2014)\s*"
+    r"(?:DAY|NIGHT|DAWN|DUSK|MORNING|AFTERNOON|EVENING|SUNSET|SUNRISE|LATER|CONTINUOUS|SAME|MOMENTS LATER|SAME TIME)\.?)$"
+)
 _TRAILING_SCENE_NO_RE = re.compile(r"\s+\d{1,4}[A-Z]{0,3}\.?\s*$")
 TRANSITION_LINE_RE = re.compile(
     r"^((FADE|IRIS) (IN|OUT|UP|TO BLACK|TO WHITE)|((QUICK|SLOW|MATCH|SMASH|JUMP|HARD|STRAIGHT|FLASH) )?CUT( BACK)?( TO)?|"
@@ -132,7 +137,8 @@ def heading_text(line: str) -> str | None:
     s = line.strip().rstrip("*").strip()
     m = HEADING_LINE_RE.match(s)
     if not m:
-        return None
+        slug = _SLUG_TOD_RE.match(_TRAILING_SCENE_NO_RE.sub("", s))
+        return slug.group(1).strip() if slug and not CAMERA_RE.match(slug.group(1)) else None
     text = m.group(2)
     letters = [c for c in text if c.isalpha()]
     if not letters or sum(c.isupper() for c in letters) / len(letters) < 0.8:

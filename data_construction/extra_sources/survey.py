@@ -63,6 +63,13 @@ def read_catalog(catalog_dir: str, name: str) -> list[dict]:
 TRANSCRIPT_RE = re.compile(r"transcript", re.I)
 
 
+def gt_fuzzy(key: str, gt_titles: set[str]) -> bool:
+    """'Lord of the Rings: Return of the King' vs GT 'The Lord of the Rings: The Return of the King'."""
+    from rapidfuzz import fuzz
+
+    return len(key) >= 8 and any(fuzz.ratio(key, g) >= 88 for g in gt_titles if len(g) >= 8)
+
+
 def match_entry(e: dict, index: dict, ms_ids, ms_titles, gt_ids, gt_titles, fuzzy_keys=None) -> dict:
     """IMDb match + dedupe status. Year-less matches are only provisional: build_extra verifies them
     against the cast character names before a film is used."""
@@ -73,10 +80,11 @@ def match_entry(e: dict, index: dict, ms_ids, ms_titles, gt_ids, gt_titles, fuzz
     elif e["kind"] == "film":
         m = lookup_any(index, e["title"], e.get("year"), e.get("year_kind") or "release", fuzzy_keys)
     keys = {norm_title(t) for t in title_variants(e["title"])}
+    full_key = norm_title(e["title"])
     status = "new"
     if m is None:
         status = "unmatched" if e["kind"] == "film" else "tv"
-    if (m and m["imdb_id"] in gt_ids) or keys & gt_titles:
+    if (m and m["imdb_id"] in gt_ids) or keys & gt_titles or gt_fuzzy(full_key, gt_titles):
         status = "in_gt"
     elif m and m["imdb_id"] in ms_ids:
         status = "in_moviesum"

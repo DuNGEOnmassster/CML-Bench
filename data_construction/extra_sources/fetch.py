@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -39,6 +40,7 @@ class Fetcher:
         self.timeout = timeout
         self.offline = offline
         self._last: dict[str, float] = {}
+        self._lock = threading.Lock()
         self._robots: dict[str, urllib.robotparser.RobotFileParser | None] = {}
         os.makedirs(cache_dir, exist_ok=True)
         self.index_path = os.path.join(cache_dir, "index.jsonl")
@@ -52,7 +54,9 @@ class Fetcher:
     def _allowed(self, url: str) -> bool:
         parts = urlsplit(url)
         host = parts.netloc.lower()
-        if host not in self._robots:
+        with self._lock:
+            known = host in self._robots
+        if not known:
             rp = urllib.robotparser.RobotFileParser()
             try:
                 req = urllib.request.Request(f"{parts.scheme}://{host}/robots.txt", headers={"User-Agent": USER_AGENT})
@@ -61,7 +65,8 @@ class Fetcher:
                 rp.parse(body.splitlines() if "user-agent" in body.lower() else [])
             except (urllib.error.URLError, TimeoutError, ValueError):
                 rp.parse([])
-            self._robots[host] = rp
+            with self._lock:
+                self._robots[host] = rp
         rp = self._robots[host]
         return rp is None or rp.can_fetch(USER_AGENT, url)
 
@@ -112,6 +117,7 @@ class Fetcher:
         return body, rec
 
     def _record(self, rec: dict) -> None:
-        self.index[rec["url"]] = rec
-        with open(self.index_path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(rec) + "\n")
+        with self._lock:
+            self.index[rec["url"]] = rec
+            with open(self.index_path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec) + "\n")

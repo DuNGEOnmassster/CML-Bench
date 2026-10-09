@@ -95,57 +95,76 @@ def lookup(index: dict, title: str, year: int | None = None, year_kind: str = "r
             "genres": [g for g in genres.split(",") if g and g != "\\N"], "confidence": conf}
 
 
-_ALT_RE = re.compile(r"\((?:was|aka|a\.k\.a\.|originally|written as|formerly|also known as)?\s*\"?([^()\"]+)\"?\)?", re.I)
+_ALT_RE = re.compile(r"\((?:was|aka|a\.k\.a\.|originally|written as|formerly|also known as|filmed as|released as|produced as|made as)?\s*\"?([^()\"]+)\"?\)?", re.I)
+
+
+def _title_forms(title: str) -> tuple[list[str], list[str]]:
+    """(primary, secondary) title forms. Primary: the title with and without a trailing parenthetical or
+    'script' suffix. Secondary: parenthetical aliases ("was"/"aka" titles) and both parts of 'X: Y'."""
+    title = re.sub(r"\s+", " ", title).strip()
+    base = re.sub(r"\s*\(.*?(\)|$)", "", title).strip()
+    aliases = [m.strip() for m in _ALT_RE.findall(title[len(base):]) if m.strip()]
+    base2 = re.sub(r"\s+(script|screenplay|shooting script|transcript)$", "", base, flags=re.I)
+    released = re.findall(r"\((?:filmed|released|produced|made) as\s+\"?([^()\"]+)\"?\)", title, re.I)
+    primary = released + [title, base, base2]
+    secondary = aliases + ([p.strip() for p in base2.split(":", 1)] if ":" in base2 else [])
+
+    def uniq(xs, seen):
+        out = []
+        for t in xs:
+            k = norm_title(t)
+            if len(k) >= 2 and k not in seen:
+                seen.add(k)
+                out.append(t)
+        return out
+
+    seen: set[str] = set()
+    return uniq(primary, seen), uniq(secondary, seen)
 
 
 def title_variants(title: str) -> list[str]:
     """'U Turn (Stray Dogs)' -> ['U Turn (Stray Dogs)', 'U Turn', 'Stray Dogs'];
     'Friday the 13th Part 10: Jason X' -> [..., 'Friday the 13th Part 10', 'Jason X']."""
-    title = re.sub(r"\s+", " ", title).strip()
-    out = [title]
-    base = re.sub(r"\s*\(.*?(\)|$)", "", title).strip()
-    out.append(base)
-    out += [m.strip() for m in _ALT_RE.findall(title[len(base):]) if m.strip()]
-    base = re.sub(r"\s+(script|screenplay|shooting script|transcript)$", "", base, flags=re.I)
-    out.append(base)
-    if ":" in base:
-        head, tail = base.split(":", 1)
-        out += [head.strip(), tail.strip()]
-    seen, uniq = set(), []
-    for t in out:
-        k = norm_title(t)
-        if len(k) >= 2 and k not in seen:
-            seen.add(k)
-            uniq.append(t)
-    return uniq
+    primary, secondary = _title_forms(title)
+    return primary + secondary
+
+
+def _fuzzy(index: dict, title: str, year, year_kind, fuzzy_keys: dict) -> dict | None:
+    from rapidfuzz import fuzz, process
+
+    k = norm_title(title)
+    pool = fuzzy_keys.get(k[:2], [])
+    best = process.extractOne(k, pool, scorer=fuzz.ratio, score_cutoff=92) if len(k) >= 6 else None
+    if not best:
+        return None
+    m = lookup(index, best[0], year, year_kind)
+    if m is None:
+        return None
+    return {**m, "matched_title": best[0], "confidence": "low", "fuzzy_score": round(best[1], 1)}
 
 
 def lookup_any(index: dict, title: str, year: int | None = None, year_kind: str = "release",
                fuzzy_keys: dict | None = None) -> dict | None:
-    """lookup() over title_variants(); then an optional fuzzy pass (rapidfuzz ratio >= 92 on normalized keys
-    sharing the first two characters) for typos such as 'Sweet Smell of Sucess'."""
-    for t in title_variants(title):
+    """Exact match on the full title (with/without parenthetical), then a fuzzy match of the full title
+    (rapidfuzz ratio >= 92 among keys sharing the first two characters: 'Sweet Smell of Sucess',
+    'Lord of the Rings: Fellowship of the Ring, The'), and only then aliases and the parts of an 'X: Y'
+    title. Fuzzy and alias/part matches get confidence 'low', so build_extra requires cast verification."""
+    primary, secondary = _title_forms(title)
+    for t in primary:
         m = lookup(index, t, year, year_kind)
         if m:
             return {**m, "matched_title": t}
-    if fuzzy_keys is None:
-        return None
-    from rapidfuzz import fuzz, process
-
-    for t in title_variants(title)[:2]:
-        k = norm_title(t)
-        pool = fuzzy_keys.get(k[:2], [])
-        best = process.extractOne(k, pool, scorer=fuzz.ratio, score_cutoff=92) if len(k) >= 6 else None
-        if best:
-            m = lookup(index, best[0], year, year_kind) if best[0] in index else None
-            if m is None:
-                cands = [c for c in index.get(best[0], []) if c[2] in FILM_TYPES]
-                if cands:
-                    c = max(cands, key=lambda c: c[3])
-                    m = {"imdb_id": c[0], "year": c[1], "title": c[6], "type": c[2], "votes": c[3], "rating": c[4],
-                         "genres": [g for g in c[5].split(",") if g and g != "\\N"], "confidence": "low"}
+    if fuzzy_keys is not None:
+        for t in primary:
+            m = _fuzzy(index, t, year, year_kind, fuzzy_keys)
             if m:
-                return {**m, "matched_title": best[0], "confidence": "low", "fuzzy_score": round(best[1], 1)}
+                return m
+    for t in secondary:
+        m = lookup(index, t, year, year_kind)
+        if m:
+            if year is None or m["confidence"] != "high":
+                m["confidence"] = "low"
+            return {**m, "matched_title": t}
     return None
 
 

@@ -13,7 +13,7 @@ from cml_format import garble_rate, is_bad_character_tag, rare_word_rate, speake
 
 QUALITY_CONFIG = {
     "min_chars_per_pdf_page": 600,
-    "max_letter_spaced_rate": 0.03,
+    "max_letter_spaced_rate": 0.01,
     "min_words": 10000,
     "min_headings": 30,
     "max_speaker_colon_share": 0.05,
@@ -42,9 +42,16 @@ def script_quality(text: str, scenes, diag: dict, pdf_meta: dict, vocab) -> tupl
     if pages and nonspace / pages < cfg["min_chars_per_pdf_page"]:
         return ["needs_ocr"], metrics | {"chars_per_page": round(nonspace / pages)}
 
-    tokens = re.findall(r"[A-Za-z]+", text)
-    singles = sum(1 for t in tokens if len(t) == 1 and t not in ("a", "A", "I"))
-    metrics["letter_spaced_rate"] = round(singles / max(1, len(tokens)), 4)
+    # OCR letter spacing ("t a k e s"): letters inside runs of >= 3 single-letter tokens
+    tokens = text.split()
+    spaced, run = 0, 0
+    for t in tokens + [""]:
+        if len(t) == 1 and t.isalpha():
+            run += 1
+        else:
+            spaced += run if run >= 3 else 0
+            run = 0
+    metrics["letter_spaced_rate"] = round(spaced / max(1, len(tokens)), 4)
     if metrics["letter_spaced_rate"] > cfg["max_letter_spaced_rate"]:
         reasons.append("ocr_letter_spaced")
 
