@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(HERE, "extra_sources"))
 
 from cml_format import Scene, render, validate_cml  # noqa: E402
 from extra_sources import catalogs  # noqa: E402
-from extra_sources.build_extra import NOT_PRODUCED_RE, gt_lookalike, window_noise  # noqa: E402
+from extra_sources.build_extra import NOT_PRODUCED_RE, c34_score, gt_lookalike, window_noise  # noqa: E402
 from dataset_schema import load_gt_related  # noqa: E402
 from extra_sources.imdb_index import norm_title, title_variants  # noqa: E402
 from extra_sources.quality import script_quality  # noqa: E402
@@ -149,6 +149,31 @@ class TextParserTests(unittest.TestCase):
             ("character", "MATT"), ("dialogue", "No, no -"),
             ("character", "LILY"), ("dialogue", "I can -"), ("character", "OTTO"), ("dialogue", "You might -"),
             ("character", "CHEN"), ("dialogue", "Output ratio at four.")])
+
+    def test_reply_cue_resumed_speech_fused_cue_and_title_cards(self):
+        page = ("\nINT. DECK - NIGHT\n\nThe crew stands in a line on the deck while the wind howls through the rigging.\n\n"
+                "                                   BOATS\n                         Corbin, John -\n"
+                "                         JOHN\n                         Here.\n\n"
+                "                                   WAYNE\n                         So?\n\n"
+                "                         (grabbing her shoulders)\n                         I love you.\n\n"
+                "                                   JESSICA\n                         Go.\n\n"
+                "                         WAYNE Ma'am - he is dead now.\n\n"
+                "                                   JOHN\n                         Fine.\n\n"
+                "                                   EPILOGUE\n                         A quiet street years later.\n\n")
+        scenes, _ = text_to_scenes("".join(page for _ in range(30)))
+        self.assertEqual(scenes[0].elements[2:], [
+            ("character", "BOATS"), ("dialogue", "Corbin, John -"), ("character", "JOHN"), ("dialogue", "Here."),
+            ("character", "WAYNE"), ("dialogue", "So?"), ("parenthetical", "(grabbing her shoulders)"), ("dialogue", "I love you."),
+            ("character", "JESSICA"), ("dialogue", "Go."), ("character", "WAYNE"), ("dialogue", "Ma'am - he is dead now."),
+            ("character", "JOHN"), ("dialogue", "Fine."), ("scene_description", "EPILOGUE A quiet street years later.")])
+        self.assertFalse(looks_like_cue("PART TWO"))
+
+    def test_c34_score(self):
+        talkers = {"MARA", "OTTO"}
+        els = [("character", "MARA"), ("dialogue", "(softly)"), ("character", "OTTO"), ("dialogue", "MARA"),
+               ("character", "EXT. HOUSE - DAY"), ("dialogue", "Hi."), ("scene_description", "MARA Get down!")]
+        self.assertEqual(c34_score(els, talkers), 4)
+        self.assertEqual(c34_score([("character", "MARA"), ("dialogue", "Hello there.")], talkers), 0)
 
     def test_cue_rules(self):
         for ok in ("MARA", "DR. OTTO", "MARA (V.O.)", "McCLANE"):

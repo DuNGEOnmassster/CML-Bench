@@ -44,6 +44,8 @@ _SCENE_NOTE_RE = re.compile(r"^\s*SCENES?\s+\d+[A-Z]?(\s*(-|TO|AND|THRU|THROUGH)
                             r"COMBINED WITH|DELETED|OMITTED)(\s+SCENES?\s+\d+[A-Z]?)?)?\s*$")
 _DUAL_CUE_RE = re.compile(r"^(\s*)(\S(?:.*?\S)?)\s{4,}(\S(?:.*?\S)?)\s*$")
 _DOUBLED_SCENE_NO_RE = re.compile(r"^(\d{1,3}[A-Z]?)\s+\1\s+(?=\S)")
+_TITLE_INTRO_RE = re.compile(r"\b(TITLES?|SUPER|CARD|CHYRON|CAPTION)\s*:\s*$")
+_FUSED_CUE_RE = re.compile(r"^(\s*)([A-Z][A-Z.'\u2019\-]+(?: [A-Z][A-Z.'\u2019\-]+){0,2}(?: \([^)]*\))?) +((?=\S*[a-z])\S.*)$")
 _OMITTED_RE = re.compile(rf"^\s*{_SCENE_NO}\s*(OMITTED|OMIT)\s*{_SCENE_NO}\s*$")
 _REVISION_MARK_RE = re.compile(r"\\*\*+\\*")
 _CUE_CONTD_RE = re.compile(r"\(\s*CONT(INUED|['\u2019]?D|\.)?[.\s]*\)", re.I)
@@ -61,7 +63,9 @@ _CUE_CHARS_RE = re.compile(r"^[A-Z0-9#'\"\u201c][A-Za-z0-9 .,'\u2019\-&#/\"\u201
 _HONORIFIC_END_RE = re.compile(r"\b(MR|MRS|MS|DR|JR|SR|ST|LT|SGT|CAPT|COL|GEN|PROF|REV|NO)\.$")
 _NOT_A_NAME = {"THE END", "CONTINUED", "MORE", "OMITTED", "BLACK", "SILENCE", "CREDITS", "TITLE", "SUPER", "INSERT",
                "FADE IN", "FADE OUT", "LATER", "CONTINUOUS", "MONTAGE", "FLASHBACK", "END FLASHBACK", "BACK TO SCENE",
-               "END OF MONTAGE", "INTERCUT", "DAY", "NIGHT"}
+               "END OF MONTAGE", "INTERCUT", "DAY", "NIGHT", "EPILOGUE", "PROLOGUE", "INTERMISSION", "OVERTURE", "TITLE CARD"}
+# structural title cards are never speakers ("PART TWO", "CHAPTER 3", "BOOK ONE")
+_TITLE_CARD_RE = re.compile(r"^(PART|CHAPTER|BOOK|ACT)\s+([IVXLC]+|\d+|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)\b")
 
 
 def decode(body: bytes) -> str:
@@ -221,7 +225,7 @@ def looks_like_cue(s: str) -> bool:
     if not s or len(s) > 50 or heading_text(s) or is_transition(s) or CAMERA_RE.match(s):
         return False
     name = cue_name(s)
-    if not name or len(name) > 35 or len(name.split()) > 5 or name in _NOT_A_NAME:
+    if not name or len(name) > 35 or len(name.split()) > 5 or name in _NOT_A_NAME or _TITLE_CARD_RE.match(name):
         return False
     if name[-1] in ":!?,;" or (name.endswith(".") and not _HONORIFIC_END_RE.search(name)
                                and not (_INITIALISM_END_RE.search(name) and not re.search(r"\d", name))):
@@ -289,6 +293,19 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
 
     def ind(l):
         return len(l) - len(l.lstrip())
+
+    if indented and c_ind > a_ind + 4:
+        # a known cue fused onto its speech line in the speech column ("SHERIFF JOHNSON Ma'am - Buddy Cole is dead."):
+        # split it into a cue line and a speech line
+        split_lines = []
+        for k, l in enumerate(lines):
+            m = _FUSED_CUE_RE.match(l)
+            if (m and ind(l) > a_ind + 4 and (k == 0 or not lines[k - 1].strip()) and not looks_like_cue(l.strip())
+                    and cue_name(m.group(2)) in lay["known_cues"] and len(cue_name(m.group(2))) >= 3):
+                split_lines += [" " * c_ind + m.group(2), " " * d_ind + m.group(3)]
+            else:
+                split_lines.append(l)
+        lines = split_lines
 
     scenes_raw: list[list[tuple[str, str]]] = []
     cur: list[tuple[str, str]] | None = None
@@ -383,8 +400,10 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
         # page break, "CHEN" where one page lost its cue indent)
         margin_cue = (indented and ind(line) <= a_ind + 2 and nxt_i == i + 1 and cue_name(s) in lay["known_cues"]
                       and abs(ind(nxt) - d_ind) <= 3 and ind(nxt) > a_ind + 2)
+        # on-screen text announced by "INSERT TITLE:" / "SUPER:" (possibly after a card such as "EPILOGUE") is not a speaker
+        after_title = any(_TITLE_INTRO_RE.search(x) for x in [x for tag, x in cur[-2:] if tag == "scene_description"] + para[-2:])
         is_cue = (
-            looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
+            not after_title and looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
             and ((ind(line) >= cue_min or margin_cue) if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
             and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("(") or flat_dialogue)
         )
@@ -420,6 +439,18 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                         and (nt[:1].islower() or not re.search(r"[.!?\"'\u201d)\-]$", dlg[-1]))):
                     i = j
                     continue
+                # the same speaker resumes after a blank line with a parenthetical and more speech ('"So"?' / "" /
+                # "(grabbing her shoulders)" / "I love you, Jessie ... why?")
+                close = next((q for q in range(j, min(n, j + 3)) if ")" in lines[q]), None)
+                after = lines[close].split(")", 1)[1].strip() if close is not None else ""
+                follow = lines[close + 1] if close is not None and close + 1 < n else ""
+                if (nt.startswith("(") and abs(ind(nx) - d_ind) <= 3 and ind(nx) > a_ind + 2 and close is not None
+                        and (after or (follow.strip() and abs(ind(follow) - d_ind) <= 3 and not looks_like_cue(follow.strip())
+                                       and not heading_text(follow.strip())))):
+                    cur.append(("dialogue", join_lines(dlg)))
+                    dlg = []
+                    i = j
+                    continue
             # "(a beat)" at the left margin between two lines of indented dialogue is still a parenthetical
             margin_paren = (t.startswith("(") and t.endswith(")") and len(t) <= 40 and i + 1 < n and lines[i + 1].strip()
                             and ind(lines[i + 1]) > a_ind + 2 and not looks_like_cue(lines[i + 1].strip()))
@@ -430,6 +461,16 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                 break
             if dlg and is_dual_cue(l2):
                 break  # two-column cue line right under a speech
+            if (dlg and not paren and indented and abs(ind(l2) - d_ind) <= 2 and looks_like_cue(t) and len(cue_name(t)) >= 3
+                    and cue_name(t) in lay["known_cues"] and i + 1 < n and lines[i + 1].strip()
+                    and not lines[i + 1].strip().isupper() and abs(ind(lines[i + 1]) - d_ind) <= 2):
+                # a known speaker's cue printed at the dialogue indent inside the previous speech ("Corbin, John -" /
+                # "JOHN" / "Here.")
+                cur.append(("dialogue", join_lines(dlg)))
+                dlg = []
+                cur.append(("character", t))
+                i += 1
+                continue
             if paren or t.startswith("("):
                 if dlg and not paren:
                     cur.append(("dialogue", join_lines(dlg)))

@@ -58,6 +58,36 @@ from dataset_schema import gt_relation, load_gt_related, load_identity_table  # 
 
 # Per-window limits on CML mislabel signatures = MovieSum v3.1 p99 per segment (13,065 segments, extra_sources/mislabel.py)
 MISLABEL_LIMITS = {"dual_collapse": 0, "paren_speech": 1, "name_in_dialogue": 1, "fused_cue": 2}
+# C34 (contract v2.2, evaluator-repilot-report.md): drop a window when paren_only + cue_as_dlg + bad_cue + fused >= 4
+C34_LIMIT = 4
+_C34_HEADING_CUE = re.compile(r"^(INT|EXT)\b|^\d+[A-Z]?\.?\s|\s-\s|\b(SERIES OF|SHOTS?|ANGLE|CLOSE ON|MONTAGE|MOMENTS LATER|"
+                              r"CONTINUOUS|FLASHBACK|INTERCUT)\b|(?<![-\w])(DAY|NIGHT|LATER)(?![-\w])")
+_C34_VOX = re.compile(r"\s+(V\.?\s?O|O\.?\s?S|O\.?\s?C|CONT'?D)\.?$")
+
+
+def c34_bad_cue(x: str) -> bool:
+    s = _C34_VOX.sub("", re.sub(r"\s*\([^)]*\)", "", x).strip()).strip()
+    w = s.split()
+    if not w:
+        return False
+    initials = all(re.fullmatch(r"(?:[A-Z]\.){1,3}|[A-Z]\.?|SR\.|JR\.|[A-Z][A-Z'\-]+", t) for t in w)
+    return bool(_C34_HEADING_CUE.search(s) or len(w) > 5 or (s.endswith(".") and len(w) >= 3 and not initials)
+                or ("," in s and len(w) >= 3))
+
+
+def c34_score(els: list[tuple[str, str]], talkers: set[str]) -> int:
+    n = 0
+    for t, x in els:
+        x = x.strip()
+        if t == "dialogue":
+            if re.fullmatch(r"\([^()]*\)\.?", x):
+                n += 1
+            elif re.fullmatch(r"[A-Z][A-Z .'\-]{1,30}", x) and mislabel_spk(x) in talkers:
+                n += 1
+        elif t == "character" and c34_bad_cue(x):
+            n += 1
+    sig = mislabel_signatures(els, talkers)
+    return n + sig["fused_cue"] + sig["paren_speech"] + sig["dual_collapse"]
 
 # parser version + the shared cml_format cleaning version ("moviesum_clean_detok_v3" -> "clean_detok_v3")
 NORMALIZATION_VERSION = f"{PARSER_VERSION.replace('_', '')}_{MOVIESUM_NORMALIZATION.split('_', 1)[1]}"
@@ -406,8 +436,11 @@ def main() -> None:
             item_id = f"{imdb_id}-s{seg[0].index:04d}-{seg[-1].index:04d}"
             st = segment_stats(seg, content, ref["vocab"])
             reasons = segment_rejections(st, validate_cml(content), cfg) + window_noise(seg)
-            sig = mislabel_signatures([(t, x) for s in seg for t, x in s.elements], film_talkers)
+            seg_els = [(t, x) for s in seg for t, x in s.elements]
+            sig = mislabel_signatures(seg_els, film_talkers)
             reasons += [f"mislabel_{k}" for k, lim in MISLABEL_LIMITS.items() if sig[k] > lim]
+            if c34_score(seg_els, film_talkers) >= C34_LIMIT:
+                reasons.append("c34_mislabel_structure")
             gt_ov = overlap(shingles(words_of(content), cfg["ngram"]), ref["gt_segment_shingles"])
             if gt_ov > cfg["max_gt_segment_overlap"]:
                 reasons.append("gt_segment_overlap")
