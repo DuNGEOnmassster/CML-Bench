@@ -37,8 +37,9 @@ def run(cmd: list[str], cwd: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
 
-def unpack(run_dir: str, build_id: str) -> dict:
-    """Copy hand-off bundles into the run dir; a file is only rewritten when its content differs."""
+def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
+    """Copy hand-off bundles into the run dir; a file is only rewritten when its content differs. Items in `skip` (C35)
+    are never copied: neither their abstracts nor their writer notes."""
     src = os.path.join(STORE, "abstracts", build_id)
     stats = {"bundles": 0, "abstracts_written": 0, "reports_written": 0, "foreign": 0}
     if not os.path.isdir(src):
@@ -64,7 +65,7 @@ def unpack(run_dir: str, build_id: str) -> dict:
                 if not line.strip():
                     continue
                 ab = json.loads(line)
-                if ab.get("item_id") not in allowed:
+                if ab.get("item_id") not in allowed or ab.get("item_id") in skip:
                     continue
                 data = json.dumps(ab, ensure_ascii=False)
                 out = os.path.join(run_dir, "abstracts", f"{ab['item_id']}.json")
@@ -75,6 +76,10 @@ def unpack(run_dir: str, build_id: str) -> dict:
         rep = os.path.join(bdir, "writer_report.json")
         if os.path.exists(rep):
             data = open(rep, encoding="utf-8").read()
+            if skip & allowed:
+                r = json.loads(data)
+                data = json.dumps({**r, "source_issues": [x for x in r.get("source_issues", []) if x.get("item_id") not in skip]},
+                                  ensure_ascii=False)
             out = os.path.join(run_dir, "batches", batch_id, "writer_report.json")
             if not os.path.exists(out) or open(out, encoding="utf-8").read() != data:
                 if os.path.exists(out):  # a backfilled report for a batch already unpacked: its G8 pool is recomputed by the sync
@@ -122,23 +127,28 @@ def ingest_c35(run_dirs: list[str]) -> dict | None:
     have_items = {x["item_id"] for x in spec["items"]}
     have_films = {x["imdb_id"] for x in spec["films"]}
     now_s = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    new_items, unknown = [], []
+    new_items, unknown, sha_mismatch = [], [], []
     for w in cand.get("exclude_windows", []):
         iid = w["item_id"]
         if iid in have_items:
             continue
-        sha1, film, build = known.get(iid, (None, w.get("film_id"), None))
+        sha1, film, build = known.get(iid, (None, w.get("imdb_id") or w.get("film_id"), None))
         if sha1 is None:
             unknown.append(iid)
+            sha1 = w.get("content_sha1")
+        elif w.get("content_sha1") and w["content_sha1"] != sha1:
+            sha_mismatch.append(iid)
         new_items.append({"item_id": iid, "content_sha1": sha1, "imdb_id": film, "build_id": build, "source": w.get("source"),
                           "added_by": "evaluator scan", "added_at": now_s})
         have_items.add(iid)
+    whole = {f.get("imdb_id") or f.get("film_id") for f in cand.get("film_recommendations", []) if f.get("recommend_whole_film_exclusion")}
+    whole |= set(cand.get("whole_film_exclusion_imdb_ids") or [])
+    source_of = {(f.get("imdb_id") or f.get("film_id")): f.get("source") for f in cand.get("film_recommendations", [])}
     new_films = []
-    for f in cand.get("film_recommendations", []):
-        if f.get("recommend_whole_film_exclusion") and f["film_id"] not in have_films:
-            new_films.append({"imdb_id": f["film_id"], "category": "sexual_content_involving_minor", "decided_by": "evaluator scan",
-                              "decided_at": now_s[:10], "source": f.get("source")})
-            have_films.add(f["film_id"])
+    for fid in sorted(whole - have_films - {None}):
+        new_films.append({"imdb_id": fid, "category": "sexual_content_involving_minor", "decided_by": "evaluator scan",
+                          "decided_at": now_s[:10], "source": source_of.get(fid)})
+        have_films.add(fid)
     spec["items"] += sorted(new_items, key=lambda x: x["item_id"])
     spec["films"] += sorted(new_films, key=lambda x: x["imdb_id"])
     spec["version"] = spec.get("version", 1) + 1
@@ -146,13 +156,83 @@ def ingest_c35(run_dirs: list[str]) -> dict | None:
     film_windows = sum(1 for i, (_, f, _) in known.items() if f in {x["imdb_id"] for x in new_films} and i not in {x["item_id"] for x in new_items})
     record = {"source_file": "content_safety/c35_candidates.json", "sha1": sha, "generated_at": cand.get("generated_at"),
               "ingested_at": now_s, "windows_added": len(new_items), "films_added": len(new_films),
-              "more_windows_via_films": film_windows, "unknown_item_ids": len(unknown)}
+              "more_windows_via_films": film_windows, "unknown_item_ids": len(unknown), "content_sha1_mismatch": len(sha_mismatch)}
     spec.setdefault("ingested", []).append(record)
     tmp = list_path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(spec, f, indent=1)
     os.replace(tmp, list_path)
     return {**record, "listed_items": len(spec["items"]), "listed_films": len(spec["films"])}
+
+
+def _rewrite(path: str, data: str) -> None:
+    tmp = path + ".c35tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(data)
+    os.replace(tmp, path)
+
+
+def purge_c35(run_dir: str) -> tuple[set[str], dict]:
+    """Remove every C35-listed item's abstract and writer note from the store hand-off bundles of its batch, from the run
+    dir (abstract files, writer reports, merge cache entries) and report the counts. Idempotent; only bundles of batches
+    that hold listed items are read. G1-G7 skip listed items, so the rest of each batch merges unchanged."""
+    sys.path.insert(0, HERE)
+    from validate_batch import content_excluded, load_content_exclusions
+
+    c35 = load_content_exclusions(os.path.join(STORE, "content_exclusions.json"))
+    items = {}
+    for line in open(os.path.join(run_dir, "items.jsonl"), encoding="utf-8"):
+        it = json.loads(line)
+        items[it["item_id"]] = it
+    listed = content_excluded(items, items, c35)
+    stats = {"listed_here": len(listed), "bundle_abstracts_removed": 0, "bundle_notes_removed": 0, "bundles_rewritten": 0,
+             "run_abstracts_removed": 0, "run_notes_removed": 0, "cache_entries_dropped": 0}
+    if not listed:
+        return listed, stats
+    build = json.load(open(os.path.join(run_dir, "run.json")))["build_id"]
+    cache_path = os.path.join(run_dir, "merge_cache.json")
+    cache = json.load(open(cache_path)) if os.path.exists(cache_path) else {}
+    for line in open(os.path.join(run_dir, "batches.jsonl"), encoding="utf-8"):
+        b = json.loads(line)
+        ids = listed & set(b["item_ids"])
+        if not ids:
+            continue
+        bdir = os.path.join(STORE, "abstracts", build, b["batch_id"])
+        changed = False
+        p = os.path.join(bdir, "abstracts.jsonl")
+        if os.path.exists(p):
+            lines = [l for l in open(p, encoding="utf-8").read().splitlines() if l.strip()]
+            keep = [l for l in lines if json.loads(l).get("item_id") not in ids]
+            if len(keep) < len(lines):
+                _rewrite(p, "".join(l + "\n" for l in keep))
+                stats["bundle_abstracts_removed"] += len(lines) - len(keep)
+                changed = True
+        for p, key in ((os.path.join(bdir, "writer_report.json"), "bundle_notes_removed"),
+                       (os.path.join(run_dir, "batches", b["batch_id"], "writer_report.json"), "run_notes_removed")):
+            if os.path.exists(p):
+                rep = json.load(open(p, encoding="utf-8"))
+                issues = rep.get("source_issues", [])
+                kept = [x for x in issues if x.get("item_id") not in ids]
+                if len(kept) < len(issues):
+                    _rewrite(p, json.dumps({**rep, "source_issues": kept}, ensure_ascii=False))
+                    stats[key] += len(issues) - len(kept)
+                    changed |= key.startswith("bundle")
+        stats["bundles_rewritten"] += changed
+        for iid in ids:
+            p = os.path.join(run_dir, "abstracts", f"{iid}.json")
+            if os.path.exists(p):
+                os.remove(p)
+                stats["run_abstracts_removed"] += 1
+        if cache.pop(b["batch_id"], None) is not None:
+            stats["cache_entries_dropped"] += 1
+    with open(cache_path, "w", encoding="utf-8") as f:
+        json.dump(cache, f)
+    return listed, stats
+
+
+def released_ids(run_dir: str) -> set[str]:
+    p = os.path.join(run_dir, "merged_release", "data", "merged.jsonl")
+    return {json.loads(l)["item_id"] for l in open(p, encoding="utf-8") if l.strip()} if os.path.exists(p) else set()
 
 
 def reused_pilot_check(run_dir: str, slug: str) -> dict | None:
@@ -181,7 +261,11 @@ def source_round(run_dir: str, draft: str = "") -> tuple[dict, dict]:
     """Unpack, sync and gate one source. Returns its summary and its build_status per-source entry."""
     run_info = json.load(open(os.path.join(run_dir, "run.json")))
     build_id = run_info["build_id"]
-    out = {"build_id": build_id, "unpack": unpack(run_dir, build_id)}
+    listed, purge = purge_c35(run_dir)
+    in_data_before = len(released_ids(run_dir) & listed)
+    out = {"build_id": build_id, "unpack": unpack(run_dir, build_id, listed)}
+    if listed:
+        out["c35"] = {**purge, "removed_from_data": in_data_before}
     cmd = [sys.executable, os.path.join(HERE, "hf_sync.py"), "sync", "--run_dir", run_dir] + (["--draft", draft] if draft else [])
     r = run(cmd)
     text = r.stdout + r.stderr
@@ -197,6 +281,9 @@ def source_round(run_dir: str, draft: str = "") -> tuple[dict, dict]:
     out.update({k: src[k] for k in ("items_with_abstract", "items_checks_passed", "items_merged", "batches_merged",
                                     "batches_rejected", "batches_incomplete", "batches_revoked")})
     out["items_excluded_from_merged"] = src.get("items_excluded_from_merged")
+    out["items_releasable"] = src.get("items_releasable")
+    if listed:
+        out["c35"]["still_in_data"] = len(released_ids(run_dir) & listed)
     out["audit"] = {k: src["audit"].get(k) for k in ("targeted_items", "targeted_selected", "sample_items", "audited",
                                                      "major_or_outside", "stop", "reason", "targeted_alarm",
                                                      "paused_orchestrators", "revoked_batch_ids")}

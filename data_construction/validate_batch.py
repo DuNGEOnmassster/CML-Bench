@@ -96,6 +96,8 @@ def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_t
 
     if skip:
         manifest = {**manifest, "items": [e for e in manifest["items"] if e["item_id"] not in skip]}
+        if not manifest["items"]:  # every item is C35-listed: nothing to write, nothing to merge
+            return {"state": "passed", "failures": [], "soft": [], "records": [], "items": [], "audit_targets": []}
     failures, soft, records, per_item, targets = [], [], [], [], []
     present = [os.path.exists(e["abstract_path"]) for e in manifest["items"]]
     if not any(present):
