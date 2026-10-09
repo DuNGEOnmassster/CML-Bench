@@ -26,7 +26,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from dataset_schema import build_id, source_slug  # noqa: E402
 
-DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1_4.md")
+DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1_5.md")
 
 
 def target_center(content_tokens: int) -> int:
@@ -69,7 +69,7 @@ def main() -> None:
     ap.add_argument("--batch_size", type=int, default=10)
     ap.add_argument("--batch_prefix", default=None, help="batch id prefix (default: '<source slug>-b')")
     ap.add_argument("--prompt", default=DEFAULT_PROMPT)
-    ap.add_argument("--prompt_version", default="abstract_v1.4")
+    ap.add_argument("--prompt_version", default="abstract_v1.5")
     args = ap.parse_args()
 
     run_dir = os.path.abspath(args.run_dir)
