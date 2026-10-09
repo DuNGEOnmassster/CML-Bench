@@ -34,8 +34,16 @@ def speaker(t: str) -> str:
     return SUFFIX_RE.sub(" ", t).strip().upper()
 
 
+NOT_A_NAME_RE = re.compile(
+    r"[\d/:]|-$|\b(POV|CLOSE|CLOSE-UP|SHOT|ANGLE|INSERT|SUPER|TITLE|LEGEND|MONTAGE|SERIES|WIDE|MED|BACK|DAY|NIGHT|MORNING|"
+    r"EVENING|LATER|CONTINUOUS|SAME|CONTINUED|OMITTED|MORE|CUT|FADE|DISSOLVE)\b"
+)
+
+
 def orphan_speaker_lines(content: str) -> int:
-    speakers = {speaker(c) for c in CHAR_RE.findall(content)}
+    # Speaker tags that are camera directions, time words or mis-tagged directions ("SILENCE-", "HIS POV", "DAY")
+    # are not names; a description repeating one is a direction, not a stray speaker line.
+    speakers = {s for s in (speaker(c) for c in CHAR_RE.findall(content)) if not NOT_A_NAME_RE.search(s)}
     return sum(1 for d in SCENE_DESC_RE.findall(content) if d.strip().upper() in speakers and d.strip().isupper())
 
 

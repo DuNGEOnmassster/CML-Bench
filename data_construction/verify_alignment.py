@@ -45,7 +45,11 @@ HEADING_NUMBERS = re.compile(
     r"SUNRISE|CONTINUOUS)\s+(\d{1,3}-?[A-Z]{0,3})\s*\.?\s*$"
 )
 DUP_LETTERED_NUMBER = re.compile(r"\b(\d{1,3}-?[A-Z]{1,3}|\d{1,3}pt)\s+\1\b")
-NOT_A_NAME = re.compile(r"\b(CUT|DISSOLVE|FADE|FLASH|SMASH|MATCH|WIPE|INTERCUT|ANGLE|INT|EXT)\b|TO:?$")
+# Speaker tags that are revision stamps, headings, camera directions or captions, not people.
+NOT_A_NAME = re.compile(
+    r"[\d/:]|-$|\b(CUT|DISSOLVE|FADE|FLASH|SMASH|MATCH|WIPE|INTERCUT|ANGLE|INT|EXT|LATER|CONTINUOUS|SAME|TITLE|LEGEND|"
+    r"SUPER|INSERT|POV|MONTAGE|SERIES|CLOSE|WIDE|SHOT|BACK|DAY|NIGHT|MORNING|EVENING|CONTINUED|OMITTED|MORE)\b|TO$"
+)
 NUMBER_ONLY = re.compile(r"^[\W\d_]*$")
 SUFFIX = re.compile(r"\s*\([^)]*\)\s*|\s+(V\.?O\.?|O\.?S\.?|O\.?C\.?|CONT'?D\.?)\s*$", re.I)
 
@@ -86,18 +90,19 @@ def talking_speakers(scenes) -> set[str]:
             j = k + 1
             while j < len(els) and els[j][0] == "parenthetical":
                 j += 1
+            name = name_of(text)
             if j < len(els) and els[j][0] == "dialogue" and has_line(els[j][1]) and re.search(r"[A-Za-z]", els[j][1]) \
-                    and not NOT_A_NAME.search(name_of(text)):
-                out.add(name_of(text))
+                    and re.search(r"[A-Z]{2}", name) and not NOT_A_NAME.search(name):
+                out.add(name)
     return out
 
 
 def page_number_line(els, k: int, talkers: set[str]) -> bool:
     """A dialogue that is a bare number nobody real says: no speaker before it, or a speaker who never talks."""
-    if els[k][0] != "dialogue" or not NUMBER_LINE.match(norm(els[k][1]).strip()):
+    if els[k][0] != "dialogue" or not NUMBER_LINE.match(MARKER.sub(" ", norm(els[k][1])).strip(" :")):
         return False
     i = k - 1
-    while i >= 0 and els[i][0] == "parenthetical":
+    while i >= 0 and (els[i][0] == "parenthetical" or (els[i][0] != "dialogue" and not re.search(r"[A-Za-z]", els[i][1]))):
         i -= 1
     return i < 0 or els[i][0] != "character" or name_of(els[i][1]) not in talkers
 
@@ -131,9 +136,12 @@ def deletable_words(els, k: int, talkers: set[str]) -> Counter:
         for num, c in lettered.items():
             if c >= 2:
                 allowed.update(words(num) * c)
+    def skippable(x):  # parentheticals, and letterless non-dialogue debris the cleaner removes first ("911!", "75")
+        return els[x][0] == "parenthetical" or (els[x][0] != "dialogue" and not re.search(r"[A-Za-z]", els[x][1]))
+
     if tag == "character":
         j = k + 1
-        while j < len(els) and els[j][0] == "parenthetical":
+        while j < len(els) and skippable(j):
             j += 1
         no_line = not (j < len(els) and els[j][0] == "dialogue" and has_line(els[j][1]))
         if no_line or (j < len(els) and page_number_line(els, j, talkers)):
@@ -143,7 +151,7 @@ def deletable_words(els, k: int, talkers: set[str]) -> Counter:
         while i >= 0 and els[i][0] == "parenthetical":
             i -= 1
         j = k + 1
-        while j < len(els) and els[j][0] == "parenthetical":
+        while j < len(els) and skippable(j):
             j += 1
         if i >= 0 and els[i][0] == "character" and j < len(els) and els[j][0] == "dialogue" \
                 and (not has_line(els[j][1]) or page_number_line(els, j, talkers)):
