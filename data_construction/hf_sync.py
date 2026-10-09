@@ -629,7 +629,10 @@ def cmd_sync(repo: Repo, args) -> dict:
     print(f"sync {slug}: {n} file operations, head {oid[:8]}")
     write_local_release(args.run_dir, slug, files)
     if args.audit_mirror:
-        mirror_audit(args.audit_mirror.format(slug=slug), slug, files)
+        try:
+            mirror_audit(args.audit_mirror.format(slug=slug), slug, files)
+        except OSError as exc:  # the hub is already committed; the store mirror catches up on the next sync
+            print(f"audit mirror failed: {exc}")
     return result["status"]
 
 
@@ -651,17 +654,26 @@ def write_local_release(run_dir: str, slug: str, files: dict) -> None:
 
 
 def _write_if_changed(path: str, data: bytes) -> bool:
+    """The project store answers some writes with a transient EINVAL/EAGAIN: retry before giving up."""
     if os.path.exists(path):
         with open(path, "rb") as f:
             if f.read() == data:
                 return False
-    with open(path, "wb") as f:
-        f.write(data)
+    for wait in (1, 2, 4, 8, None):
+        try:
+            with open(path, "wb") as f:
+                f.write(data)
+            return True
+        except OSError:
+            if wait is None:
+                raise
+            time.sleep(wait)
     return True
 
 
 def mirror_audit(out_dir: str, slug: str, files: dict) -> None:
-    """For auditors without HF access: the audit lists plus every listed item's content and abstract, in the store."""
+    """For auditors without HF access: the audit lists, plus content and abstract of every item to audit (random sample
+    and tiered targeted selection), in the store. The full targeted pool is listed by id in targeted.jsonl."""
     os.makedirs(out_dir, exist_ok=True)
     lists = {name: _records(files, f"audit/{slug}/{name}.jsonl") for name in ("sample", "targeted", "targeted_selected")}
     wanted, note = {}, {}
@@ -672,8 +684,9 @@ def mirror_audit(out_dir: str, slug: str, files: dict) -> None:
             if r.get("writer_note"):
                 note[r["item_id"]] = r["writer_note"]
     items = []
+    to_audit = {r["item_id"] for name in ("sample", "targeted_selected") for r in lists[name]}  # what auditors read
     for rec in _records(files, f"data/{slug}/"):
-        if rec["item_id"] in wanted:
+        if rec["item_id"] in to_audit:
             items.append({"item_id": rec["item_id"], "batch_id": rec["batch_id"], "movie_name": rec["movie_name"],
                           "summary_sha1": hashlib.sha1(rec["summary"].encode()).hexdigest(), "audit_lists": wanted[rec["item_id"]],
                           "writer_note": note.get(rec["item_id"], ""),
