@@ -59,7 +59,7 @@ _NOISE_IN_WORD_RE = re.compile(r"\b([A-Za-z]+)[\u2022\u25a0\u25aa\u00b7\u25cf\u2
 _MD_ESCAPE_RE = re.compile(r"\\([^\w\s\\]|_)")
 _BACKSLASH_RE = re.compile(r"\\+")
 # Runs after detokenization so the PTB form "( CONT 'D . )" is caught too; uppercase only.
-_INLINE_JUNK_RE = re.compile(r"\(?\b(CONTINUED|OMITTED|OMIT)\b\)?:?")
+_INLINE_JUNK_RE = re.compile(r"\(?\b(CONTINUED|OMITTED|OMIT)\b\)?:?(?:\s*\(\s*\d+\s*\))?")
 _CONTD_RE = re.compile(r"\s*[;,]?\s*\bCONT\s*['\u2019]?\s*D\b\.?")
 _EMPTY_PARENS_RE = re.compile(r"\(\s*[;,.]?\s*\)")
 _ASTERISK_RE = re.compile(r"\*+")
@@ -198,6 +198,80 @@ def clean_text(text: str, detok: bool = True) -> str:
     return text
 
 
+# Page furniture: running headers/footers and watermarks that the PDF->text step left inside elements
+# ("Jane Eyre adapted by Moira Buffini March 2008 24.", "©2015 DISNEY PIXAR - PRIVILEGED AND CONFIDENTIAL").
+_WATERMARK_RE = re.compile(
+    r"©\s*\d{0,4}\s*DISNEY\s*/?\s*PIXAR(?:\s*-\s*PRIVILEGED AND CONFIDENTIAL)?|©\s*\d{0,4}\s*MARVEL STUDIOS,?\s*INC\.?|"
+    r"©\s*MARVEL\b|©\s*\d{0,4}\s*CTMG\.?(?:\s*All Rights Reserved\.?)?|©[^.<]{0,50}?All Rights Reserved\.?|"
+    r"\bPRIVILEGED AND CONFIDENTIAL\b|(?:\b\d?FLIX(?:\.COM|\s+INSTITUTE)\s*)?\bSCREENPLAY DATABASE\b(?:\s*(?:\d{8}|\d{2}\.\d{2}\.\d{4}))?|"
+    r"\bFOR EDUCATIONAL (?:USE|PURPOSES) ONLY\b|\bNO DUPLICATION WITHOUT [A-Z']+ WRITTEN CONSENT\.?(?:\s*\(\s*\d+\s*\))?|"
+    r"=*\s*\bScript\s*Fly\.com\b\s*=*|"
+    # revision stamps, e.g. "5/1/91 BLUE (2) 39.", ")P( 5/1/91 BLUE", "Rev. 12/11/00 (Grey) 76.", "Rev. Blue 4/30/01 19.",
+    # "Yellow 05/14/2001 ' 62.", "Rev. 02/06/01 (2nd Yellow) 56.", "Cherry Rev. (Nov 16 '17) - 249"
+    r"(?:\)[A-Z]\(\s*)?\bRev(?:ised|\.)?\s*(?:(?:\d(?:st|nd|rd|th)\s+)?(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\s+)?\d{1,2}\s*/\s*\d{1,2}\s*/\s*\d{2,4}"
+    r"(?:\s*\((?:\d(?:st|nd|rd|th)\s+)?[A-Za-z]+\))*(?:\s+'?\s*\d{1,3}[A-Z]?\s*\.)?|"
+    r"(?:\)[A-Z]\(\s*)?\b(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\s+'?\d{1,2}/\d{1,2}/\d{2,4}(?:\s*')?(?:\s*\(\s*\d+\s*\))?(?:\s+'?\s*\d{1,3}[A-Z]?\s*\.)?|"
+    r"(?:\)[A-Z]\(\s*)?\b\d{1,2}/\d{1,2}/\d{2,4}\s+\(?(?:\d(?:st|nd|rd|th)\s+)?(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\)?(?:\s*\(\s*\d+\s*\))?(?:\s+\d{1,3}[A-Z]?\s*\.)?|"
+    r"\b(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\s+Rev(?:ision|\.)?\s*\([^)]{3,20}\)(?:\s*-\s*\d{1,3}[A-Z]?\.?)?|©",
+    re.I,
+)
+# A running header always says what it is: a date stamp, a draft/revision word, a copyright notice or an author credit.
+_FURNITURE_SIGNAL_RE = re.compile(
+    r"#/#/#|#-#-#|#\.#\.#|\b(draft|rev|revised|revision|shooting draft|shooting script|final|script|screenplay|adapted|copyright|"
+    r"confidential|duplication|work file)\b|\bby [a-z]+ [a-z]+"
+)
+_PAGE_TAIL_RE = re.compile(r"(?<=[.!?\"')])\s+(\d{1,3})\.$")
+
+
+def _furniture_templates(elements: list[tuple[str, str]]) -> list[re.Pattern]:
+    """Phrases that start or end >= 3 description/dialogue/parenthetical elements of one script, differ only in their
+    numbers (>= 2 distinct), carry a header signal and have the varying number at their edge."""
+    count, digits = {}, {}
+    for i, (tag, text) in enumerate(elements):
+        if tag in ("stage_direction", "character") or not any(ch.isdigit() for ch in text):
+            continue
+        ws = text.split()
+        segs = {" ".join(ws[-m:]) for m in range(3, min(16, len(ws)) + 1)} | {" ".join(ws[:m]) for m in range(3, min(16, len(ws)) + 1)}
+        for seg in segs:
+            key = re.sub(r"\d+[a-z]?\b", "#", seg.lower())
+            if "#" not in key or not (re.search(r"#\W*$", key) or re.match(r"^\W*#", key)):
+                continue
+            if len(re.findall(r"[a-z]{2,}", key)) < 2 or len(re.sub(r"[^a-z]", "", key)) < 8 or not _FURNITURE_SIGNAL_RE.search(key):
+                continue
+            count.setdefault(key, set()).add(i)
+            digits.setdefault(key, set()).add(tuple(re.findall(r"\d+[A-Za-z]?\b", seg)))
+    keys = [k for k in count if len(count[k]) >= 3 and len(digits[k]) >= 2]
+    keys = [k for k in keys if not any(k != o and k in o and len(count[o]) >= len(count[k]) for o in keys)]
+    pats = []
+    for k in sorted(keys, key=len, reverse=True):
+        body = r"\s*".join(r"\d+[A-Za-z]?\b" if p == "#" else re.escape(p) for p in re.split(r"(#)", k) if p)
+        pats.append(re.compile(body.replace(r"\ ", r"\s+"), re.I))
+    return pats
+
+
+def strip_page_furniture(raw_scenes: list[list[tuple[str, str]]]) -> list[list[tuple[str, str]]]:
+    """Remove watermarks, running headers/footers and page numbers glued to element ends (C12e)."""
+    flat = [(tag, _WATERMARK_RE.sub(" ", text)) for els in raw_scenes for tag, text in els]
+    templates = _furniture_templates(flat)
+    tails = [(si, k, int(m.group(1))) for si, els in enumerate(raw_scenes) for k, (_, t) in enumerate(els)
+             if (m := _PAGE_TAIL_RE.search(t))]
+    rising = sum(b[2] >= a[2] for a, b in zip(tails, tails[1:]))
+    strip_tails = len(tails) >= 3 and rising >= 0.7 * (len(tails) - 1)
+    tail_at = {(si, k) for si, k, _ in tails} if strip_tails else set()
+    out = []
+    for si, els in enumerate(raw_scenes):
+        new = []
+        for k, (tag, text) in enumerate(els):
+            t = _WATERMARK_RE.sub(" ", text)
+            for p in templates:
+                t = p.sub(" ", t)
+            if (si, k) in tail_at:
+                t = _PAGE_TAIL_RE.sub("", t)
+            new.append((tag, _WS_RE.sub(" ", t).strip() if t != text else text))
+        out.append(new)
+    return out
+
+
 def clean_heading(text: str) -> str:
     """Strip shooting-script scene numbers from a scene heading ("64 INT. BAR - NIGHT", "EXT. ROAD - DAY 64").
     A number is only removed before INT/EXT or after a time of day, so "EXT. ROUTE 66" survives."""
@@ -308,6 +382,7 @@ def parse_script(script: str, detok: bool = True, dropped: dict | None = None) -
                 text = clean_heading(text)
             elements.append((tag, text))
         raw_scenes.append(elements)
+    raw_scenes = strip_page_furniture(raw_scenes)
     known = known_speakers_of(raw_scenes)
     scenes = []
     for idx, elements in enumerate(raw_scenes):
