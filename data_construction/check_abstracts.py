@@ -9,6 +9,7 @@ Hard failures make the item ineligible for assembly; soft flags are reported for
 from __future__ import annotations
 
 import argparse
+import difflib
 import json
 import os
 import re
@@ -113,9 +114,16 @@ def check_one(abstract: str, content: str, target: list[int] | None = None) -> d
     top = [n for n, _ in speakers.most_common(3)]
     abstract_upper = text.upper()
 
+    abstract_names = set(re.findall(r"[^\W\d_][^\W\d_'\-]+", abstract_upper))
+
     def mentioned(speaker):
+        """Exact name token, or a spelling variant of it (MCCLEOD ~ MACLEOD; contract C21')."""
         toks = name_tokens(speaker)
-        return any(re.search(rf"\b{re.escape(t)}\b", abstract_upper) for t in toks) if toks else True
+        if not toks:
+            return True
+        if any(re.search(rf"\b{re.escape(t)}\b", abstract_upper) for t in toks):
+            return True
+        return any(len(t) >= 5 and difflib.SequenceMatcher(None, t, w).ratio() >= 0.8 for t in toks for w in abstract_names)
 
     top1_mentioned = mentioned(top[0]) if top else True
     top3_mentioned = sum(mentioned(s) for s in top)
