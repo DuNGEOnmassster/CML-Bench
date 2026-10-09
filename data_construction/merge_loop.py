@@ -166,10 +166,23 @@ def ingest_c35(run_dirs: list[str]) -> dict | None:
 
 
 def _rewrite(path: str, data: str) -> None:
+    """Replace a file's content. The store mount can refuse a rename while it syncs a file (EAGAIN): retry, then fall
+    back to writing in place."""
     tmp = path + ".c35tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         f.write(data)
-    os.replace(tmp, path)
+    for wait in (0.5, 1, 2, 4):
+        try:
+            os.replace(tmp, path)
+            return
+        except BlockingIOError:
+            time.sleep(wait)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(data)
+    try:
+        os.remove(tmp)
+    except OSError:
+        pass
 
 
 def purge_c35(run_dir: str) -> tuple[set[str], dict]:
@@ -199,6 +212,9 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
             continue
         bdir = os.path.join(STORE, "abstracts", build, b["batch_id"])
         changed = False
+        for name in ("abstracts.jsonl.c35tmp", "writer_report.json.c35tmp"):
+            if os.path.exists(os.path.join(bdir, name)):
+                os.remove(os.path.join(bdir, name))
         p = os.path.join(bdir, "abstracts.jsonl")
         if os.path.exists(p):
             lines = [l for l in open(p, encoding="utf-8").read().splitlines() if l.strip()]
