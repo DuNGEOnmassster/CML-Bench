@@ -5,7 +5,7 @@
   (labelers write DIR/labels/<labeler>.json for the windows in DIR/assign/<labeler>.txt, following DIR/RUBRIC.md)
   python data_construction/extra_sources/label_sample.py score --dir DIR [--out report.json]
 
-`make` draws --n windows per group with a fixed seed, writes each window's CML (no ids, names or source) to
+`make` draws --n windows per group with a fixed seed (skipping windows labeled in --exclude samples), writes each window's CML (no ids, names or source) to
 DIR/windows/<blind id>.xml in shuffled order, and splits them over --labelers so every labeler sees a mix of groups.
 --double windows per group get a second, different labeler (inter-rater agreement). A window whose content is
 byte-identical in two groups is labeled once and counted in both. DIR/key.json unblinds.
@@ -81,10 +81,14 @@ def make(args) -> None:
     if os.path.exists(args.out):
         sys.exit(f"{args.out} exists (samples are write-once)")
     groups = dict(g.split("=", 1) for g in args.group)
+    seen = set()
+    for prev in args.exclude or []:
+        with open(prev) as f:
+            seen |= {e["content_sha1"] for ents in json.load(f)["windows"].values() for e in ents}
     windows, key = {}, {}
     by_sha, per_group = {}, defaultdict(list)
     for name, path in groups.items():
-        segs = load(path)
+        segs = [s for s in load(path) if s.get("content_sha1") not in seen]
         for s in rng.sample(segs, min(args.n, len(segs))):
             sha = s.get("content_sha1") or str(hash(s["script_segment"]))
             ent = {"group": name, "item_id": s["item_id"], "movie_name": s["movie_name"], "imdb_id": s["imdb_id"],
@@ -222,6 +226,7 @@ def main() -> None:
     m.add_argument("--double", type=int, default=6, help="windows per group labeled twice")
     m.add_argument("--labelers", type=int, default=12)
     m.add_argument("--seed", type=int, default=20261009)
+    m.add_argument("--exclude", action="append", help="key.json of an earlier sample: skip windows labeled there")
     m.add_argument("--out", required=True)
     s = sub.add_parser("score")
     s.add_argument("--dir", required=True)
