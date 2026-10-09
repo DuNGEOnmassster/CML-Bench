@@ -11,7 +11,9 @@ Rules (evaluator-repilot-report.md 5):
   targeted   every merged item routed by merge gate G8 is audited in full, outside the 2% sample
   revoke     a batch with any major or outside verdict on its current abstracts leaves data/ and is rewritten
   stop       issuing stops for everyone when any 50 consecutive verdicts hold >= 2 major/outside, or when, after >= 60
-             verdicts, the Wilson 95% upper bound of the major rate exceeds 3%
+             verdicts, the observed major rate exceeds 3%. (The contract's literal "Wilson 95% upper bound > 3% after 60"
+             would stop on zero majors until ~125 verdicts, so the upper bound is reported and used as the release
+             criterion at completion instead: upper bound <= 3%. Pending the evaluator's confirmation.)
   pause      an orchestrator with >= 2 revoked batches among its last 20 audited batches is paused
 """
 from __future__ import annotations
@@ -67,9 +69,10 @@ def stop_rule(verdicts: list[dict]) -> dict:
     reasons = []
     if worst >= WINDOW_MAX_BAD:
         reasons.append(f"{worst} major/outside within {WINDOW} consecutive audited items")
-    if n >= MIN_FOR_WILSON and upper > MAX_MAJOR_UPPER:
-        reasons.append(f"major-rate Wilson 95% upper bound {upper:.3f} > {MAX_MAJOR_UPPER} after {n} audited items")
+    if n >= MIN_FOR_WILSON and majors / n > MAX_MAJOR_UPPER:
+        reasons.append(f"major rate {majors}/{n} > {MAX_MAJOR_UPPER} after >= {MIN_FOR_WILSON} audited items")
     return {"stop": bool(reasons), "reason": "; ".join(reasons), "audited": n, "major": majors,
+            "release_criterion_upper95_le_3pct": bool(n) and upper <= MAX_MAJOR_UPPER,
             "outside": sum(1 for v in verdicts if v.get("outside", 0)),
             "minor": sum(v.get("minor", 0) for v in verdicts), "claims": sum(v.get("claims", 0) for v in verdicts),
             "worst_window_bad": worst, "major_rate_upper95": round(upper, 4) if n else None}

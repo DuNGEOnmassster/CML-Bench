@@ -4,6 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+from audit_rules import sample_batches, stop_rule, wilson_upper  # noqa: E402
 from build_segments import CONFIG, choose_windows  # noqa: E402
 from check_abstracts import check_one  # noqa: E402
 from cml_format import (  # noqa: E402
@@ -15,6 +16,7 @@ from cml_format import (  # noqa: E402
     render,
     retag_orphan_characters,
     segment_stats,
+    strip_page_furniture,
     validate_cml,
 )
 from dataset_schema import make_record, validate_record  # noqa: E402
@@ -115,6 +117,34 @@ class FormatTests(unittest.TestCase):
         scenes = parse_script(RAW, dropped=dropped)
         self.assertEqual([s.index for s in scenes], [0])
         self.assertEqual(dropped, {1: "no_body"})
+
+
+class AuditRuleTests(unittest.TestCase):
+    def test_stop_rule(self):
+        ok = [{"major": 0, "outside": 0}] * 100
+        self.assertFalse(stop_rule(ok)["stop"])
+        two_close = ok[:20] + [{"major": 1}] + ok[:10] + [{"outside": 1}] + ok[:20]
+        self.assertTrue(stop_rule(two_close)["stop"])
+        spread = ([{"major": 1}] + ok[:59]) * 2
+        self.assertFalse(stop_rule(spread)["stop"])
+        self.assertTrue(stop_rule(([{"major": 1}] + ok[:24]) * 4)["stop"])
+        self.assertLess(wilson_upper(0, 261), 0.015)
+
+    def test_sample_is_two_per_block_and_stable(self):
+        ids = [f"moviesum-b{n:04d}" for n in range(1, 31)] + ["moviesum-hold-b0001"]
+        picked = sample_batches(ids)
+        self.assertEqual(len(picked), 6)
+        self.assertEqual(picked, sample_batches(list(reversed(ids))))
+        self.assertNotIn("moviesum-hold-b0001", picked)
+
+    def test_furniture_stripping(self):
+        els = [[("scene_description", f"{w} Jane Eyre adapted by Moira Buffini March 2008 {n}.")]
+               for w, n in (("He runs.", 24), ("She waits.", 25), ("They talk.", 26))]
+        els.append([("scene_description", "©2015 DISNEY PIXAR - PRIVILEGED AND CONFIDENTIAL Arlo smiles.")])
+        els.append([("stage_direction", "INT. MOTEL ROOM 12 - NIGHT")])
+        out = [t for scene in strip_page_furniture(els) for _, t in scene]
+        self.assertEqual(out[:4], ["He runs.", "She waits.", "They talk.", "Arlo smiles."])
+        self.assertEqual(out[4], "INT. MOTEL ROOM 12 - NIGHT")
 
 
 class SchemaTests(unittest.TestCase):
