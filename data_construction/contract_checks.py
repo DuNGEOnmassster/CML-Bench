@@ -204,7 +204,7 @@ def main() -> None:
     record("C13", not noise, f"violations={noise[:5]}")
 
     by_film = defaultdict(list)
-    for r in recs:
+    for r in sorted(recs, key=lambda r: (r["imdb_id"], r["scene_start"])):  # script order: page numbers rise along it
         by_film[r["imdb_id"]].extend((m.group(1) or m.group(3), m.group(2) or "") for sc in SCENE.findall(r["script_segment"])
                                      for m in ELEMENT.finditer(sc))
     furn = {f: furniture_findings(els) for f, els in by_film.items()}
