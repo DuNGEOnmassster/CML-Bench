@@ -27,7 +27,7 @@ Requirements: Python 3.10+, `tiktoken` (stages 1/4/5), `huggingface_hub` (stage 
 
 No LLM API is used. An agent (or several in parallel, one per batch) is given a batch manifest and:
 
-1. reads `prompt_path` (`prompts/abstract_prompt_v1_1.md`) once;
+1. reads `prompt_path` (`prompts/abstract_prompt_v1_2.md`) once;
 2. for each item: reads `content_path`, writes `{"item_id", "abstract", "prompt_version", "author"}` to
    `abstract_path`, keeping the word count inside `target_words`;
 3. skips items whose `abstract_path` already exists (resumable);

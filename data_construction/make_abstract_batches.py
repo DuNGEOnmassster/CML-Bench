@@ -19,12 +19,13 @@ import random
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1_1.md")
+DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1_2.md")
 
 
 def target_center(content_tokens: int) -> int:
-    """GT summaries: words ~= 123 + 6.1 per 1k content tokens (r=0.32), median 151."""
-    return round(120 + 6 * content_tokens / 1000)
+    """GT summaries: words ~= 123 + 6.1 per 1k content tokens (r=0.32), median 151.
+    Writers overshoot the stated center by ~15 words (pilot v1.1), so the center sits below the GT line."""
+    return round(108 + 6 * content_tokens / 1000)
 
 
 def target_words(content_tokens: int) -> list[int]:
@@ -59,7 +60,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=20261009)
     ap.add_argument("--batch_size", type=int, default=10)
     ap.add_argument("--prompt", default=DEFAULT_PROMPT)
-    ap.add_argument("--prompt_version", default="abstract_v1.1")
+    ap.add_argument("--prompt_version", default="abstract_v1.2")
     args = ap.parse_args()
 
     run_dir = os.path.abspath(args.run_dir)
