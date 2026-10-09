@@ -212,6 +212,23 @@ class AuditRuleTests(unittest.TestCase):
         self.assertLessEqual(sum(r["tier"] != "A" for r in capped), sum(r["tier"] != "A" for r in select(pool, notes)))
         self.assertFalse(any(r["tier"] == "C" for r in capped))
 
+    def test_c35_content_exclusions(self):
+        import json
+        import tempfile
+
+        from validate_batch import content_excluded, load_content_exclusions
+
+        self.assertEqual(load_content_exclusions(""), {"items": {}, "films": set()})
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "c35.json")
+            with open(p, "w") as f:
+                json.dump({"films": [{"imdb_id": "tt9"}], "items": [{"item_id": "tt1-s0001-0015", "content_sha1": "x"}]}, f)
+            c35 = load_content_exclusions(p)
+        items = {"tt1-s0001-0015": {"imdb_id": "tt1"}, "tt1-s0016-0030": {"imdb_id": "tt1"},
+                 "tt9-s0100-0115": {"imdb_id": "tt9"}, "tt2-s0001-0015": {"imdb_id": "tt2"}}
+        self.assertEqual(content_excluded(items, items, c35), {"tt1-s0001-0015", "tt9-s0100-0115"})
+        self.assertEqual(content_excluded(["tt9-s0200-0215"], {}, c35), {"tt9-s0200-0215"})
+
     def test_c34_window_score(self):
         from mislabel_gate import score_items
 

@@ -41,6 +41,7 @@ STORE_STATUS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/
 DEFAULT_VERDICTS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/audit"
 DEFAULT_AUDIT_MIRROR = DEFAULT_VERDICTS + "/{slug}"
 DEFAULT_EXCLUSIONS = os.path.join(HERE, "merge_exclusions")
+DEFAULT_CONTENT_EXCLUSIONS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/content_exclusions.json"
 SHARD_BATCHES = 100
 DEFAULT_REPO = f"{os.environ.get('HF_ACCOUNT', '')}/CML-Dataset-Expanded"
 
@@ -259,6 +260,7 @@ audit sampling and release statistics are computed without them):
 `C34` drops a window whose MovieSum markup is structurally mislabelled (dialogue that is only a parenthetical, a
 speaker name tagged as dialogue, a heading/shot/action tagged as a speaker, speech fused into action) at least 4 times.
 `identity_hold` films await a human read of their identity (C33) and stay out of the release until it is done.
+`C35` removes windows, or whole films, on content-safety grounds; they are also left out of the `content` config.
 
 ## Configs
 
@@ -362,7 +364,7 @@ def load_merge_exclusions(exclusions_dir: str | None, build: str, items_by_id: d
 
 
 def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir: str | None = DEFAULT_EXCLUSIONS,
-                 draft_reason: str | None = None):
+                 draft_reason: str | None = None, content_exclusions: str | None = DEFAULT_CONTENT_EXCLUSIONS):
     """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file).
     Excluded items (merge exclusion list, hold films) are left out of data/, of the audit pools and of all release
     statistics; the batch that carries them is still judged on all its items."""
@@ -370,7 +372,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     from cml_format import count_tokens
     from targeted_rule import select as select_targeted
     from targeted_rule import tier as targeted_tier
-    from validate_batch import abstract_set_hash, first8, validate
+    from validate_batch import abstract_set_hash, content_excluded, first8, load_content_exclusions, validate
 
     with open(os.path.join(run_dir, "run.json"), encoding="utf-8") as f:
         run = json.load(f)
@@ -382,6 +384,9 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     slug, build = run["source_slug"], run["build_id"]
     source = items[0]["source_dataset"]
     excluded, exclusion_spec = load_merge_exclusions(exclusions_dir, build, items_by_id)
+    c35 = load_content_exclusions(content_exclusions)
+    c35_ids = content_excluded(items_by_id, items_by_id, c35)
+    excluded.update({i: "C35" for i in c35_ids})
     for it in items:
         if it.get("identity_decision") == "hold":
             excluded.setdefault(it["item_id"], "identity_hold")
@@ -411,6 +416,8 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     content_records = []
     for b in batches:
         for iid in b["item_ids"]:
+            if iid in c35_ids:
+                continue
             rec = make_record(items_by_id[iid], batch_id=b["batch_id"], build=build)
             problems = validate_record(rec)
             if problems:
@@ -430,14 +437,15 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         bdir = os.path.join(run_dir, "batches", b["batch_id"])
         with open(os.path.join(bdir, "manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
-        key = abstract_set_hash(manifest)
+        skip = c35_ids & set(b["item_ids"])
+        key = abstract_set_hash(manifest) + ("|c35:" + ",".join(sorted(skip)) if skip else "")
         hit = cache.get(b["batch_id"])
         reusable = (hit and hit["key"] == key and not any(f.startswith("G6") for f in hit["res"]["failures"])
                     and not (set(hit["first8"]) & merged_first8))
         if reusable and hit["res"]["state"] in ("pending", "incomplete", "rejected"):
             res, rec_list = hit["res"], []
         else:
-            full = validate(manifest, items_by_id, merged_first8, count_tokens=count_tokens)
+            full = validate(manifest, items_by_id, merged_first8, count_tokens=count_tokens, skip=skip)
             res = {k: full[k] for k in ("state", "failures", "items", "audit_targets")}
             rec_list = full["records"]
         first8s = [first8(r["summary"]) for r in rec_list]
@@ -475,7 +483,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
                 files[f"data/{slug}/{b['batch_id']}.related.jsonl"] = jsonl_bytes(related)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(new_cache, f)
-    notes = writer_notes(run_dir, batches)
+    notes = {i: n for i, n in writer_notes(run_dir, batches).items() if i not in c35_ids}
     selected = [{**t, "writer_note": notes.get(t["item_id"], "")} for t in select_targeted(targeted, notes, merged_items)]
     released = {r["item_id"] for p, data in files.items() if p.startswith(f"data/{slug}/") for r in map(json.loads, data.decode().splitlines())}
     signals = writer_signals(notes, items_by_id, released)
@@ -553,6 +561,8 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         "items_excluded": {r: sum(v == r for v in excluded.values()) for r in sorted(set(excluded.values()))},
         "items_excluded_from_merged": dict(sorted(excluded_from_merged.items())),
         "merge_exclusion_list": exclusion_spec or None,
+        "content_exclusion_list": {"file": "content_exclusions.json (project store)", "listed_items": len(c35["items"]),
+                                   "listed_films": len(c35["films"]), "excluded_here": len(c35_ids)} if (c35["items"] or c35["films"]) else None,
         "writer_notes": {"notes": signals["notes"],
                          "source_gaps_released": sum(r["released"] for r in signals["source_gaps"]),
                          "identity_doubts": len(signals["identity_doubts"]), "marker_residue": len(signals["marker_residue"]),
@@ -567,7 +577,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
 
 
 def cmd_sync(repo: Repo, args) -> dict:
-    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions, args.draft)
+    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions, args.draft, args.content_exclusions)
     owned = (f"content/{slug}/", f"manifests/{slug}/", f"data/{slug}/", f"audit/{slug}/")
     result = {}
 
@@ -722,6 +732,7 @@ def main() -> None:
     s.add_argument("--audit_mirror", default=DEFAULT_AUDIT_MIRROR, help="store dir for audit lists + listed items ('' to skip)")
     s.add_argument("--exclusions", default=DEFAULT_EXCLUSIONS, help="dir of <build_id>.json merge-time exclusion lists ('' for none)")
     s.add_argument("--draft", default="", help="mark this source's merged abstracts as drafts, with this reason (config release_draft)")
+    s.add_argument("--content_exclusions", default=DEFAULT_CONTENT_EXCLUSIONS, help="C35 content-safety list ('' for none)")
     p = sub.add_parser("pilot")
     p.add_argument("--folder", required=True)
     p.add_argument("--name", required=True)
