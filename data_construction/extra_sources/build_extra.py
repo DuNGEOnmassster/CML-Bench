@@ -1,0 +1,329 @@
+"""Extra-source segment build: catalog matches -> fetch -> text -> CML -> script quality -> dedupe -> windows.
+
+  python data_construction/extra_sources/build_extra.py \
+      --matches data_construction/work/extra_survey/catalog_matches.jsonl --out data_construction/work/extra_build
+
+Films are candidates when the survey marked them new (IMDb id not in MovieSum or the CML-Bench GT, title
+not a MovieSum/GT title). For each film the offers are tried in source/format priority order until one
+passes the script-level quality gates (quality.py), the IMDb-match check and the duplicate checks:
+
+- IMDb match: year-less or ambiguous matches must share a speaker name with the IMDb cast characters;
+- 13-gram overlap (sampled) with the GT movies' scripts <= 20%, with every MovieSum script <= 30%,
+  and with already accepted extra films <= 30% (remakes, re-titled copies, the same draft on two sites).
+
+Accepted films are windowed with build_segments.choose_windows and filtered per window exactly like
+MovieSum (segment_rejections + GT segment overlap <= 2%). Outputs (no screenplay text outside segments.jsonl):
+
+  segments.jsonl        accepted segments, MovieSum segment schema + extra provenance fields
+  films.jsonl           one row per candidate film: offers tried, quality metrics, outcome (no text)
+  rejected_windows.jsonl, build_stats.json
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import pickle
+import re
+import sys
+import time
+from collections import Counter, defaultdict
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+sys.path.insert(0, HERE)
+from build_segments import CONFIG, choose_windows, load_gt, load_moviesum, overlap, segment_rejections, shingles, words_of  # noqa: E402
+from cml_format import count_tokens, drop_duplicate_scenes, drop_front_matter, parse_script, render, segment_stats, speaker_name, validate_cml  # noqa: E402
+
+from extra_sources.fetch import Fetcher, PolicyError  # noqa: E402
+from extra_sources.imdb_index import load_characters, load_index, lookup  # noqa: E402
+from extra_sources.quality import QUALITY_CONFIG, script_quality  # noqa: E402
+from extra_sources.text_screenplay import PARSER_VERSION, extract_text, text_to_scenes  # noqa: E402
+from extra_sources import catalogs  # noqa: E402
+from extra_sources.gt_related import relate  # noqa: E402
+
+NORMALIZATION_VERSION = f"{PARSER_VERSION}+clean_detok_v2"
+SOURCE_NAMES = {"imsdb": "IMSDb", "dailyscript": "DailyScript", "awesomefilm": "AwesomeFilm", "simplyscripts": "SimplyScripts"}
+SOURCE_PRIORITY = ("imsdb", "dailyscript", "awesomefilm", "simplyscripts")
+FORMAT_PRIORITY = ("html", "txt", "pdf")
+SUPPORTED_FORMATS = set(FORMAT_PRIORITY)
+OCR_SYMBOL_RE = re.compile(r"[\\~{}^|]|[_]{2,}[^_\s]|[,.'`]{2,}[_\\]")
+
+
+def window_noise(seg) -> list[str]:
+    """Evaluator R3/C12b/C12c/C13b/P2 on one window: backslash residue, speaker names split by noise
+    ("BLAKE \\" next to "BLAKE"), orphan speaker lines, OCR symbol debris."""
+    reasons = []
+    texts = [(tag, t) for s in seg for tag, t in s.elements]
+    if any("\\" in t for _, t in texts):
+        reasons.append("backslash_residue")
+    names = {speaker_name(t) for tag, t in texts if tag == "character"}
+    keys = Counter(re.sub(r"[^A-Z]", "", n) for n in names)
+    if any(v > 1 for k, v in keys.items() if k):
+        reasons.append("speaker_fission")
+    if any(tag == "scene_description" and len(t) < 30 and t.upper() == t and speaker_name(t.rstrip(".:")) in names for tag, t in texts):
+        reasons.append("orphan_speaker_line")
+    if sum(len(OCR_SYMBOL_RE.findall(t)) for _, t in texts) > 0:
+        reasons.append("ocr_symbols")
+    return reasons
+
+
+NAME_STOP = {"MR", "MRS", "MS", "DR", "THE", "OLD", "YOUNG", "MAN", "WOMAN", "GIRL", "BOY", "VOICE", "OFFICER", "COP", "GUARD"}
+
+
+def load_reference(args, cache_path: str):
+    if os.path.exists(cache_path):
+        with open(cache_path, "rb") as f:
+            return pickle.load(f)
+    rows = load_moviesum(args.moviesum_dir)
+    gt = load_gt(args.gt_path)
+    gt_ids = {r["imdb_id"] for r in gt}
+    vocab = Counter()
+    for row in rows:
+        vocab.update(re.findall(r"[a-z]{3,}", row["script"].lower()))
+    ms_sh, gt_movie_sh, seen = set(), set(), set()
+    for row in rows:
+        if row["imdb_id"] in seen:
+            continue
+        seen.add(row["imdb_id"])
+        text = " ".join(t for s in parse_script(row["script"]) for _, t in s.elements)
+        sh = shingles(words_of(text), CONFIG["ngram"], CONFIG["shingle_sample_mod"])
+        ms_sh |= sh
+        if row["imdb_id"] in gt_ids:
+            gt_movie_sh |= sh
+    gt_seg_sh = set()
+    for r in gt:
+        gt_seg_sh |= shingles(words_of(render(parse_script(r["script_segment"]))), CONFIG["ngram"])
+    ref = {"vocab": vocab, "ms_ids": seen, "ms_shingles": ms_sh, "gt_ids": gt_ids, "gt_movie_shingles": gt_movie_sh,
+           "gt_segment_shingles": gt_seg_sh}
+    with open(cache_path, "wb") as f:
+        pickle.dump(ref, f)
+    return ref
+
+
+def candidate_films(matches_path: str, sources: set[str]) -> dict[str, list[dict]]:
+    films = defaultdict(list)
+    with open(matches_path, encoding="utf-8") as f:
+        for line in f:
+            r = json.loads(line)
+            src = r["source"].split(":")[0]
+            if src not in sources or r["status"] not in ("new", "remake_of_moviesum_title") or not r.get("match"):
+                continue
+            if r["format"] not in SUPPORTED_FORMATS:
+                continue
+            films[r["match"]["imdb_id"]].append(r)
+    for offers in films.values():
+        offers.sort(key=lambda r: (SOURCE_PRIORITY.index(r["source"].split(":")[0]), FORMAT_PRIORITY.index(r["format"]), r["url"]))
+    return films
+
+
+def speaker_tokens(scenes) -> list[set[str]]:
+    counts = Counter(speaker_name(t) for s in scenes for tag, t in s.elements if tag == "character")
+    out = []
+    for name, _ in counts.most_common(10):
+        toks = {t for t in re.findall(r"[A-Z][A-Z'\-]{2,}", name) if t not in NAME_STOP}
+        if toks:
+            out.append(toks)
+    return out
+
+
+def verify_match(scenes, characters: set[str] | None) -> bool | None:
+    if not characters:
+        return None
+    return any(toks & characters for toks in speaker_tokens(scenes))
+
+
+def resolve_imsdb(offer: dict, fetcher: Fetcher, index: dict) -> dict:
+    """IMSDb detail page -> release year (re-run the IMDb match with it) and the real script link."""
+    try:
+        page, _ = fetcher.get(offer["page_url"])
+    except (RuntimeError, PolicyError):
+        return offer
+    det = catalogs.imsdb_detail(page.decode("latin-1"))
+    offer = dict(offer)
+    if det["script_url"]:
+        offer["url"] = det["script_url"]
+    if det["release_year"]:
+        offer["release_year"] = det["release_year"]
+        m = lookup(index, offer["title"], det["release_year"], "release")
+        if m and m["confidence"] == "high":
+            offer["match"] = {**m, "matched_title": offer["title"]}
+    return offer
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--matches", default="data_construction/work/extra_survey/catalog_matches.jsonl")
+    ap.add_argument("--sources", default=",".join(SOURCE_PRIORITY))
+    ap.add_argument("--cache_dir", default="data_construction/work/sources/extra/raw")
+    ap.add_argument("--moviesum_dir", default="data_construction/work/sources/moviesum")
+    ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
+    ap.add_argument("--imdb_dir", default="data_construction/work/sources/imdb")
+    ap.add_argument("--out", default="data_construction/work/extra_build")
+    ap.add_argument("--limit_films", type=int, default=0)
+    ap.add_argument("--delay", type=float, default=2.0)
+    ap.add_argument("--offline", action="store_true", help="only use cached downloads")
+    args = ap.parse_args()
+    cfg = CONFIG
+    t0 = time.time()
+    os.makedirs(args.out, exist_ok=True)
+
+    ref = load_reference(args, os.path.join(args.out, "reference_cache.pkl"))
+    gt_names = [r["movie_name"] for r in load_gt(args.gt_path)]
+    index = load_index(os.path.join(args.imdb_dir, "title_index.json"))
+    films = candidate_films(args.matches, set(args.sources.split(",")))
+    order = sorted(films, key=lambda i: (SOURCE_PRIORITY.index(films[i][0]["source"].split(":")[0]), i))
+    if args.limit_films:
+        order = order[: args.limit_films]
+    print(f"{len(order)} candidate films; loading IMDb cast characters", flush=True)
+    characters = load_characters(args.imdb_dir, set(order))
+    fetcher = Fetcher(args.cache_dir, delay=args.delay, offline=args.offline)
+
+    accepted, rejected, film_rows = [], [], []
+    stats = Counter()
+    extra_sh: set[int] = set()
+    for fi, imdb_id in enumerate(order):
+        row = {"imdb_id": imdb_id, "offers": [], "outcome": None}
+        chosen = None
+        for offer in films[imdb_id]:
+            src = offer["source"].split(":")[0]
+            if src == "imsdb":
+                offer = resolve_imsdb(offer, fetcher, index)
+            info = {"source": offer["source"], "url": offer["url"], "format": offer["format"]}
+            row["offers"].append(info)
+            try:
+                body, rec = fetcher.get(offer["url"])
+            except PolicyError as exc:
+                info["reasons"] = [f"policy:{exc}"]
+                continue
+            except RuntimeError as exc:
+                info["reasons"] = [f"fetch_failed:{str(exc)[:80]}"]
+                continue
+            text, pdf_meta = extract_text(body, offer["format"])
+            scenes, diag = text_to_scenes(text)
+            scenes = drop_duplicate_scenes(drop_front_matter(scenes))
+            info["orphan_cues_dropped"] = diag.get("orphan_cues_dropped", 0)
+            reasons, metrics = script_quality(text, scenes, diag, pdf_meta, ref["vocab"])
+            info.update({"metrics": metrics, "layout": diag.get("layout"), "source_file": rec["file"], "source_sha1": rec["sha1"]})
+            match = offer["match"]
+            verified = verify_match(scenes, characters.get(match["imdb_id"]))
+            info["imdb_match"] = {k: match.get(k) for k in ("imdb_id", "title", "year", "confidence", "matched_title")} | {"verified": verified}
+            if not reasons and match.get("confidence") in ("low", "medium") and verified is not True:
+                reasons.append("imdb_match_unverified")
+            if not reasons:
+                text_all = " ".join(t for s in scenes for _, t in s.elements)
+                sh = shingles(words_of(text_all), cfg["ngram"], cfg["shingle_sample_mod"])
+                ov = {"gt": overlap(sh, ref["gt_movie_shingles"]), "moviesum": overlap(sh, ref["ms_shingles"]), "extra": overlap(sh, extra_sh)}
+                info["overlap"] = {k: round(v, 4) for k, v in ov.items()}
+                if ov["gt"] > cfg["max_gt_movie_overlap"]:
+                    reasons.append("gt_movie_text_overlap")
+                elif ov["moviesum"] > cfg["max_duplicate_movie_overlap"]:
+                    reasons.append("duplicate_of_moviesum_text")
+                elif ov["extra"] > cfg["max_duplicate_movie_overlap"]:
+                    reasons.append("duplicate_extra_text")
+            info["reasons"] = reasons
+            if not reasons:
+                chosen = (offer, rec, scenes, sh, verified)
+                break
+        if chosen is None:
+            last = [r for o in row["offers"] for r in o.get("reasons", [])]
+            row["outcome"] = "rejected:" + (last[-1].split(":")[0] if last else "no_offer")
+            stats["films_rejected"] += 1
+            stats.update(f"film_reject:{r.split(':')[0]}" for o in row["offers"][-1:] for r in o.get("reasons", []))
+            film_rows.append(row)
+            continue
+        offer, rec, scenes, sh, verified = chosen
+        extra_sh |= sh
+        match = offer["match"]
+        name = f"{match['title']}_{match['year']}"
+        gt_rel = relate(match["title"], gt_names) or relate(offer["title"], gt_names)
+        present = {s.index for s in scenes}
+        wrapper_tokens = count_tokens(render([]))
+        prefix = [0]
+        for s in scenes:
+            prefix.append(prefix[-1] + count_tokens(render([s])) - wrapper_tokens)
+        windows = choose_windows(scenes, prefix, cfg)
+        kept = 0
+        src = offer["source"].split(":")[0]
+        for a, b in windows:
+            seg = scenes[a:b]
+            content = render(seg)
+            item_id = f"{imdb_id}-s{seg[0].index:04d}-{seg[-1].index:04d}"
+            st = segment_stats(seg, content, ref["vocab"])
+            reasons = segment_rejections(st, validate_cml(content), cfg) + window_noise(seg)
+            gt_ov = overlap(shingles(words_of(content), cfg["ngram"]), ref["gt_segment_shingles"])
+            if gt_ov > cfg["max_gt_segment_overlap"]:
+                reasons.append("gt_segment_overlap")
+            stats["windows_total"] += 1
+            if reasons:
+                rejected.append({"item_id": item_id, "movie_name": name, "reasons": reasons, "content_tokens": st["content_tokens"]})
+                stats.update(f"reject:{r.split(':')[0]}" for r in reasons)
+                continue
+            accepted.append({
+                "item_id": item_id, "movie_name": name, "imdb_id": imdb_id, "script_segment": content, "summary": "",
+                "segment_index": kept, "scene_start": seg[0].index, "scene_end": seg[-1].index,
+                "dropped_scenes": [i for i in range(seg[0].index, seg[-1].index + 1) if i not in present],
+                "relative_position": round(a / len(scenes), 4),
+                "source_dataset": SOURCE_NAMES[src], "source_split": "extra", "source_url": offer["url"],
+                "source_file": rec["file"], "source_sha1": rec["sha1"], "source_format": offer["format"],
+                "source_host": offer["source"].split(":", 1)[1] if ":" in offer["source"] else src,
+                "source_page_url": offer.get("page_url"), "catalog_title": offer["title"],
+                "imdb_url": f"https://www.imdb.com/title/{imdb_id}/", "imdb_rating": match.get("rating"),
+                "imdb_votes": match.get("votes"), "genres": match.get("genres", []), "year": match.get("year"),
+                "imdb_match_confidence": match.get("confidence"), "imdb_match_verified": verified,
+                "gt_related": gt_rel, "eval_safe": gt_rel is None,
+                "content_normalization": NORMALIZATION_VERSION, "content_sha1": hashlib.sha1(content.encode()).hexdigest(),
+                "gt_ngram_overlap": round(gt_ov, 5), **st,
+            })
+            kept += 1
+        row.update({"outcome": "accepted" if kept else "accepted_no_windows", "movie_name": name, "source": offer["source"],
+                    "gt_related": gt_rel,
+                    "scenes": len(scenes), "windows": len(windows), "segments": kept})
+        stats["films_accepted"] += 1
+        stats["films_with_segments"] += bool(kept)
+        film_rows.append(row)
+        if (fi + 1) % 25 == 0:
+            print(f"[{fi + 1}/{len(order)}] films_with_segments={stats['films_with_segments']} segments={len(accepted)} "
+                  f"{time.time() - t0:.0f}s", flush=True)
+
+    def dump(name, items):
+        with open(os.path.join(args.out, name), "w", encoding="utf-8") as f:
+            for it in items:
+                f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+    dump("segments.jsonl", accepted)
+    dump("films.jsonl", film_rows)
+    dump("rejected_windows.jsonl", rejected)
+
+    def dist(xs):
+        xs = sorted(xs)
+        return {p: xs[min(len(xs) - 1, int(p / 100 * len(xs)))] for p in (0, 5, 10, 25, 50, 75, 90, 95, 100)} if xs else {}
+
+    per_movie = Counter(s["imdb_id"] for s in accepted)
+    build_stats = {
+        "config": cfg, "quality_config": QUALITY_CONFIG, "normalization": NORMALIZATION_VERSION,
+        "candidate_films": len(order), "films_accepted": stats["films_accepted"], "films_with_segments": stats["films_with_segments"],
+        "films_rejected": stats["films_rejected"],
+        "film_rejections": {k[12:]: v for k, v in stats.items() if k.startswith("film_reject:")},
+        "film_outcomes": dict(Counter(r["outcome"] for r in film_rows)),
+        "windows_total": stats["windows_total"], "segments_accepted": len(accepted),
+        "window_rejections": {k[7:]: v for k, v in stats.items() if k.startswith("reject:")},
+        "segments_by_source": dict(Counter(s["source_dataset"] for s in accepted)),
+        "films_by_source": dict(Counter(r["source"].split(":")[0] for r in film_rows if r["outcome"] == "accepted")),
+        "segments_by_format": dict(Counter(s["source_format"] for s in accepted)),
+        "gt_related_segments": sum(1 for s in accepted if s["gt_related"]),
+        "gt_related_films": sorted({(s["movie_name"], s["gt_related"]["gt_movie"]) for s in accepted if s["gt_related"]}),
+        "segments_per_movie": dist(list(per_movie.values())),
+        "content_tokens": dist([s["content_tokens"] for s in accepted]),
+        "num_scenes": dist([s["num_scenes"] for s in accepted]),
+        "total_content_tokens": sum(s["content_tokens"] for s in accepted),
+        "seconds": round(time.time() - t0, 1),
+    }
+    with open(os.path.join(args.out, "build_stats.json"), "w") as f:
+        json.dump(build_stats, f, indent=2)
+    print(json.dumps({k: v for k, v in build_stats.items() if k not in ("config", "quality_config")}, indent=2))
+
+
+if __name__ == "__main__":
+    main()
