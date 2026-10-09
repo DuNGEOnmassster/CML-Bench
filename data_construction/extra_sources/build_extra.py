@@ -33,7 +33,17 @@ from collections import Counter, defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
 sys.path.insert(0, HERE)
-from build_segments import CONFIG, choose_windows, load_gt, load_moviesum, overlap, segment_rejections, shingles, words_of  # noqa: E402
+from build_segments import (  # noqa: E402
+    CONFIG,
+    NORMALIZATION_VERSION as MOVIESUM_NORMALIZATION,
+    choose_windows,
+    load_gt,
+    load_moviesum,
+    overlap,
+    segment_rejections,
+    shingles,
+    words_of,
+)
 from cml_format import count_tokens, drop_duplicate_scenes, drop_front_matter, parse_script, render, segment_stats, speaker_name, validate_cml  # noqa: E402
 
 from extra_sources.fetch import Fetcher, PolicyError  # noqa: E402
@@ -43,20 +53,35 @@ from extra_sources.text_screenplay import PARSER_VERSION, extract_text, text_to_
 from extra_sources import catalogs  # noqa: E402
 from dataset_schema import gt_relation, load_gt_related  # noqa: E402
 
-NORMALIZATION_VERSION = f"{PARSER_VERSION.replace('_', '')}_clean_detok_v2"
+# parser version + the shared cml_format cleaning version ("moviesum_clean_detok_v3" -> "clean_detok_v3")
+NORMALIZATION_VERSION = f"{PARSER_VERSION.replace('_', '')}_{MOVIESUM_NORMALIZATION.split('_', 1)[1]}"
 SOURCE_NAMES = {"imsdb": "IMSDb", "dailyscript": "DailyScript", "awesomefilm": "AwesomeFilm", "simplyscripts": "SimplyScripts"}
 SOURCE_LANDING = {"imsdb": "https://imsdb.com", "dailyscript": "https://www.dailyscript.com",
                   "awesomefilm": "https://www.awesomefilm.com", "simplyscripts": "https://www.simplyscripts.com/movie-screenplays.html"}
 
 
-def gt_lookalike(title: str, table: dict) -> str | None:
-    """GT movie whose curated IP keyword appears in the title (contract C15b: such titles must be listed in
-    gt_related.json as a relation or as unrelated before they can be released)."""
-    low = " " + re.sub(r"[^a-z0-9' ]+", " ", title.lower()) + " "
+def _base_title(name: str) -> str:
+    """Same rule as contract_checks.base_title (title without year, leading 'the', subtitle, sequel number)."""
+    t = re.sub(r"_\d{4}$", "", name).lower()
+    t = re.sub(r"^the\s+", "", t)
+    t = re.split(r"[:\-\u2013]", t)[0]
+    t = re.sub(r"\b(part\s+)?([ivx]+|\d+)\b\s*$", "", t.strip())
+    return re.sub(r"[^a-z0-9]", "", t)
+
+
+def gt_lookalike(title: str, table: dict, gt_names: dict | None = None) -> str | None:
+    """GT imdb_id the title looks like under contract C15b: a curated IP keyword in the title, or GT base title
+    and film base title containing one another (>= 4 chars). Such films must be listed in gt_related.json (as a
+    relation or as unrelated) before they can be released."""
+    low = title.lower()
     for gt_id, kws in table.get("ip_keywords", {}).items():
-        for kw in kws:
-            if re.search(rf"(?<![a-z0-9]){re.escape(kw)}(?![a-z0-9])", low):
-                return gt_id
+        if any(re.search(rf"\b{re.escape(kw)}\b", low) for kw in kws):
+            return gt_id
+    b = _base_title(title)
+    for gt_id, gt_name in (gt_names or {}).items():
+        gb = _base_title(gt_name)
+        if len(gb) >= 4 and len(b) >= 4 and (gb in b or b in gb):
+            return gt_id
     return None
 SOURCE_PRIORITY = ("imsdb", "dailyscript", "awesomefilm", "simplyscripts")
 FORMAT_PRIORITY = ("html", "txt", "pdf")
@@ -190,6 +215,7 @@ def main() -> None:
 
     ref = load_reference(args, os.path.join(args.out, "reference_cache.pkl"))
     gt_table = load_gt_related(args.gt_related)
+    gt_names = {r["imdb_id"]: r["movie_name"] for r in load_gt(args.gt_path)}
     reviewed = {r["imdb_id"] for r in gt_table["relations"]} | {r["imdb_id"] for r in gt_table.get("unrelated", [])}
     index = load_index(os.path.join(args.imdb_dir, "title_index.json"))
     films = candidate_films(args.matches, set(args.sources.split(",")))
@@ -248,8 +274,9 @@ def main() -> None:
             rel = gt_relation(imdb_id, gt_table)
             if not reasons and rel and rel["type"] == "remake":
                 reasons.append("gt_remake")
-            if not reasons and imdb_id not in reviewed and (gt_lookalike(meta["title"], gt_table) or gt_lookalike(offer["title"], gt_table)):
-                reasons.append(f"gt_lookalike_unreviewed:{gt_lookalike(meta['title'], gt_table) or gt_lookalike(offer['title'], gt_table)}")
+            look = gt_lookalike(meta["title"], gt_table, gt_names) if not reasons and imdb_id not in reviewed else None
+            if look:
+                reasons.append(f"gt_lookalike_unreviewed:{look}")
             if not reasons:
                 text_all = " ".join(t for s in scenes for _, t in s.elements)
                 sh = shingles(words_of(text_all), cfg["ngram"], cfg["shingle_sample_mod"])

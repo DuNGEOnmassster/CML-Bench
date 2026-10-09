@@ -19,6 +19,8 @@ import os
 import re
 import subprocess
 import tempfile
+from collections import Counter
+import unicodedata
 
 WHITELIST = re.compile(
     r"^(continued|cont|contd|d|more|omitted|omit|\d{1,4}[a-z]{0,3}|pt|rev|revised|revision|revisions|draft|pink|blue|yellow|"
@@ -43,8 +45,9 @@ def raw_words(path: str, fmt: str) -> list[str]:
         except UnicodeDecodeError:
             text = body.decode("cp1252", "replace")
         if fmt == "html":
-            text = html.unescape(re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<(script|style|head)[^>]*>.*?</\1>", " ", text)))
-    return words(text)
+            text = re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<(script|style|head)[^>]*>.*?</\1>", " ", text))
+    # declared normalizations: HTML entities (twice), NFKC (ligatures)
+    return words(unicodedata.normalize("NFKC", html.unescape(html.unescape(text))))
 
 
 def words(text: str) -> list[str]:
@@ -74,7 +77,7 @@ def check(item: dict, cache_dir: str) -> dict:
     best = None
     for st in starts:  # tightest span that starts at an anchor occurrence and ends at the end anchor
         end = min(len(raw_f), st + len(seg_f))
-        for j in range(st, min(len(raw_f), st + 3 * len(seg_f))):
+        for j in range(st + int(0.8 * len(seg_f)) - len(end_anchor), min(len(raw_f), st + 3 * len(seg_f))):
             if raw_f[j : j + len(end_anchor)] == end_anchor:
                 end = j + len(end_anchor)
                 break
@@ -82,14 +85,31 @@ def check(item: dict, cache_dir: str) -> dict:
             best = (st, end)
     start, end = raw_pos[best[0]], raw_pos[best[1] - 1] + 1
     region = raw[start:end]
+    near_ws = raw[max(0, start - len(seg)):end + len(seg)]
+    near6 = {tuple(near_ws[i:i + 6]) for i in range(len(near_ws) - 5)}
+    seg6 = {tuple(seg[i:i + 6]) for i in range(len(seg) - 5)}
+
+    def covered(ws, i, grams):
+        return any(tuple(ws[k:k + 6]) in grams for k in range(max(0, i - 5), min(i, len(ws) - 6) + 1))
     speakers = {w for c in re.findall(r"<character>(.*?)</character>", item["script_segment"]) for w in words(html.unescape(c))}
     sm = difflib.SequenceMatcher(None, region, seg, autojunk=False)
-    inserted, del_white, del_declared, del_other, runs = 0, 0, 0, 0, []
+    inserted, reordered, del_white, del_declared, del_other, runs, ins_runs = 0, 0, 0, 0, 0, [], []
     for op, a1, a2, b1, b2 in sm.get_opcodes():
         if op in ("insert", "replace"):
-            inserted += b2 - b1
+            # words inside a 6-gram that also occurs in the raw text nearby are real text the aligner paired with
+            # another copy of a repeated passage; only the rest counts as inserted
+            found = sum(covered(seg, j, near6) for j in range(b1, b2))
+            reordered += found
+            if b2 - b1 - found:
+                inserted += b2 - b1 - found
+                ins_runs.append(" ".join(seg[max(0, b1 - 3):b1]) + " {{" + " ".join(seg[b1:b2]) + "}} " + " ".join(seg[b2:b2 + 3]))
         if op in ("delete", "replace"):
             run = region[a1:a2]
+            moved = [covered(region, j, seg6) for j in range(a1, a2)]
+            reordered += sum(moved)
+            run = [w for w, m in zip(run, moved) if not m]
+            if not run:
+                continue
             other = [w for w in run if not WHITELIST.match(w)]
             del_white += len(run) - len(other)
             if other and all(w in speakers for w in other):
@@ -101,9 +121,50 @@ def check(item: dict, cache_dir: str) -> dict:
             del_other += len(other)
             if other:
                 runs.append(" ".join(region[max(0, a1 - 4):a1]) + " [[" + " ".join(run) + "]] " + " ".join(region[a2:a2 + 4]))
-    return {"item_id": item["item_id"], "segment_words": len(seg), "region_words": len(region), "inserted": inserted,
+    return {"item_id": item["item_id"], "segment_words": len(seg), "region_words": len(region), "inserted": inserted, "aligned_elsewhere": reordered,
             "deleted_whitelisted": del_white, "deleted_declared": del_declared, "deleted_other": del_other, "dropped_scenes": item.get("dropped_scenes", []),
-            "other_runs": runs[:15]}
+            "other_runs": runs[:15], "inserted_runs": ins_runs[:10]}
+
+
+def ngrams8(ws: list[str]) -> set:
+    return {" ".join(ws[i:i + 8]) for i in range(len(ws) - 7)}
+
+
+def verify_extra(records: list[dict], cache_dir: str, gt_path: str) -> tuple[dict, list[dict]]:
+    """C05'/C16b for extra-source records (schema 1.0): `source_file` is the script URL, looked up in the fetch
+    cache index. Pass = no inserted word and no unexplained deletion."""
+    index = {}
+    with open(os.path.join(cache_dir, "index.jsonl"), encoding="utf-8") as f:
+        for line in f:
+            rec = json.loads(line)
+            index[rec["url"]] = rec
+    with open(gt_path, encoding="utf-8") as f:
+        gt8 = set().union(*(ngrams8(words(re.sub(r"<[^>]+>", " ", json.loads(l)["script_segment"]))) for l in f if l.strip()))
+    results, fails = [], []
+    for r in records:
+        rec = index.get(r["source_file"])
+        if not rec or not rec.get("file"):
+            res = {"item_id": r["item_id"], "pass": False, "problems": ["source_not_cached"]}
+        else:
+            fmt = {"htm": "html"}.get(rec["file"].rsplit(".", 1)[-1], rec["file"].rsplit(".", 1)[-1])
+            res = check({**r, "source_cache_file": rec["file"], "source_format": fmt}, cache_dir)
+            res["problems"] = (["inserted_words"] if res["inserted"] else []) + (["deleted_words"] if res["deleted_other"] else [])
+            res["pass"] = not res["problems"]
+        g = ngrams8(words(re.sub(r"<[^>]+>", " ", r["script_segment"])))
+        res["gt_8gram_overlap"] = round(len(g & gt8) / max(1, len(g)), 5)
+        results.append(res)
+        if not res["pass"]:
+            fails.append(res)
+    ov = [x["gt_8gram_overlap"] for x in results]
+    summary = {
+        "items": len(results), "c05_pass": len(results) - len(fails), "c05_fail": len(fails),
+        "inserted_words": sum(x.get("inserted", 0) for x in results),
+        "deleted_words": sum(x.get("deleted_other", 0) for x in results),
+        "raw_words": sum(x.get("region_words", 0) for x in results),
+        "problem_kinds": dict(Counter(p for x in fails for p in x["problems"])),
+        "c16b_max_gt_8gram_overlap": max(ov) if ov else 0, "c16b_pass": (max(ov) if ov else 0) <= 0.01,
+    }
+    return summary, fails
 
 
 def main() -> None:
@@ -115,7 +176,8 @@ def main() -> None:
     with open(args.segments, encoding="utf-8") as f:
         items = [json.loads(line) for line in f]
     results = [check(it, args.cache_dir) for it in items]
-    tot = {k: sum(r[k] for r in results) for k in ("segment_words", "inserted", "deleted_whitelisted", "deleted_declared", "deleted_other")}
+    tot = {k: sum(r[k] for r in results) for k in ("segment_words", "inserted", "aligned_elsewhere", "deleted_whitelisted",
+                                                   "deleted_declared", "deleted_other")}
     summary = {"items": len(results), **tot,
                "items_with_inserted": sum(r["inserted"] > 0 for r in results),
                "items_with_other_deletions": sum(r["deleted_other"] > 0 for r in results)}
