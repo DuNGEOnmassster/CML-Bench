@@ -33,7 +33,7 @@ TRANSITION_LINE_RE = re.compile(
 )
 # Page furniture. Only the typographic forms are removed ("(MORE)", "CONTINUED:", a page number on its own
 # line at a page break or the right margin), so dialogue such as "More." or "478." is never dropped.
-_PAGE_NO_RE = re.compile(r"^\s*(page\s*)?[-\u2013]?\s*\d{1,3}\s*[-\u2013]?[.)]?\s*$", re.I)
+_PAGE_NO_RE = re.compile(r"^\s*(page\s*)?[-\u2013\[]?\s*\d{1,3}\s*[-\u2013\]]?[.)]?\s*$", re.I)
 _CONTINUED_RE = re.compile(
     r"^\s*\d{0,4}[A-Z]{0,2}\s*(\(\s*(CONTINUED|CONT'?D|MORE|continued|more)\s*\)|CONTINUED\s*:?|-+\s*MORE\s*-+)"
     r"\s*(\(\d+\))?\s*\d{0,4}[A-Z]{0,2}\s*$"
@@ -43,11 +43,12 @@ _REVISION_MARK_RE = re.compile(r"\\*\*+\\*")
 _CUE_CONTD_RE = re.compile(r"\(\s*CONT(INUED|['\u2019]?D|\.)?[.\s]*\)", re.I)
 _STRAY_BACKSLASH_RE = re.compile(r"\\+")
 _REVISION_RE = re.compile(
-    r"\b(rev(ision|ised|s)?\.?|draft|pink|blue|yellow|green|goldenrod|buff|salmon|cherry)\b.{0,40}\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}", re.I
+    r"\b(rev(ision|ised|s)?\.?|draft|pink|blue|yellow|green|goldenrod|buff|salmon|cherry)\b.{0,40}"
+    r"(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}|\(mm/dd/yy\))", re.I
 )
 _SPEAKER_COLON_RE = re.compile(r"^\s*[A-Z][A-Za-z .'\-]{0,24}:\s+\S")
 _CUE_EXT_RE = re.compile(r"\s*\([^()]*\)\s*$")
-_CUE_CHARS_RE = re.compile(r"^[A-Z0-9#'\"][A-Za-z0-9 .,'\-&#/\"]*$")
+_CUE_CHARS_RE = re.compile(r"^[A-Z0-9#'\"][A-Za-z0-9 .,'\u2019\-&#/\"]*$")
 _HONORIFIC_END_RE = re.compile(r"\b(MR|MRS|MS|DR|JR|SR|ST|LT|SGT|CAPT|COL|GEN|PROF|REV|NO)\.$")
 _NOT_A_NAME = {"THE END", "CONTINUED", "MORE", "OMITTED", "BLACK", "SILENCE", "CREDITS", "TITLE", "SUPER", "INSERT",
                "FADE IN", "FADE OUT", "LATER", "CONTINUOUS", "MONTAGE", "FLASHBACK", "END FLASHBACK", "BACK TO SCENE",
@@ -118,6 +119,19 @@ def _is_noise_line(s: str, prev_blank: bool = True) -> bool:
 
 def _header_key(line: str) -> str:
     return re.sub(r"\s+", " ", re.sub(r"\d+", "#", line.strip().lower()))
+
+
+def _strip_glued_header(line: str, headers: set[str]) -> str:
+    """A running header printed on the same line as text, after a wide gap ("So I-     Blue Rev. (mm/dd/yy)  3.")."""
+    if not headers:
+        return line
+    m = re.match(r"^(.*?\S)\s{3,}(\S.*?)\s*$", line)
+    if m and _header_key(m.group(2)) in headers:
+        return m.group(1)
+    m = re.match(r"^(\s*)(\S.*?)\s{3,}(\S.*)$", line)
+    if m and _header_key(m.group(2)) in headers:
+        return m.group(1) + " " * len(m.group(2)) + "   " + m.group(3)
+    return line
 
 
 def repeated_page_headers(lines: list[str], min_repeats: int = 5) -> set[str]:
@@ -228,8 +242,10 @@ def infer_layout(lines: list[str]) -> dict:
     action_ind = _mode([ind for ind, s in indents if len(s) > 50], 0)
     cue, dlg = _mode(cue_ind, 0), _mode(dlg_ind, 0)
     indented = len(cue_ind) >= 20 and cue >= action_ind + 8 and dlg >= action_ind + 4
+    known = {cue_name(s) for i, (ind, s) in enumerate(indents[:-1])
+             if s and indents[i + 1][1] and looks_like_cue(s) and indents[i + 1][0] >= action_ind + 4}
     return {"layout": "indented" if indented else "flush", "action_indent": action_ind, "cue_indent": cue,
-            "dialogue_indent": dlg, "cue_candidates": len(cue_ind)}
+            "dialogue_indent": dlg, "cue_candidates": len(cue_ind), "known_cues": known}
 
 
 def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
@@ -239,6 +255,7 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
     lines, prev_blank = [], True
     for raw in raw_lines:
         l = _strip_marks(raw).rstrip()
+        l = _strip_glued_header(l, headers)
         lines.append("" if l.strip() and (_is_noise_line(l, prev_blank) or _header_key(l) in headers) else l)
         prev_blank = not l.strip()
     lay = infer_layout(lines)
@@ -293,16 +310,19 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             i += 1
             continue
         nxt_i = i + 1
-        if cue_by_indent and nxt_i < n and not lines[nxt_i].strip() and nxt_i + 1 < n:
-            # tolerate one blank line between an indented cue and its parenthetical (or indented dialogue)
+        if nxt_i < n and not lines[nxt_i].strip() and nxt_i + 1 < n:
+            # tolerate one blank line between a cue and its parenthetical (any layout) or indented dialogue
             cand = lines[nxt_i + 1]
             if cand.strip().startswith("(") or (indented and cand.strip() and a_ind + 3 < ind(cand) < c_ind - 2):
                 nxt_i += 1
         nxt = lines[nxt_i] if nxt_i < n else ""
+        # a known speaker at the cue indent whose line sits at the action indent (dialogue then runs to a blank line)
+        flat_dialogue = (indented and ind(line) >= cue_min and ind(nxt) <= a_ind + 2 and not nxt.strip().startswith("(")
+                         and cue_name(s) in lay["known_cues"])
         is_cue = (
             looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
             and (ind(line) >= cue_min if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
-            and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("("))
+            and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("(") or flat_dialogue)
         )
         if not is_cue:
             if not _PAGE_NO_RE.match(s):  # a bare number inside action is a page number (in dialogue it is speech)
@@ -317,7 +337,14 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
         while i < n:
             l2 = lines[i]
             t = l2.strip()
-            if not t or heading_text(t) or is_transition(t) or (indented and ind(l2) <= a_ind + 2 and len(t) > 0):
+            if not t and not dlg and not paren and cur[-1][0] == "parenthetical" and i + 1 < n:
+                # "CUE / (paren) / blank / line": the line after the blank is still this speaker's dialogue
+                t2 = lines[i + 1].strip()
+                if t2 and not heading_text(t2) and not is_transition(t2) and not looks_like_cue(t2):
+                    i += 1
+                    continue
+            if not t or heading_text(t) or is_transition(t) or (
+                    indented and not flat_dialogue and ind(l2) <= a_ind + 2 and len(t) > 0):
                 break
             if indented and ind(l2) >= cue_min and looks_like_cue(t) and dlg:
                 break

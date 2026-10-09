@@ -28,6 +28,7 @@ import pickle
 import re
 import sys
 import time
+from urllib.parse import unquote
 from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -90,8 +91,50 @@ SUPPORTED_FORMATS = set(FORMAT_PRIORITY)
 OCR_SYMBOL_RE = re.compile(r"[\\~{}^|]|[_]{2,}[^_\s]|[,.'`]{2,}[_\\]")
 
 
-_SPEAKER_LED_RE = re.compile(r"^([A-Z][A-Z.'\-]+(?: [A-Z][A-Z.'\-]+)?)\s+(?:\(|[A-Z][a-z']|[!?.,\-])")
 _TRAILING_PAGE_NO_RE = re.compile(r"[.!?\"]\s+\d{1,3}\.?$")
+# Evaluator's strict fused-speaker detector (evaluator/sources/v2/strict_fused.py): an action element that opens with a
+# speaker's name followed by a speech-type parenthetical, a first/second-person word, or a ?/! sentence. MovieSum v3:
+# mean 0.079 per segment, p99 2.
+_FUSED_PAREN_RE = re.compile(r"\((O\.?S|V\.?O|O\.?C|CONT|to |beat|into|on |re:|over|off|then|quietly|sotto|whisper|softly|reading|"
+                             r"yelling|shouting)[^)]*\)", re.I)
+_FUSED_PRON_RE = re.compile(r"\b(I|I'm|I'll|I've|I'd|you|you're|your|we|we're|my|me|us|our|yeah|yes|no|okay|ok|hey|oh)\b", re.I)
+# Revision/draft stamp with a page number at the end of a dialogue line (contract C12e)
+_GLUED_HEADER_RE = re.compile(r"(Rev\.|Revision|Draft|REV|\(\d\d?/\d\d?/\d\d\)|\(mm/dd/yy\)).{0,25}\d{1,3}\.?$")
+
+
+def _spk(t: str) -> str:
+    return re.sub(r"\s*\(.*?\)\s*", " ", t.replace("\u2019", "'")).strip().upper().rstrip(".:")
+
+
+def strict_fused(elements: list[tuple[str, str]]) -> list[str]:
+    talkers = {_spk(x) for t, x in elements if t == "character" and len(_spk(x)) >= 2}
+    out = []
+    for t, x in elements:
+        if t != "scene_description":
+            continue
+        toks = x.split()
+        k = 0
+        while k < len(toks) and k < 5 and re.fullmatch(r"[A-Z0-9.'\u2019\-&#]+", toks[k]) and re.search(r"[A-Z]", toks[k]):
+            k += 1
+        name = None
+        for j in range(k, 0, -1):
+            cand = " ".join(toks[:j]).replace("\u2019", "'").rstrip(".:")
+            if _spk(cand) in talkers or ("'" in cand and j <= 3):
+                name = cand
+                break
+        if not name:
+            continue
+        rest = " ".join(toks[len(name.split()):])
+        m = re.match(r"^((?:\([^)]*\)\s*)*)(.*)$", rest)
+        parens, rest = m.group(1), m.group(2)
+        if not rest or (rest[:1].islower() and not rest.startswith(("i ", "i'"))):
+            continue
+        first = re.split(r"(?<=[.!?])\s", rest, maxsplit=1)[0]
+        third_person_verb = re.match(r"^[A-Za-z]+s\b", rest) and not _FUSED_PRON_RE.search(first)
+        if (parens and _FUSED_PAREN_RE.search(parens)) or (_FUSED_PRON_RE.search(first) and not third_person_verb) or (
+                first.rstrip().endswith(("?", "!")) and not third_person_verb):
+            out.append(x)
+    return out
 
 
 def window_noise(seg) -> list[str]:
@@ -115,9 +158,12 @@ def window_noise(seg) -> list[str]:
     talkers = {speaker_name(t) for i, (tag, t) in enumerate(texts)
                if tag == "character" and i + 1 < len(texts) and texts[i + 1][0] in ("dialogue", "parenthetical")}
     descs = [t for tag, t in texts if tag == "scene_description"]
-    led = sum(1 for d in descs if (m := _SPEAKER_LED_RE.match(d)) and m.group(1) in talkers)
-    if led > 4:
-        reasons.append("speaker_in_action")  # "LOIS Superman!": cue and line fused into an action element
+    if len(strict_fused(texts)) > 1:
+        reasons.append("speaker_in_action")  # "LOIS Superman!": cue and line fused into an action element (evaluator: <= 1)
+    if sum(1 for d in descs if d.startswith("(")) > 3:
+        reasons.append("parenthetical_in_action")  # "(agonized) Susan! Duck!" with its speaker lost (MovieSum p99 3)
+    if any(tag in ("dialogue", "parenthetical", "scene_description") and _GLUED_HEADER_RE.search(t) for tag, t in texts):
+        reasons.append("glued_page_header")
     if sum(1 for d in descs if _TRAILING_PAGE_NO_RE.search(d)) > 1:
         reasons.append("page_numbers_in_text")
     if sum(1 for n in talkers if len(n) >= 3 and any(o != n and len(o) == len(n) + 1 and o.endswith(n) for o in talkers)) >= 2:
@@ -127,7 +173,12 @@ def window_noise(seg) -> list[str]:
     return reasons
 
 
-NAME_STOP = {"MR", "MRS", "MS", "DR", "THE", "OLD", "YOUNG", "MAN", "WOMAN", "GIRL", "BOY", "VOICE", "OFFICER", "COP", "GUARD"}
+NAME_STOP = {"MR", "MRS", "MS", "DR", "THE", "OLD", "YOUNG", "MAN", "WOMAN", "GIRL", "BOY", "VOICE", "OFFICER", "COP", "GUARD",
+             "JOHN", "MARY", "JACK", "MOM", "DAD", "MOTHER", "FATHER", "KID", "GUY", "DOCTOR", "NURSE", "DRIVER", "WAITER",
+             "WAITRESS", "BARTENDER", "CLERK", "REPORTER", "SOLDIER", "PRIEST", "JUDGE", "LAWYER", "SHERIFF", "DEPUTY",
+             "CAPTAIN", "AGENT", "DETECTIVE", "SERGEANT", "PILOT", "OPERATOR", "SECRETARY", "BOSS", "STRANGER", "LADY"}
+# Catalog entries that are not films (Carnivore: "...Carnivore (Unproduced).txt" was matched to an unrelated film)
+NOT_PRODUCED_RE = re.compile(r"unproduced|un-produced|spec[ _+%-]?script|\bspec\b|treatment|unfilmed|never (made|filmed)", re.I)
 
 
 def load_reference(args, cache_path: str):
@@ -187,10 +238,12 @@ def speaker_tokens(scenes) -> list[set[str]]:
 
 
 def verify_match(scenes, characters: set[str] | None, need: int = 1) -> bool | None:
-    """True if >= `need` of the script's top-10 speakers carry a name of the IMDb cast characters."""
+    """True if >= `need` of the script's top-10 speakers carry a non-generic name (not JOHN, MAN, COP ...) of the IMDb
+    cast characters; False if none does; None without cast data."""
     if not characters:
         return None
-    return sum(1 for toks in speaker_tokens(scenes) if toks & characters) >= need
+    hits = sum(1 for toks in speaker_tokens(scenes) if toks & (characters - NAME_STOP))
+    return True if hits >= need else (False if hits == 0 else None)
 
 
 def resolve_imsdb(offer: dict, fetcher: Fetcher, index: dict) -> dict:
@@ -257,6 +310,9 @@ def main() -> None:
                 offer = resolve_imsdb(offer, fetcher, index)
             info = {"source": offer["source"], "url": offer["url"], "format": offer["format"]}
             row["offers"].append(info)
+            if NOT_PRODUCED_RE.search(offer["title"]) or NOT_PRODUCED_RE.search(unquote(offer["url"])):
+                info["reasons"] = ["not_produced"]
+                continue
             if offer.get("mislinked"):
                 info["reasons"] = [f"imsdb_mislinked:{offer['mislinked']}"]
                 continue
@@ -276,7 +332,7 @@ def main() -> None:
             reasons, metrics = script_quality(text, scenes, diag, pdf_meta, ref["vocab"])
             info.update({"metrics": metrics, "layout": diag.get("layout"), "source_file": rec["file"], "source_sha1": rec["sha1"]})
             match = offer["match"]
-            verified = verify_match(scenes, characters.get(match["imdb_id"]), need=2 if match.get("confidence") == "low" else 1)
+            verified = verify_match(scenes, characters.get(match["imdb_id"]), need=2)
             info["imdb_match"] = {k: match.get(k) for k in ("imdb_id", "title", "year", "confidence", "matched_title")} | {"verified": verified}
             if not reasons and verified is False and match.get("confidence") not in ("low", "medium"):
                 reasons.append("imdb_cast_mismatch")  # e.g. a catalog link labelled with the wrong film
