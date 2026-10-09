@@ -158,6 +158,7 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
     keys = ("items_total", "items_releasable", "movies", "items_eval_safe", "items_gt_related", "items_with_abstract",
             "items_checks_passed", "items_merged", "batches_total", "batches_merged", "batches_rejected", "content_tokens_total")
     totals = {k: sum(s.get(k, 0) for s in sources.values()) for k in keys}
+    totals["items_merged_draft"] = sum(s.get("items_merged", 0) for s in sources.values() if s.get("abstracts_draft"))
     updated = max([s["updated_at"] for s in sources.values()] + [control.get("updated_at", "")] +
                   [m.get("uploaded_at", "") for m in pilots.values()] or [now()])
     return {
@@ -176,25 +177,37 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
             "items_checks_passed": "items whose abstract passes the per-item merge gates G1-G4, G7 (validate_batch.py)",
             "items_merged": "items in data/ (their whole batch passed all gates and is not revoked by the audit)",
             "items_releasable": "items_total minus merge-time exclusions (C34 mislabel windows, hold films); the release target",
+            "items_merged_draft": "merged items of sources whose abstracts are still drafts (config release_draft)",
         },
     }
 
 
 def card(status: dict, tree_paths: set[str]) -> bytes:
-    has_data = any(p.startswith("data/") for p in tree_paths)
-    has_safe = any(p.startswith("data/") and p.endswith(".safe.jsonl") for p in tree_paths)
+    draft_slugs = {s["source_slug"] for s in status["per_source"].values() if s.get("abstracts_draft")}
+    data_slugs = sorted({p.split("/")[1] for p in tree_paths if p.startswith("data/") and p.count("/") >= 2})
+    final = [s for s in data_slugs if s not in draft_slugs]
+    drafts = [s for s in data_slugs if s in draft_slugs]
+    safe = [s for s in final if any(p.startswith(f"data/{s}/") and p.endswith(".safe.jsonl") for p in tree_paths)]
     configs = []
-    if has_data:
-        configs.append(("release", "data/*/*.jsonl", True))
-        if has_safe:
-            configs.append(("eval_safe", "data/*/*.safe.jsonl", False))
-    configs.append(("content", "content/*/*.jsonl", not has_data))
+    if final:
+        configs.append(("release", [f"data/{s}/*.jsonl" for s in final], True))
+        if safe:
+            configs.append(("eval_safe", [f"data/{s}/*.safe.jsonl" for s in safe], False))
+    if drafts:
+        configs.append(("release_draft", [f"data/{s}/*.jsonl" for s in drafts], False))
+    configs.append(("content", "content/*/*.jsonl", not final))
     for name, meta in sorted(status["pilots"].items()):
         configs.append((f"pilot_{name}", f"pilots/{name}/data/*.jsonl", False))
+
+    def yaml_path(p):
+        return f"path: \"{p}\"" if isinstance(p, str) else "path:\n" + "\n".join(f"    - \"{x}\"" for x in p)
+
     yaml_cfg = "\n".join(
-        f"- config_name: {n}\n  data_files:\n  - split: train\n    path: \"{p}\"" + ("\n  default: true" if d else "")
+        f"- config_name: {n}\n  data_files:\n  - split: train\n    {yaml_path(p)}" + ("\n  default: true" if d else "")
         for n, p, d in configs
     )
+    draft_note = "\n".join(f"- {src}: {s['abstracts_draft']}" for src, s in sorted(status["per_source"].items())
+                           if s.get("abstracts_draft")) or "- none"
     t = status["totals"]
     rows = "\n".join(
         f"| {src} | {s['build_id']} | {s['items_total']:,} | {s.get('items_releasable', s['items_total']):,} | {s['movies']:,} | "
@@ -249,8 +262,12 @@ speaker name tagged as dialogue, a heading/shot/action tagged as a speaker, spee
 
 ## Configs
 
-- `release`: items whose abstract passed every merge gate (`data/<source>/<batch>.{{safe,related}}.jsonl`).
+- `release`: items whose abstract passed every merge gate (`data/<source>/<batch>.{{safe,related}}.jsonl`), from
+  sources whose abstracts are final.
 - `eval_safe`: the `release` items with no story/franchise relation to the 100 CML-Bench GT movies (`gt_related == null`).
+- `release_draft`: merged items of sources whose abstracts are still drafts (same gates; kept out of `release` until the
+  source passes its remaining audit):
+{draft_note}
 - `content`: every item of the current content build; `summary` is empty until its abstract is merged.
 {pilots}
 
@@ -344,7 +361,8 @@ def load_merge_exclusions(exclusions_dir: str | None, build: str, items_by_id: d
     return out, {"file": os.path.relpath(path, HERE), "rule": spec["rule"], "listed_items": len(out)}
 
 
-def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir: str | None = DEFAULT_EXCLUSIONS):
+def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir: str | None = DEFAULT_EXCLUSIONS,
+                 draft_reason: str | None = None):
     """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file).
     Excluded items (merge exclusion list, hold films) are left out of data/, of the audit pools and of all release
     statistics; the batch that carries them is still judged on all its items."""
@@ -532,6 +550,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         "batch_size": run["batch_size"],
         "merged_prompt_versions": prompt_versions,
         "content_checks": content_checks,
+        "abstracts_draft": draft_reason or None,
         "items_held": sum(it.get("identity_decision") == "hold" for it in items),
         "items_releasable": len(items) - len(excluded),
         "items_excluded": {r: sum(v == r for v in excluded.values()) for r in sorted(set(excluded.values()))},
@@ -551,7 +570,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
 
 
 def cmd_sync(repo: Repo, args) -> dict:
-    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions)
+    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions, args.draft)
     owned = (f"content/{slug}/", f"manifests/{slug}/", f"data/{slug}/", f"audit/{slug}/")
     result = {}
 
@@ -705,6 +724,7 @@ def main() -> None:
     s.add_argument("--verdicts", default=DEFAULT_VERDICTS, help="audit verdicts: a jsonl file, or a dir of verdicts*.jsonl (C31); missing = none yet")
     s.add_argument("--audit_mirror", default=DEFAULT_AUDIT_MIRROR, help="store dir for audit lists + listed items ('' to skip)")
     s.add_argument("--exclusions", default=DEFAULT_EXCLUSIONS, help="dir of <build_id>.json merge-time exclusion lists ('' for none)")
+    s.add_argument("--draft", default="", help="mark this source's merged abstracts as drafts, with this reason (config release_draft)")
     p = sub.add_parser("pilot")
     p.add_argument("--folder", required=True)
     p.add_argument("--name", required=True)
