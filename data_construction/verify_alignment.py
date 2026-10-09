@@ -10,7 +10,8 @@ scenes scene_start..scene_end, and aligns lowercase alphanumeric words of the ra
     page numbers (margin/heading numbers, number-only non-dialogue elements), PTB bracket tokens (-LRB-), and bare
     speaker names that never get a line (a <character> whose dialogue is empty/missing, with its parentheticals, or a
     <scene_description> that is exactly the name of a speaker who talks elsewhere in the script);
-  - no word of a non-empty <dialogue> is deleted unless it is a marker;
+  - no word of a non-empty <dialogue> is deleted unless it is a marker, or the whole line is a bare number with no
+    speaker before it or a "speaker" who never says anything with letters (a page number under a revision stamp);
   - raw scenes in range == num_scenes + len(dropped_scenes), and each dropped scene is really body-less ("no_body")
     or a verbatim repeat of an earlier scene ("duplicate").
 The declared normalizations it tolerates: HTML entities, NFKC, and spacing-only differences (the same letters split or
@@ -34,6 +35,8 @@ NOISE = "\u2022\u25a0\u25aa\u00b7\u25cf\u25a1\u2023\u2043"
 MERGES = {"gonna": ("gon", "na"), "wanna": ("wan", "na"), "gotta": ("got", "ta"), "lemme": ("lem", "me"), "gimme": ("gim", "me")}
 MARKER = re.compile(r"\(\s*MORE\s*\)|\(?\b(CONTINUED|OMITTED|OMIT)\b\)?|\bCONT\s*['\u2019`]?\s*D\b")
 MARKER_ANY_CASE = re.compile(MARKER.pattern, re.I)
+NUMBER_LINE = re.compile(r"^\d{1,4}[A-Z]?\.?$")
+MARKER_WORDS = {"more", "continued", "omitted", "omit", "cont", "d", "lrb", "rrb", "lsb", "rsb", "lcb", "rcb"}
 PTB = re.compile(r"-[LR][RSC]B-")
 DUP_NUMBER = re.compile(r"\b(\d{1,3}-?[A-Z]{0,3}|\d{1,3}pt)\s+(?=.*\b\1\b)")
 SCENE_NUMBER = re.compile(r"\b\d{1,3}-?[A-Z]{0,3}\b|\b\d{1,3}pt\b")
@@ -74,6 +77,7 @@ def has_line(text: str) -> bool:
 
 
 def talking_speakers(scenes) -> set[str]:
+    """Names that say at least one line containing letters somewhere in the script."""
     out = set()
     for els in scenes:
         for k, (tag, text) in enumerate(els):
@@ -82,9 +86,20 @@ def talking_speakers(scenes) -> set[str]:
             j = k + 1
             while j < len(els) and els[j][0] == "parenthetical":
                 j += 1
-            if j < len(els) and els[j][0] == "dialogue" and has_line(els[j][1]) and not NOT_A_NAME.search(name_of(text)):
+            if j < len(els) and els[j][0] == "dialogue" and has_line(els[j][1]) and re.search(r"[A-Za-z]", els[j][1]) \
+                    and not NOT_A_NAME.search(name_of(text)):
                 out.add(name_of(text))
     return out
+
+
+def page_number_line(els, k: int, talkers: set[str]) -> bool:
+    """A dialogue that is a bare number nobody real says: no speaker before it, or a speaker who never talks."""
+    if els[k][0] != "dialogue" or not NUMBER_LINE.match(norm(els[k][1]).strip()):
+        return False
+    i = k - 1
+    while i >= 0 and els[i][0] == "parenthetical":
+        i -= 1
+    return i < 0 or els[i][0] != "character" or name_of(els[i][1]) not in talkers
 
 
 def deletable_words(els, k: int, talkers: set[str]) -> Counter:
@@ -103,7 +118,7 @@ def deletable_words(els, k: int, talkers: set[str]) -> Counter:
     for m in DUP_LETTERED_NUMBER.finditer(text):
         allowed.update(words(m.group()))
     if tag == "dialogue":
-        return allowed
+        return Counter(words(raw)) if page_number_line(els, k, talkers) else allowed
     if NUMBER_ONLY.match(SCENE_NUMBER.sub(" ", MARKER_ANY_CASE.sub(" ", PTB.sub(" ", text)))):
         return Counter(words(raw))
     for m in DUP_NUMBER.finditer(text):
@@ -112,7 +127,7 @@ def deletable_words(els, k: int, talkers: set[str]) -> Counter:
     if tag == "stage_direction":
         for m in HEADING_NUMBERS.finditer(text):
             allowed.update(words(m.group(1) or m.group(2) or ""))
-        lettered = Counter(re.findall(r"\b\d{1,3}-?[A-Z]{1,3}\b", text))
+        lettered = Counter(re.findall(r"\b\d{1,3}-?[A-Z]{1,3}\b", norm(raw)))
         for num, c in lettered.items():
             if c >= 2:
                 allowed.update(words(num) * c)
@@ -121,7 +136,7 @@ def deletable_words(els, k: int, talkers: set[str]) -> Counter:
         while j < len(els) and els[j][0] == "parenthetical":
             j += 1
         no_line = not (j < len(els) and els[j][0] == "dialogue" and has_line(els[j][1]))
-        if no_line:
+        if no_line or (j < len(els) and page_number_line(els, j, talkers)):
             return Counter(words(raw))
     if tag == "parenthetical":
         i = k - 1
@@ -130,10 +145,11 @@ def deletable_words(els, k: int, talkers: set[str]) -> Counter:
         j = k + 1
         while j < len(els) and els[j][0] == "parenthetical":
             j += 1
-        if i >= 0 and els[i][0] == "character" and j < len(els) and els[j][0] == "dialogue" and not has_line(els[j][1]):
+        if i >= 0 and els[i][0] == "character" and j < len(els) and els[j][0] == "dialogue" \
+                and (not has_line(els[j][1]) or page_number_line(els, j, talkers)):
             return Counter(words(raw))
-    bare = norm(raw).strip()
-    if tag == "scene_description" and bare.isupper() and bare.upper() == name_of(raw) and bare in talkers:
+    bare = MARKER_ANY_CASE.sub(" ", re.sub(r"[\\*]+", " ", norm(raw))).strip(" :")
+    if tag == "scene_description" and bare.isupper() and bare.upper() == name_of(bare) and bare in talkers:
         return Counter(words(raw))
     return allowed
 
@@ -194,12 +210,18 @@ def verify_item(item: dict, scenes, talkers: set[str]) -> dict:
         inserted += j2 - j1
         for i in range(i1, i2):
             deleted += 1
-            key = owner[i]
-            if allowance[key[0]][raw_tokens[i]] > 0:
-                allowance[key[0]][raw_tokens[i]] -= 1
+            key, tok = owner[i], raw_tokens[i]
+            if allowance[key[0]][tok] > 0:
+                allowance[key[0]][tok] -= 1
                 continue
+            # Numbers and markers repeat across scenes ("130" in a heading and in a description): borrow item-wide.
+            if re.search(r"\d", tok) or tok in MARKER_WORDS:
+                donor = next((s for s, a in allowance.items() if a[tok] > 0), None)
+                if donor is not None:
+                    allowance[donor][tok] -= 1
+                    continue
             tag, text = scenes[key[0]][key[1]]
-            (dialogue_deleted if tag == "dialogue" else unexplained).append(f"s{key[0]}:{tag}:{text[:60]}")
+            (dialogue_deleted if tag == "dialogue" else unexplained).append(f"s{key[0]}:{tag}:'{raw_tokens[i]}' in {text[:60]}")
     if inserted:
         problems.append(f"inserted_words:{inserted}")
     if unexplained:

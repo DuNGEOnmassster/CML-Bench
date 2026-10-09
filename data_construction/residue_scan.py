@@ -24,7 +24,8 @@ HEADING_NO_RE = re.compile(
     r"<stage_direction>(\d{1,3}[A-Z]{0,2}\s+(INT|EXT|I/E)\b[^<]*|[^<]*\b(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DAWN|DUSK|LATER|"
     r"CONTINUOUS|SUNSET|SUNRISE)\s+\d{1,3}[A-Z]{0,2})</stage_direction>"
 )
-SCENE_DESC_RE = re.compile(r"<scene_description>([^<]{2,29})</scene_description>")
+# The evaluator's definition: a short all-caps line of letters, spaces, periods, apostrophes or hyphens.
+SCENE_DESC_RE = re.compile(r"<scene_description>([A-Z][A-Z .'\-]{1,28})</scene_description>")
 CHAR_RE = re.compile(r"<character>([^<]+)</character>")
 SUFFIX_RE = re.compile(r"\s*\([^)]*\)\s*|\s+(V\.?O\.?|O\.?S\.?|O\.?C\.?|CONT'?D\.?)\s*$", re.I)
 
