@@ -86,26 +86,36 @@ def check(item: dict, cache_dir: str) -> dict:
     start, end = raw_pos[best[0]], raw_pos[best[1] - 1] + 1
     region = raw[start:end]
     near_ws = raw[max(0, start - len(seg)):end + len(seg)]
-    near6 = {tuple(near_ws[i:i + 6]) for i in range(len(near_ws) - 5)}
-    seg6 = {tuple(seg[i:i + 6]) for i in range(len(seg) - 5)}
+    # coverage n-grams skip page-furniture tokens ("cont d", page numbers), which interleave the raw words
+    near_f = [w for w in near_ws if not WHITELIST.match(w)]
+    near4 = {tuple(near_f[i:i + 4]) for i in range(len(near_f) - 3)}
+    seg4 = {tuple(t) for t in (lambda f: [f[i:i + 4] for i in range(len(f) - 3)])([w for w in seg if not WHITELIST.match(w)])}
+    joined = {"".join(near_ws[i:i + k]) for k in (2, 3) for i in range(len(near_ws) - k + 1)}
 
     def covered(ws, i, grams):
-        return any(tuple(ws[k:k + 6]) in grams for k in range(max(0, i - 5), min(i, len(ws) - 6) + 1))
+        if WHITELIST.match(ws[i]):
+            return True
+        f = [k for k in range(max(0, i - 12), min(len(ws), i + 13)) if not WHITELIST.match(ws[k])]
+        p = f.index(i)
+        return any(tuple(ws[f[k]] for k in range(s0, s0 + 4)) in grams for s0 in range(max(0, p - 3), min(p, len(f) - 4) + 1))
+
     speakers = {w for c in re.findall(r"<character>(.*?)</character>", item["script_segment"]) for w in words(html.unescape(c))}
     sm = difflib.SequenceMatcher(None, region, seg, autojunk=False)
     inserted, reordered, del_white, del_declared, del_other, runs, ins_runs = 0, 0, 0, 0, 0, [], []
     for op, a1, a2, b1, b2 in sm.get_opcodes():
+        if op == "replace" and "".join(region[a1:a2]) == "".join(seg[b1:b2]):
+            continue  # spacing only: the same letters split or joined differently ("mouse- pad" -> "mousepad")
         if op in ("insert", "replace"):
             # words inside a 6-gram that also occurs in the raw text nearby are real text the aligner paired with
             # another copy of a repeated passage; only the rest counts as inserted
-            found = sum(covered(seg, j, near6) for j in range(b1, b2))
+            found = sum(covered(seg, j, near4) or seg[j] in joined for j in range(b1, b2))
             reordered += found
             if b2 - b1 - found:
                 inserted += b2 - b1 - found
                 ins_runs.append(" ".join(seg[max(0, b1 - 3):b1]) + " {{" + " ".join(seg[b1:b2]) + "}} " + " ".join(seg[b2:b2 + 3]))
         if op in ("delete", "replace"):
             run = region[a1:a2]
-            moved = [covered(region, j, seg6) for j in range(a1, a2)]
+            moved = [not WHITELIST.match(region[j]) and covered(region, j, seg4) for j in range(a1, a2)]
             reordered += sum(moved)
             run = [w for w, m in zip(run, moved) if not m]
             if not run:

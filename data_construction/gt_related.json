@@ -68,6 +68,7 @@
   ],
   "unrelated": [
     {"imdb_id": "tt11827628", "movie_name": "Memory_2022", "gt_movie": "Memory_2023", "note": "same title, different story"},
+    {"imdb_id": "tt0144084", "movie_name": "American Psycho_2000", "gt_movie": "The American_2010", "note": "extra source (IMSDb); shares only a title word"},
     {"imdb_id": "tt0120812", "movie_name": "Rush Hour_1998", "gt_movie": "Rush_2013"},
     {"imdb_id": "tt0266915", "movie_name": "Rush Hour 2_2001", "gt_movie": "Rush_2013"},
     {"imdb_id": "tt0120255", "movie_name": "The Sweet Hereafter_1997", "gt_movie": "Hereafter_2010"},

@@ -40,7 +40,7 @@ _CONTINUED_RE = re.compile(
 )
 _OMITTED_RE = re.compile(r"^\s*\d{0,4}[A-Z]{0,3}\s*(OMITTED|OMIT)\s*\d{0,4}[A-Z]{0,3}\s*$")
 _REVISION_MARK_RE = re.compile(r"\\*\*+\\*")
-_CUE_CONTD_RE = re.compile(r"\(\s*CONT(INUED|'?D|\.)?[.\s]*\)", re.I)
+_CUE_CONTD_RE = re.compile(r"\(\s*CONT(INUED|['\u2019]?D|\.)?[.\s]*\)", re.I)
 _STRAY_BACKSLASH_RE = re.compile(r"\\+")
 _REVISION_RE = re.compile(
     r"\b(rev(ision|ised|s)?\.?|draft|pink|blue|yellow|green|goldenrod|buff|salmon|cherry)\b.{0,40}\d{1,2}[/.\-]\d{1,2}[/.\-]\d{2,4}", re.I
@@ -122,12 +122,16 @@ def _strip_marks(line: str) -> str:
     return _STRAY_BACKSLASH_RE.sub(lambda m: " " * len(m.group()), line)
 
 
-def drop_orphan_cues(elements: list[tuple[str, str]]) -> tuple[list[tuple[str, str]], int]:
-    """A cue whose dialogue is missing is removed rather than turned into an action line."""
+def drop_orphan_cues(elements: list[tuple[str, str]], talkers: set[str] | None = None) -> tuple[list[tuple[str, str]], int]:
+    """A cue whose dialogue is missing is removed (contract C12c) when that name speaks elsewhere in the script;
+    otherwise it was an uppercase action line taken for a cue ("EXPLOSION OF COLORS") and stays as action."""
     out, dropped = [], 0
     for i, (tag, text) in enumerate(elements):
         nxt = elements[i + 1][0] if i + 1 < len(elements) else None
         if tag == "character" and nxt not in ("dialogue", "parenthetical"):
+            if talkers is not None and speaker_name(text) not in talkers:
+                out.append(("scene_description", text))
+                continue
             dropped += 1
             continue
         out.append((tag, text))
@@ -274,7 +278,7 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                 nxt_i += 1
         nxt = lines[nxt_i] if nxt_i < n else ""
         is_cue = (
-            looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip())
+            looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
             and (ind(line) >= cue_min if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
             and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("("))
         )
@@ -311,8 +315,8 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             cur.append(("dialogue", join_lines(dlg)))
     flush_para()
 
-    scenes, orphan_cues = [], 0
-    for idx, elements in enumerate(scenes_raw):
+    cleaned_scenes = []
+    for elements in scenes_raw:
         cleaned = []
         for tag, t in elements:
             if tag == "character":
@@ -321,7 +325,12 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             # dialogue is real text however short ("More.", "...", "478."); page furniture was removed per line
             if (tag in ("dialogue", "parenthetical") and t.strip()) or not is_junk_element(t):
                 cleaned.append((tag, t))
-        cleaned, dropped = drop_orphan_cues(cleaned)
+        cleaned_scenes.append(cleaned)
+    talkers = {speaker_name(t) for els in cleaned_scenes for i, (tag, t) in enumerate(els)
+               if tag == "character" and i + 1 < len(els) and els[i + 1][0] in ("dialogue", "parenthetical")}
+    scenes, orphan_cues = [], 0
+    for idx, cleaned in enumerate(cleaned_scenes):
+        cleaned, dropped = drop_orphan_cues(cleaned, talkers)
         orphan_cues += dropped
         scenes.append(Scene(idx, cleaned))
     speakers = {speaker_name(t) for s in scenes for tag, t in s.elements if tag == "character"}
