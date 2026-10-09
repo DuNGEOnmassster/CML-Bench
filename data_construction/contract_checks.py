@@ -52,7 +52,7 @@ def binom_cdf(k: int, n: int, p: float) -> float:
 def base_title(movie_name: str) -> str:
     t = re.sub(r"_\d{4}$", "", movie_name).lower()
     t = re.sub(r"^the\s+", "", t)
-    t = re.split(r"[:\-–]", t)[0]
+    t = re.split(r":| - | – ", t)[0]
     t = re.sub(r"\b(part\s+)?([ivx]+|\d+)\b\s*$", "", t.strip())
     return re.sub(r"[^a-z0-9]", "", t)
 
@@ -91,12 +91,16 @@ def main() -> None:
                     or not isinstance(r["summary"], str))
     record("C01", parse_err == 0 and bad_first == 0 and recs, f"{n} items, parse_errors={parse_err}, bad_first_fields={bad_first}")
 
-    ms = {}
+    # An imdb_id can occur twice in one split; the builder (and the verifier) use the longer screenplay.
+    ms, vocab = {}, Counter()
     for split in ("train", "val", "test"):
         with open(os.path.join(args.moviesum_dir, f"{split}.jsonl"), encoding="utf-8") as f:
             for line in f:
                 row = json.loads(line)
-                ms.setdefault(row["imdb_id"], {})[split] = row
+                vocab.update(re.findall(r"[a-z]{3,}", row["script"].lower()))
+                cur = ms.setdefault(row["imdb_id"], {}).get(split)
+                if cur is None or len(row["script"]) > len(cur["script"]):
+                    ms[row["imdb_id"]][split] = row
     bad_ids = [r["item_id"] for r in recs if ms.get(r["imdb_id"], {}).get(r["source_split"], {}).get("movie_name") != r["movie_name"]]
     record("C02", not bad_ids, f"mismatches={bad_ids[:5]}")
 
@@ -150,18 +154,25 @@ def main() -> None:
         pref_ok, how = pval >= 0.05, f"binomial P(X<={k}|n={n},p=0.8)={pval:.3f} >= 0.05"
     record("C10'", all(12 <= s <= 24 for s in sc) and pref_ok, f"range=[{min(sc)},{max(sc)}], share_15_20={share:.3f}, {how}")
 
-    vocab = Counter()
-    for by_split in ms.values():
-        for row in by_split.values():
-            vocab.update(re.findall(r"[a-z]{3,}", row["script"].lower()))
-    parsed = {r["item_id"]: parse_script(r["script_segment"], detok=False) for r in recs}
-    stats = {r["item_id"]: segment_stats(parsed[r["item_id"]], r["script_segment"], vocab) for r in recs}
+    def has_dup_scene(scenes):
+        bodies = ["\n".join(t for tag, t in s.elements if tag != "stage_direction") for s in scenes]
+        bodies = [b for b in bodies if len(b) >= 200]
+        return len(bodies) != len(set(bodies))
+
+    stats, dup_scene = {}, set()
+    for r in recs:
+        scenes = parse_script(r["script_segment"], detok=False)
+        stats[r["item_id"]] = segment_stats(scenes, r["script_segment"], vocab)
+        if has_dup_scene(scenes):
+            dup_scene.add(r["item_id"])
     bad_dlg = [i for i, s in stats.items() if s["dialogue_turns"] < 20 or s["num_speakers"] < 2 or not 0.10 <= s["dialogue_char_ratio"] <= 0.85]
     record("C11", not bad_dlg, f"violations={bad_dlg[:5]}")
 
     art = sorted(s["tokenization_artefacts_per_1k_words"] for s in stats.values())
     p99 = art[min(len(art) - 1, int(0.99 * len(art)))]
-    junk = [r["item_id"] for r in recs if re.search(r"\ufffd|[\x00-\x08\x0b-\x1f]|&amp;amp;|>\(?(CONTINUED|OMITTED)\)?<|>\d+\.?<", r["script_segment"])]
+    # A bare-number <dialogue> is a line when a real speaker says it ("478."); C05' rejects page numbers kept as lines.
+    junk = [r["item_id"] for r in recs if re.search(r"\ufffd|[\x00-\x08\x0b-\x1f]|&amp;amp;|>\(?(CONTINUED|OMITTED)\)?<|"
+                                                     r"<(?!dialogue)(\w+)>\d+\.?</\2>", r["script_segment"])]
     record("C12", p99 <= 2 and not junk, f"artefacts_p99={p99}/1k words, junk_items={junk[:5]}")
 
     c12b = [r["item_id"] for r in recs if C12B_RE.search(r["script_segment"])]
@@ -173,14 +184,9 @@ def main() -> None:
     bad_orph = [i for i, v in orphans.items() if v]
     record("C12c", not bad_orph, f"items_with_orphan_speaker_lines={len(bad_orph)} {bad_orph[:3]}, total={sum(orphans.values())}")
 
-    def has_dup_scene(scenes):
-        bodies = ["\n".join(t for tag, t in s.elements if tag != "stage_direction") for s in scenes]
-        bodies = [b for b in bodies if len(b) >= 200]
-        return len(bodies) != len(set(bodies))
-
     noise = [i for i, s in stats.items() if s["garble_rate"] > 0.005 or s["rare_word_rate"] > 0.01
              or s["bad_character_tag_ratio"] > 0.05 or s["max_element_chars"] > 3000 or s["heading_ratio"] < 0.7
-             or has_dup_scene(parsed[i])]
+             or i in dup_scene]
     record("C13", not noise, f"violations={noise[:5]}")
 
     headings = sum(r["script_segment"].count("<stage_direction>") for r in recs)
@@ -207,13 +213,17 @@ def main() -> None:
     wrong_flag = [r["item_id"] for r in recs
                   if (r["gt_related"] or None) != ({"type": rel[r["imdb_id"]]["type"], "gt_movie": rel[r["imdb_id"]]["gt_movie"],
                                                      "gt_imdb_id": rel[r["imdb_id"]]["gt_imdb_id"]} if r["imdb_id"] in rel else None)]
-    gt_base = {g["imdb_id"]: base_title(g["movie_name"]) for g in gt}
+    # Look-alike = same base title, a multi-word GT base title inside the title, or a curated IP keyword.
+    # Single-word GT titles ("The American", "Sugar", "Rush") only match exactly, or every "American ..." would.
+    gt_base = {g["imdb_id"]: (base_title(g["movie_name"]), len(re.sub(r"_\d{4}$", "", g["movie_name"]).split()) > 1 and
+                              not re.match(r"^the \S+$", re.sub(r"_\d{4}$", "", g["movie_name"]).lower())) for g in gt}
     lookalikes = set()
     for r in recs:
         name, b = r["movie_name"].lower(), base_title(r["movie_name"])
-        for gid, gb in gt_base.items():
+        for gid, (gb, multi) in gt_base.items():
             kws = table["ip_keywords"].get(gid, [])
-            if (len(gb) >= 4 and len(b) >= 4 and (gb in b or b in gb)) or any(re.search(rf"\b{re.escape(kw)}\b", name) for kw in kws):
+            if (b == gb and len(gb) >= 3) or (multi and len(gb) >= 6 and gb in b) \
+                    or any(re.search(rf"\b{re.escape(kw)}\b", name) for kw in kws):
                 if r["imdb_id"] not in cleared:
                     lookalikes.add(r["movie_name"])
     unsafe = sum(1 for r in recs if r["eval_safe"] != (r["gt_related"] is None))
@@ -225,18 +235,22 @@ def main() -> None:
     gt_sh = set()
     for g in gt:
         gt_sh |= shingles(words_of(render(parse_script(g["script_segment"]))), CONFIG["ngram"])
-    item_sh = {r["item_id"]: shingles(words_of(r["script_segment"]), CONFIG["ngram"]) for r in recs}
-    gt_ov = {i: overlap(s, gt_sh) for i, s in item_sh.items()}
+    # Sampled 13-grams (1/16, as in the build's movie-level check) keep the C17 owner map small at 13k items.
+    gt_ov, sampled = {}, {}
+    for r in recs:
+        sh = shingles(words_of(r["script_segment"]), CONFIG["ngram"])
+        gt_ov[r["item_id"]] = overlap(sh, gt_sh)
+        sampled[r["item_id"]] = {h for h in sh if h % CONFIG["shingle_sample_mod"] == 0}
     record("C16", max(gt_ov.values()) <= 0.02, f"max_gt_overlap={max(gt_ov.values()):.4f}")
     record("C16b", align["c16b_pass"], f"max_gt_8gram_overlap={align['c16b_max_gt_8gram_overlap']:.5f} (independent tokenizer)")
 
     owner = defaultdict(set)
     for r in recs:
-        for h in item_sh[r["item_id"]]:
+        for h in sampled[r["item_id"]]:
             owner[h].add(r["imdb_id"])
     dup_pairs = []
     for r in recs:
-        sh = item_sh[r["item_id"]]
+        sh = sampled[r["item_id"]]
         other = Counter(m for h in sh for m in owner[h] if m != r["imdb_id"])
         if other and other.most_common(1)[0][1] / max(1, len(sh)) > 0.30:
             dup_pairs.append((r["item_id"], other.most_common(1)[0][0]))

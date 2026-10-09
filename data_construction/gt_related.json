@@ -84,7 +84,9 @@
     {"imdb_id": "tt0118661", "movie_name": "The Avengers_1998", "gt_movie": "Black Panther: Wakanda Forever_2022", "note": "unrelated British spy film"},
     {"imdb_id": "tt0082010", "movie_name": "An American Werewolf in London_1981", "gt_movie": "The American_2010"},
     {"imdb_id": "tt0118604", "movie_name": "An American Werewolf in Paris_1997", "gt_movie": "The American_2010"},
-    {"imdb_id": "tt2278388", "movie_name": "The Grand Budapest Hotel_2014", "gt_movie": "Grand Hotel_1932"}
+    {"imdb_id": "tt2278388", "movie_name": "The Grand Budapest Hotel_2014", "gt_movie": "Grand Hotel_1932"},
+    {"imdb_id": "tt6418778", "movie_name": "Fast Color_2018", "gt_movie": "Fast & Furious_2009"},
+    {"imdb_id": "tt0083929", "movie_name": "Fast Times at Ridgemont High_1982", "gt_movie": "Fast & Furious_2009"}
   ],
   "ip_keywords": {
     "tt1877830": ["batman", "dark knight", "joker", "catwoman", "gotham", "suicide squad", "riddler", "penguin"],
