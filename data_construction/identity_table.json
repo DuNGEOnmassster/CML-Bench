@@ -35,6 +35,7 @@
     {"imdb_id": "tt0151137", "movie_name": "The Messenger: The Story of Joan of Arc_1999", "c33": "low", "decision": "accept", "evidence": "Jeanne for Joan"},
     {"imdb_id": "tt1745960", "movie_name": "Top Gun: Maverick_2022", "c33": "low", "decision": "accept", "evidence": "call signs; 7 spelling-variant matches"},
     {"imdb_id": "tt5093026", "movie_name": "Papillon_2017", "c33": "low", "decision": "accept", "evidence": "same story as Papillon (1973); spelling-variant match"},
+    {"imdb_id": "tt1262416", "movie_name": "Scream 4_2011", "c33": "low", "decision": "accept", "evidence": "extra source (IMSDb), proposed by the sources worker, for the evaluator to confirm: IMDb principals list the opening Stab cameos (Chloe, Rachel, Sherrie, Trudie, Jenny) and Sidney/Dewey/Gale; the window speakers Kirby, Jill, Charlie, Robbie, Trevor, Olivia, Kate, Deputy Hicks are the film's other characters; GHOST FACE vs GHOSTFACE is spacing"},
 
     {"imdb_id": "tt14735318", "movie_name": "Emma_2020", "c33": "unverifiable", "decision": "unverifiable_ok", "evidence": "speakers Emma, Mr Knightley, Frank Churchill, Harriet"},
     {"imdb_id": "tt15679400", "movie_name": "Knock at the Cabin_2023", "c33": "unverifiable", "decision": "unverifiable_ok", "evidence": "speakers Andrew, Leonard, Adriane, Sabrina, Eric"}

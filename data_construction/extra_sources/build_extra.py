@@ -54,7 +54,7 @@ from extra_sources.text_screenplay import PARSER_VERSION, extract_text, text_to_
 from extra_sources.verbatim_check import check as verbatim_check  # noqa: E402
 from extra_sources.mislabel import signatures as mislabel_signatures, spk as mislabel_spk  # noqa: E402
 from extra_sources import catalogs  # noqa: E402
-from dataset_schema import gt_relation, load_gt_related  # noqa: E402
+from dataset_schema import gt_relation, load_gt_related, load_identity_table  # noqa: E402
 
 # Per-window limits on CML mislabel signatures = MovieSum v3.1 p99 per segment (13,065 segments, extra_sources/mislabel.py)
 MISLABEL_LIMITS = {"dual_collapse": 0, "paren_speech": 1, "name_in_dialogue": 1, "fused_cue": 2}
@@ -282,6 +282,7 @@ def main() -> None:
     ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
     ap.add_argument("--imdb_dir", default="data_construction/work/sources/imdb")
     ap.add_argument("--gt_related", default=None, help="GT relation table (default: data_construction/gt_related.json)")
+    ap.add_argument("--identity_table", default=None, help="C33 decisions (default: data_construction/identity_table.json)")
     ap.add_argument("--out", default="data_construction/work/extra_build")
     ap.add_argument("--limit_films", type=int, default=0)
     ap.add_argument("--delay", type=float, default=2.0)
@@ -296,6 +297,7 @@ def main() -> None:
 
     ref = load_reference(args, os.path.join(args.out, "reference_cache.pkl"))
     gt_table = load_gt_related(args.gt_related)
+    identity = load_identity_table(args.identity_table)
     gt_names = {r["imdb_id"]: r["movie_name"] for r in load_gt(args.gt_path)}
     reviewed = {r["imdb_id"] for r in gt_table["relations"]} | {r["imdb_id"] for r in gt_table.get("unrelated", [])}
     index = load_index(os.path.join(args.imdb_dir, "title_index.json"))
@@ -358,6 +360,9 @@ def main() -> None:
             rel = gt_relation(imdb_id, gt_table)
             if not reasons and rel and rel["type"] == "remake":
                 reasons.append("gt_remake")
+            ident = identity.get(imdb_id, {})
+            if not reasons and ident.get("decision") in ("exclude", "relabel", "duplicate_keep_other"):
+                reasons.append(f"identity_{ident['decision']}")  # C33 ruling: the text is not this film's screenplay
             look = gt_lookalike(meta["title"], gt_table, gt_names) if not reasons and imdb_id not in reviewed else None
             if look:
                 reasons.append(f"gt_lookalike_unreviewed:{look}")
@@ -439,6 +444,8 @@ def main() -> None:
                 "imdb_votes": meta.get("votes"), "genres": meta.get("genres", []), "year": meta.get("year"),
                 "imdb_match_confidence": match.get("confidence"), "imdb_match_verified": verified,
                 "gt_related": gt_rel, "eval_safe": gt_rel is None,
+                "identity_decision": identity.get(imdb_id, {}).get("decision"),
+                "script_version": "draft" if identity.get(imdb_id, {}).get("decision") == "accept_as_draft" else None,
                 "content_normalization": NORMALIZATION_VERSION, "content_sha1": hashlib.sha1(content.encode()).hexdigest(),
                 "gt_ngram_overlap": round(gt_ov, 5), "speaker_tag_check": tag_check, **st,
                 **({"ablated_reasons": ablated} if ablate else {}),
