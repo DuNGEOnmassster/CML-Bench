@@ -14,7 +14,7 @@ import subprocess
 import tempfile
 from collections import Counter
 
-from cml_format import CAMERA_RE, Scene, clean_text, is_junk_element, speaker_name
+from cml_format import CAMERA_RE, Scene, clean_text, is_junk_element, speaker_name, strip_page_furniture
 
 PARSER_VERSION = "text_screenplay_v1"
 
@@ -33,12 +33,18 @@ TRANSITION_LINE_RE = re.compile(
 )
 # Page furniture. Only the typographic forms are removed ("(MORE)", "CONTINUED:", a page number on its own
 # line at a page break or the right margin), so dialogue such as "More." or "478." is never dropped.
-_PAGE_NO_RE = re.compile(r"^\s*(page\s*)?[-\u2013\[]?\s*\d{1,3}\s*[-\u2013\]]?[.)]?\s*$", re.I)
+_PAGE_NO_RE = re.compile(r"^\s*(page\s*)?[-\u2013\[]?\s*\d{1,3}\s*[-\u2013\]]?[.)]?\s*(of\s+\d{1,3}\s*)?$", re.I)
+# Scene numbers around it ("12A", "A12") always hold a digit, so "JO (CONT'D)" stays a cue.
+_SCENE_NO = r"([A-Z]?\d{1,4}[A-Z]{0,2})?"
 _CONTINUED_RE = re.compile(
-    r"^\s*\d{0,4}[A-Z]{0,2}\s*(\(\s*(CONTINUED|CONT'?D|MORE|continued|more)\s*\)|CONTINUED\s*:?|-+\s*MORE\s*-+)"
-    r"\s*(\(\d+\))?\s*\d{0,4}[A-Z]{0,2}\s*$"
+    rf"^\s*{_SCENE_NO}\s*(\(\s*(CONTINUED|CONT'?D|MORE|continued|more)\s*\)|CONTINUED\s*:?|-+\s*MORE\s*-+)"
+    rf"\s*(\(\d+\))?\s*{_SCENE_NO}\s*$"
 )
-_OMITTED_RE = re.compile(r"^\s*\d{0,4}[A-Z]{0,3}\s*(OMITTED|OMIT)\s*\d{0,4}[A-Z]{0,3}\s*$")
+_SCENE_NOTE_RE = re.compile(r"^\s*SCENES?\s+\d+[A-Z]?(\s*(-|TO|AND|THRU|THROUGH)\s*\d+[A-Z]?)?(\s+(INCORPORATED INTO|MOVED TO|"
+                            r"COMBINED WITH|DELETED|OMITTED)(\s+SCENES?\s+\d+[A-Z]?)?)?\s*$")
+_DUAL_CUE_RE = re.compile(r"^(\s*)(\S(?:.*?\S)?)\s{4,}(\S(?:.*?\S)?)\s*$")
+_DOUBLED_SCENE_NO_RE = re.compile(r"^(\d{1,3}[A-Z]?)\s+\1\s+(?=\S)")
+_OMITTED_RE = re.compile(rf"^\s*{_SCENE_NO}\s*(OMITTED|OMIT)\s*{_SCENE_NO}\s*$")
 _REVISION_MARK_RE = re.compile(r"\\*\*+\\*")
 _CUE_CONTD_RE = re.compile(r"\(\s*CONT(INUED|['\u2019]?D|\.)?[.\s]*\)", re.I)
 _STRAY_BACKSLASH_RE = re.compile(r"\\+")
@@ -48,6 +54,9 @@ _REVISION_RE = re.compile(
 )
 _SPEAKER_COLON_RE = re.compile(r"^\s*[A-Z][A-Za-z .'\-]{0,24}:\s+\S")
 _CUE_EXT_RE = re.compile(r"\s*\([^()]*\)\s*$")
+_CUE_DASH_RE = re.compile(r"^[-\u2013]\s+")
+_CUE_VOICE_RE = re.compile(r"\s+[VO]\.\s?[SOC0]\.?$")  # unbracketed "V.O.", "O.S.", "O.C." (and the "V.0." typo)
+_INITIALISM_END_RE = re.compile(r"(^|\s)([A-Z]\.){1,3}$")  # "M.E.", "STORE P.A."
 _CUE_CHARS_RE = re.compile(r"^[A-Z0-9#'\"][A-Za-z0-9 .,'\u2019\-&#/\"]*$")
 _HONORIFIC_END_RE = re.compile(r"\b(MR|MRS|MS|DR|JR|SR|ST|LT|SGT|CAPT|COL|GEN|PROF|REV|NO)\.$")
 _NOT_A_NAME = {"THE END", "CONTINUED", "MORE", "OMITTED", "BLACK", "SILENCE", "CREDITS", "TITLE", "SUPER", "INSERT",
@@ -111,7 +120,7 @@ def _is_noise_line(s: str, prev_blank: bool = True) -> bool:
     if _PAGE_NO_RE.match(s):
         return prev_blank or len(s) - len(s.lstrip()) > 55
     return bool(
-        _CONTINUED_RE.match(s) or _OMITTED_RE.match(s)
+        _CONTINUED_RE.match(s) or _OMITTED_RE.match(s) or _SCENE_NOTE_RE.match(s)
         or (len(s.strip()) < 80 and _REVISION_RE.search(s) and not re.search(r"[a-z]{3,} [a-z]{3,} [a-z]{3,}", s))
         or (prev_blank and re.fullmatch(r"\s*([_=~]+|[-.]{5,})\s*", s))
     )
@@ -136,19 +145,25 @@ def _strip_glued_header(line: str, headers: set[str]) -> str:
 
 def repeated_page_headers(lines: list[str], min_repeats: int = 5) -> set[str]:
     """Page headers/footers printed on every page ('"Ricky Stanicky" 11.13.09 Bushell 93.', 'Deceptions by Richard
-    Taylor 32.'): lines carrying a number whose text, with numbers masked, repeats >= min_repeats times. Scene
-    headings, cues and transitions never qualify."""
+    Taylor 32.', 'WONDERSTRUCK 2.', 'WRECK-IT RALPH 62'): lines carrying a number whose text, with numbers masked,
+    repeats >= min_repeats times. Scene headings and transitions never qualify. Short all-caps lines (shot slugs
+    "151 SARK 151", cues) only qualify as a title with a trailing page number that takes >= 3 values."""
     counts: dict[str, int] = {}
+    pages: dict[str, set] = {}
     for l in lines:
         s = l.strip()
+        if len(s) < 6 or not re.search(r"\d", s) or heading_text(s) or is_transition(s):
+            continue
         letters = [c for c in s if c.isalpha()]
         shot_or_cue = len(s.split()) <= 6 and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.9
-        if len(s) < 6 or not re.search(r"\d", s) or heading_text(s) or is_transition(s) or looks_like_cue(s) or shot_or_cue:
-            continue  # numbered shot headings ("151 SARK 151") repeat too, but they are content
         k = _header_key(s)
+        title_page = re.fullmatch(r"[^\d#]*[a-z][^#]*\s#\.?", k)  # "wonderstruck #." : no number but the trailing page
+        if (looks_like_cue(s) or shot_or_cue) and not title_page:
+            continue  # numbered shot headings ("151 SARK 151") repeat too, but they are content
         if len(re.sub(r"[^a-z]", "", k)) >= 4:
             counts[k] = counts.get(k, 0) + 1
-    return {k for k, c in counts.items() if c >= min_repeats}
+            pages.setdefault(k, set()).add(re.findall(r"\d+", s)[-1])
+    return {k for k, c in counts.items() if c >= min_repeats and len(pages[k]) >= 3}
 
 
 def _strip_marks(line: str) -> str:
@@ -194,10 +209,11 @@ def is_transition(s: str) -> bool:
 
 
 def cue_name(s: str) -> str:
-    name = s.strip()
+    """'JAMIE (CONT'D).' / '- LEWIS' / 'SARK V.0.' -> 'JAMIE' / 'LEWIS' / 'SARK'"""
+    name = re.sub(r"\)\s*\.$", ")", _CUE_DASH_RE.sub("", s.strip()))
     for _ in range(2):
         name = _CUE_EXT_RE.sub("", name)
-    return name.strip()
+    return _CUE_VOICE_RE.sub("", name).strip()
 
 
 def looks_like_cue(s: str) -> bool:
@@ -207,7 +223,8 @@ def looks_like_cue(s: str) -> bool:
     name = cue_name(s)
     if not name or len(name) > 35 or len(name.split()) > 5 or name in _NOT_A_NAME:
         return False
-    if name[-1] in ":!?,;" or (name.endswith(".") and not _HONORIFIC_END_RE.search(name)):
+    if name[-1] in ":!?,;" or (name.endswith(".") and not _HONORIFIC_END_RE.search(name)
+                               and not (_INITIALISM_END_RE.search(name) and not re.search(r"\d", name))):
         return False
     if not _CUE_CHARS_RE.match(name):
         return False
@@ -230,12 +247,17 @@ def _mode(xs, default=0):
     return Counter(xs).most_common(1)[0][0] if xs else default
 
 
+def is_dual_cue(line: str) -> bool:
+    m = _DUAL_CUE_RE.match(line)
+    return bool(m and looks_like_cue(m.group(2)) and looks_like_cue(m.group(3)))
+
+
 def infer_layout(lines: list[str]) -> dict:
     indents = [(len(l) - len(l.lstrip()), l.strip()) for l in lines]
     cue_ind, dlg_ind = [], []
     for i, (ind, s) in enumerate(indents[:-1]):
         nxt_ind, nxt = indents[i + 1]
-        if s and nxt and looks_like_cue(s):
+        if s and nxt and looks_like_cue(s) and not is_dual_cue(s):
             cue_ind.append(ind)
             if not nxt.startswith("("):
                 dlg_ind.append(nxt_ind)
@@ -243,7 +265,7 @@ def infer_layout(lines: list[str]) -> dict:
     cue, dlg = _mode(cue_ind, 0), _mode(dlg_ind, 0)
     indented = len(cue_ind) >= 20 and cue >= action_ind + 8 and dlg >= action_ind + 4
     known = {cue_name(s) for i, (ind, s) in enumerate(indents[:-1])
-             if s and indents[i + 1][1] and looks_like_cue(s) and indents[i + 1][0] >= action_ind + 4}
+             if s and indents[i + 1][1] and looks_like_cue(s) and not is_dual_cue(s) and indents[i + 1][0] >= action_ind + 4}
     return {"layout": "indented" if indented else "flush", "action_indent": action_ind, "cue_indent": cue,
             "dialogue_indent": dlg, "cue_candidates": len(cue_ind), "known_cues": known}
 
@@ -309,16 +331,54 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             cur.append(("scene_description", s))
             i += 1
             continue
+        dual = _DUAL_CUE_RE.match(line)
+        if is_dual_cue(line) and i + 1 < n and lines[i + 1].strip():
+            # two-column (dual) dialogue: "BARNES          TAYLOR" / "Co --           Copy that."
+            flush_para()
+            col2 = line.index(dual.group(3), len(dual.group(1)) + len(dual.group(2)))
+            sides = ([], [])
+            i += 1
+            while i < n and lines[i].strip() and not heading_text(lines[i].strip()) and not is_transition(lines[i].strip()):
+                l2 = lines[i].rstrip()
+                chunks = [c for c in re.split(r"\s{3,}", l2.strip()) if c]
+                if len(chunks) >= 2:
+                    sides[0].append(chunks[0])
+                    sides[1].append(" ".join(chunks[1:]))
+                else:
+                    sides[1 if ind(l2) >= col2 - 6 else 0].append(chunks[0])
+                i += 1
+            for name, side in zip((dual.group(2), dual.group(3)), sides):
+                if not side:
+                    continue
+                cur.append(("character", name))
+                speech = []
+                for t in side:
+                    if t.startswith("(") and t.endswith(")"):
+                        if speech:
+                            cur.append(("dialogue", join_lines(speech)))
+                            speech = []
+                        cur.append(("parenthetical", t))
+                    else:
+                        speech.append(t)
+                if speech:
+                    cur.append(("dialogue", join_lines(speech)))
+            continue
         nxt_i = i + 1
-        if nxt_i < n and not lines[nxt_i].strip() and nxt_i + 1 < n:
-            # tolerate one blank line between a cue and its parenthetical (any layout) or indented dialogue
-            cand = lines[nxt_i + 1]
-            if cand.strip().startswith("(") or (indented and cand.strip() and a_ind + 3 < ind(cand) < c_ind - 2):
-                nxt_i += 1
+        if nxt_i < n and not lines[nxt_i].strip():
+            # blank lines between a cue and its parenthetical (any layout) or indented dialogue: one blank line, or a
+            # page break (several blank lines where the page furniture was removed)
+            j = nxt_i
+            while j < n and j - nxt_i < 12 and not lines[j].strip():
+                j += 1
+            cand = lines[j] if j < n else ""
+            if (j - nxt_i == 1 or not cand.strip()[:1].isupper() or indented) and (
+                    cand.strip().startswith("(") or (indented and cand.strip() and a_ind + 3 < ind(cand) < c_ind - 2)):
+                nxt_i = j
         nxt = lines[nxt_i] if nxt_i < n else ""
-        # a known speaker at the cue indent whose line sits at the action indent (dialogue then runs to a blank line)
-        flat_dialogue = (indented and ind(line) >= cue_min and ind(nxt) <= a_ind + 2 and not nxt.strip().startswith("(")
-                         and cue_name(s) in lay["known_cues"])
+        # a known speaker at the cue indent whose line (or parenthetical) sits at the action indent: the dialogue then
+        # runs to a blank line ("LOIS" / "(pre-occupied)" / "Uh-huh ..." all at column 0 under a tab-indented cue)
+        flat_dialogue = (indented and ind(line) >= cue_min and ind(nxt) <= a_ind + 2
+                         and (nxt.strip().startswith("(") or cue_name(s) in lay["known_cues"]))
         is_cue = (
             looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
             and (ind(line) >= cue_min if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
@@ -330,7 +390,7 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             i += 1
             continue
         flush_para()
-        cur.append(("character", s))
+        cur.append(("character", re.sub(r"\)\s*\.$", ")", _CUE_DASH_RE.sub("", s))))
         i = nxt_i
         dlg: list[str] = []
         paren: list[str] = []
@@ -343,8 +403,11 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                 if t2 and not heading_text(t2) and not is_transition(t2) and not looks_like_cue(t2):
                     i += 1
                     continue
+            # "(a beat)" at the left margin between two lines of indented dialogue is still a parenthetical
+            margin_paren = (t.startswith("(") and t.endswith(")") and len(t) <= 40 and i + 1 < n and lines[i + 1].strip()
+                            and ind(lines[i + 1]) > a_ind + 2 and not looks_like_cue(lines[i + 1].strip()))
             if not t or heading_text(t) or is_transition(t) or (
-                    indented and not flat_dialogue and ind(l2) <= a_ind + 2 and len(t) > 0):
+                    indented and not flat_dialogue and ind(l2) <= a_ind + 2 and len(t) > 0 and not margin_paren):
                 break
             if indented and ind(l2) >= cue_min and looks_like_cue(t) and dlg:
                 break
@@ -376,6 +439,8 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             if (tag in ("dialogue", "parenthetical") and t.strip()) or not is_junk_element(t):
                 cleaned.append((tag, t))
         cleaned_scenes.append(cleaned)
+    cleaned_scenes = [[(tag, _DOUBLED_SCENE_NO_RE.sub("", t) if tag == "scene_description" else t) for tag, t in els if t.strip()]
+                      for els in strip_page_furniture(cleaned_scenes)]
     talkers = {speaker_name(t) for els in cleaned_scenes for i, (tag, t) in enumerate(els)
                if tag == "character" and i + 1 < len(els) and els[i + 1][0] in ("dialogue", "parenthetical")}
     scenes, orphan_cues = [], 0
