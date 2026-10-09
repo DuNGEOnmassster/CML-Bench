@@ -4,6 +4,7 @@ Run directory layout:
   items.jsonl                         selected segments (content + metadata); source of truth for the run
   batches/batch_0001/manifest.json    work unit for one agent: prompt path + items (content/abstract paths, target words)
   batches/batch_0001/items/<id>.xml   exact `script_segment` text, one file per item
+  batches/batch_0001/scratch/         private temp space for the agent working this batch
   abstracts/<id>.json                 written by agents (stage 3); existing files are never overwritten here
 
 Abstract writing is done by agents (no API key needed): each agent takes one manifest, reads the prompt
@@ -79,6 +80,7 @@ def main() -> None:
         batch_id = f"batch_{n_batches:04d}"
         bdir = os.path.join(run_dir, "batches", batch_id)
         os.makedirs(os.path.join(bdir, "items"), exist_ok=True)
+        os.makedirs(os.path.join(bdir, "scratch"), exist_ok=True)
         entries = []
         for it in items[b : b + args.batch_size]:
             content_path = os.path.join(bdir, "items", f"{it['item_id']}.xml")
@@ -101,6 +103,7 @@ def main() -> None:
             "run_dir": run_dir,
             "prompt_path": os.path.abspath(args.prompt),
             "prompt_version": args.prompt_version,
+            "scratch_dir": os.path.join(bdir, "scratch"),
             "num_items": len(entries),
             "total_content_tokens": sum(e["content_tokens"] for e in entries),
             "items": entries,

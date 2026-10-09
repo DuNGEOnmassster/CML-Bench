@@ -30,7 +30,8 @@ No LLM API is used. An agent (or several in parallel, one per batch) is given a 
 1. reads `prompt_path` (`prompts/abstract_prompt_v1_2.md`) once;
 2. for each item: reads `content_path`, writes `{"item_id", "abstract", "prompt_version", "author"}` to
    `abstract_path`, keeping the word count inside `target_words`;
-3. skips items whose `abstract_path` already exists (resumable);
+3. skips items whose `abstract_path` already exists (resumable), and keeps any temp files in the
+   manifest's `scratch_dir` (parallel agents share `/tmp` and have deleted each other's drafts);
 4. runs `python data_construction/check_abstracts.py --batch <batch_dir>` and rewrites only items with
    mechanical hard failures (length, markdown, meta phrases, all-caps names, ungrounded names).
 

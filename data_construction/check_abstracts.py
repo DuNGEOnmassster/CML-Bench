@@ -73,7 +73,10 @@ def grounded(word: str, content_lower: str) -> bool:
     """A capitalized abstract word is grounded if it (each capitalized hyphen part) or its singular occurs in the content."""
     parts = [p.lower() for p in word.split("-") if p and p[0].isupper()]
     def ok(p):
-        return p in content_lower or (p.endswith("es") and p[:-2] in content_lower) or (p.endswith("s") and p[:-1] in content_lower)
+        if p in content_lower or (p.endswith("es") and p[:-2] in content_lower) or (p.endswith("s") and p[:-1] in content_lower):
+            return True
+        # derived forms of a grounded name: Mexican/Mexico, Confederate/Confederacy
+        return len(p) >= 7 and p[: len(p) - 3] in content_lower
     return bool(parts) and all(ok(p) for p in parts)
 
 
