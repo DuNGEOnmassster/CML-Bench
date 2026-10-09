@@ -46,7 +46,7 @@ _DUAL_CUE_RE = re.compile(r"^(\s*)(\S(?:.*?\S)?)\s{4,}(\S(?:.*?\S)?)\s*$")
 _DOUBLED_SCENE_NO_RE = re.compile(r"^(\d{1,3}[A-Z]?)\s+\1\s+(?=\S)")
 _TITLE_INTRO_RE = re.compile(r"\b(TITLES?|SUPER|CARD|CHYRON|CAPTION)\s*:\s*$")
 # the speech after a fused cue starts like speech ("Ma'am - ..."), never with a lowercase verb ("EMILY gives her a look.")
-_FUSED_CUE_RE = re.compile(r"^(\s*)([A-Z][A-Z.'\u2019\-]+(?: [A-Z][A-Z.'\u2019\-]+){0,2}(?: \([^)]*\))?) +((?=[A-Z\"'\u2018\u201c(.\-])(?=\S*[a-z])\S.*)$")
+_FUSED_CUE_RE = re.compile(r"^(\s*)([A-Z][A-Z.'\u2019\-]+(?: [A-Z][A-Z.'\u2019\-]+){0,2}(?: \([^)]*\))?) +((?=[A-Z\"'\u2018\u201c.])(?=\S*[a-z])\S.*)$")
 _OMITTED_RE = re.compile(rf"^\s*{_SCENE_NO}\s*(OMITTED|OMIT)\s*{_SCENE_NO}\s*$")
 _REVISION_MARK_RE = re.compile(r"\\*\*+\\*")
 _CUE_CONTD_RE = re.compile(r"\(\s*CONT(INUED|['\u2019]?D|\.)?[.\s]*\)", re.I)
@@ -65,6 +65,7 @@ _HONORIFIC_END_RE = re.compile(r"\b(MR|MRS|MS|DR|JR|SR|ST|LT|SGT|CAPT|COL|GEN|PR
 _NOT_A_NAME = {"THE END", "CONTINUED", "MORE", "OMITTED", "BLACK", "SILENCE", "CREDITS", "TITLE", "SUPER", "INSERT",
                "FADE IN", "FADE OUT", "LATER", "CONTINUOUS", "MONTAGE", "FLASHBACK", "END FLASHBACK", "BACK TO SCENE",
                "END OF MONTAGE", "INTERCUT", "DAY", "NIGHT", "EPILOGUE", "PROLOGUE", "INTERMISSION", "OVERTURE", "TITLE CARD"}
+_TITLE_WORDS = {"EPILOGUE", "PROLOGUE", "INTERMISSION", "OVERTURE", "TITLE CARD"}
 # structural title cards are never speakers ("PART TWO", "CHAPTER 3", "BOOK ONE")
 _TITLE_CARD_RE = re.compile(r"^(PART|CHAPTER|BOOK|ACT)\s+([IVXLC]+|\d+|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN)\b")
 
@@ -402,7 +403,9 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
         margin_cue = (indented and ind(line) <= a_ind + 2 and nxt_i == i + 1 and cue_name(s) in lay["known_cues"]
                       and abs(ind(nxt) - d_ind) <= 3 and ind(nxt) > a_ind + 2)
         # on-screen text announced by "INSERT TITLE:" / "SUPER:" (possibly after a card such as "EPILOGUE") is not a speaker
-        after_title = any(_TITLE_INTRO_RE.search(x) for x in [x for tag, x in cur[-2:] if tag == "scene_description"] + para[-2:])
+        recent = [x for tag, x in cur[-2:] if tag == "scene_description"] + para[-2:]
+        after_title = any(_TITLE_CARD_RE.match(x.strip()) or x.strip() in _TITLE_WORDS for x in recent[-1:]) \
+            or any(_TITLE_INTRO_RE.search(x) for x in recent)
         is_cue = (
             not after_title and looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
             and ((ind(line) >= cue_min or margin_cue) if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))

@@ -167,6 +167,11 @@ class TextParserTests(unittest.TestCase):
             ("character", "JESSICA"), ("dialogue", "Go."), ("character", "WAYNE"), ("dialogue", "Ma'am - he is dead now."),
             ("character", "JOHN"), ("dialogue", "Fine."), ("scene_description", "EPILOGUE A quiet street years later.")])
         self.assertFalse(looks_like_cue("PART TWO"))
+        intro = ("\nINT. CLINIC - DAY\n\nThe waiting room is full and the phones ring without a break all morning.\n\n"
+                 "                         SHANNON (30s, a nurse) is on the phone.\n\n"
+                 "                                   SHANNON\n                         Hold, please.\n\n")
+        scenes, _ = text_to_scenes("".join(intro for _ in range(30)))
+        self.assertEqual(scenes[0].elements[2], ("scene_description", "SHANNON (30s, a nurse) is on the phone."))
 
     def test_c34_score(self):
         talkers = {"MARA", "OTTO"}
