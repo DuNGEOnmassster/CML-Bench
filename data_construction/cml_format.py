@@ -224,28 +224,32 @@ _PAGE_TAIL_RE = re.compile(r"(?<=[.!?\"')])\s+(\d{1,3})\.$")
 
 
 def _furniture_templates(elements: list[tuple[str, str]]) -> list[re.Pattern]:
-    """Phrases that start or end >= 3 description/dialogue/parenthetical elements of one script, differ only in their
-    numbers (>= 2 distinct), carry a header signal and have the varying number at their edge."""
+    """Word sequences that start or end >= 3 description/dialogue/parenthetical elements of one script, differ only in
+    their numbers (>= 2 distinct), carry a header signal and have the varying number at their edge. Punctuation is
+    ignored when counting ("Oliver - 11." and "Oliver - 11," are one header); every such template is applied,
+    longest first, so fragments of a header split across elements go too."""
     count, digits = {}, {}
     for i, (tag, text) in enumerate(elements):
         if tag in ("stage_direction", "character") or not any(ch.isdigit() for ch in text):
             continue
         ws = text.split()
         segs = {" ".join(ws[-m:]) for m in range(3, min(16, len(ws)) + 1)} | {" ".join(ws[:m]) for m in range(3, min(16, len(ws)) + 1)}
-        for seg in segs:
-            key = re.sub(r"\d+[a-z]?\b", "#", seg.lower())
-            if "#" not in key or not (re.search(r"#\W*$", key) or re.match(r"^\W*#", key)):
+        for seg in sorted(segs):  # sorted: set order changes with the per-process string hash seed
+            low = seg.lower()
+            toks = re.findall(r"[a-z0-9]+", low)
+            key = tuple("#" if re.fullmatch(r"\d+[a-z]?", t) else t for t in toks)
+            if "#" not in key or (key[0] != "#" and key[-1] != "#"):
                 continue
-            if len(re.findall(r"[a-z]{2,}", key)) < 2 or len(re.sub(r"[^a-z]", "", key)) < 8 or not _FURNITURE_SIGNAL_RE.search(key):
+            alpha = [t for t in key if t != "#" and len(t) >= 2]
+            if len(alpha) < 2 or sum(map(len, alpha)) < 8 or not _FURNITURE_SIGNAL_RE.search(re.sub(r"\d+[a-z]?\b", "#", low)):
                 continue
             count.setdefault(key, set()).add(i)
-            digits.setdefault(key, set()).add(tuple(re.findall(r"\d+[A-Za-z]?\b", seg)))
+            digits.setdefault(key, set()).add(tuple(t for t in toks if re.fullmatch(r"\d+[a-z]?", t)))
     keys = [k for k in count if len(count[k]) >= 3 and len(digits[k]) >= 2]
-    keys = [k for k in keys if not any(k != o and k in o and len(count[o]) >= len(count[k]) for o in keys)]
     pats = []
-    for k in sorted(keys, key=len, reverse=True):
-        body = r"\s*".join(r"\d+[A-Za-z]?\b" if p == "#" else re.escape(p) for p in re.split(r"(#)", k) if p)
-        pats.append(re.compile(body.replace(r"\ ", r"\s+"), re.I))
+    for k in sorted(keys, key=lambda k: (-len(k), k)):
+        body = r"\W*".join(r"\d+[A-Za-z]?" if t == "#" else re.escape(t) for t in k)
+        pats.append(re.compile(r"(?<![A-Za-z0-9])" + body + r"(?![A-Za-z0-9])\.?", re.I))
     return pats
 
 

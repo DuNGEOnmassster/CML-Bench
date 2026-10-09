@@ -189,7 +189,7 @@ NUMBERISH = re.compile(r"\d+[a-z]?")
 PAGE_TAIL = re.compile(r"(?<=[.!?\"')])\s+(\d{1,3})\s*\.\s*$")
 
 
-def _furniture_key(toks: list[str]) -> tuple | None:
+def _furniture_key(toks: list[str], raw_date: bool = True) -> tuple | None:
     key = tuple("#" if NUMBERISH.fullmatch(t) else t for t in toks)
     if "#" not in key or (key[0] != "#" and key[-1] != "#"):
         return None
@@ -197,7 +197,7 @@ def _furniture_key(toks: list[str]) -> tuple | None:
     if len(alpha) < 2 or sum(len(t) for t in alpha) < 8:
         return None
     s = " ".join(key)
-    has_date = "# # #" in s
+    has_date = raw_date and "# # #" in s  # a date only when the element prints one ("4/7/16"), not a time ("11:59:58")
     by_credit = any(key[i] == "by" and i + 2 < len(key) and key[i + 1] != "#" and key[i + 2] != "#" for i in range(len(key)))
     if not (has_date or by_credit or (FURN_SIGNAL_WORDS & set(key)) or ("work" in key and "file" in key)):
         return None
@@ -212,14 +212,14 @@ def furniture_templates(elements: list[tuple[str, str]]) -> set[tuple]:
         if tag in ("stage_direction", "character") or not re.search(r"\d", text):
             continue
         toks = words(MARKER_ANY_CASE.sub(" ", FURN_WATERMARK.sub(" ", norm(text))))
+        raw_date = bool(re.search(r"\d{1,2}\s*[/.-]\s*\d{1,2}\s*[/.-]\s*\d{2,4}", text))
         for m in range(3, min(16, len(toks)) + 1):
             for win in (toks[:m], toks[-m:]):
-                key = _furniture_key(win)
+                key = _furniture_key(win, raw_date)
                 if key:
                     count[key].add(i)
                     digits[key].add(tuple(t for t in win if NUMBERISH.fullmatch(t)))
-    keys = {k for k in count if len(count[k]) >= 3 and len(digits[k]) >= 2}
-    return {k for k in keys if not any(k != o and len(o) > len(k) and _contains(o, k) and len(count[o]) >= len(count[k]) for o in keys)}
+    return {k for k in count if len(count[k]) >= 3 and len(digits[k]) >= 2}
 
 
 def _contains(hay: tuple, needle: tuple) -> bool:
