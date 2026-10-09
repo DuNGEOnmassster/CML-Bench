@@ -208,6 +208,12 @@ class AuditRuleTests(unittest.TestCase):
         self.assertEqual(sel["t004"], "A")
         self.assertTrue(all(sum(1 for i, k in sel.items() if k == "B" and i[1:3] == f"{b:02d}") <= 1 for b in range(20)))
         self.assertTrue(all(h(i) < 1 / 20 for i, k in sel.items() if k == "C"))
+        cov = [{"item_id": f"c{i:03d}", "batch_id": "b99", "reasons": ["last_third_not_covered"]} for i in range(400)]
+        picked = select(cov, {})
+        self.assertTrue(all(r["tier"] == "A4" and h(r["item_id"]) < 1 / 4 for r in picked))
+        self.assertTrue(60 < len(picked) < 140)
+        both = select([{"item_id": "x1", "batch_id": "b98", "reasons": ["top_speaker_missing", "ungrounded_names"]}], {})
+        self.assertEqual([r["tier"] for r in both], ["A"])
         capped = select(pool, notes, merged_items=200)
         self.assertLessEqual(sum(r["tier"] != "A" for r in capped), sum(r["tier"] != "A" for r in select(pool, notes)))
         self.assertFalse(any(r["tier"] == "C" for r in capped))

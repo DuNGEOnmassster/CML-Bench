@@ -1,7 +1,9 @@
 """C31 targeted-pool budget rule (G8). Deterministic: anyone can recompute the audit set from targeted.jsonl + writer notes.
 
-Tier A  always: any G8 trigger other than writer_source_issue (title_mention, ungrounded_names, top_speaker_missing,
-        last_third_not_covered), and writer notes that question the film's identity (IDENTITY_RE).
+Tier A  always: title_mention, ungrounded_names, and writer notes that question the film's identity (IDENTITY_RE).
+Tier A4 coverage-only triggers (top_speaker_missing, last_third_not_covered, no other A trigger): audit when h < 1/4
+        (coordinator approval 2026-10-09 18:58 after 50 such audits found nothing; revert to Tier A if a sampled
+        coverage item ever finds a missing ending).
 Tier B  writer_source_issue only, note plausibly affects the abstract (IMPACT_RE: missing/omitted/truncated content,
         scene order or merged scenes, title-page/credits/epigraph scenes, actor names, name inconsistencies, a writer's
         attribution guess): audit when h(item) < 1/3, at most 1 per batch.
@@ -21,6 +23,8 @@ IMPACT_RE = re.compile(r"missing|omitted|omit\b|deleted|cut off|truncat|separate
                        r"unclear who|ambiguous|never named|inconsistent|spelled (both|inconsistently)|instead of|called .{0,40} (then|but|in dialogue)|"
                        r"\bbut the character is\b|mislabeled as|labeled both|unexplained|mismatch", re.I)
 FRAC_B, FRAC_C, CAP_B_PER_BATCH = 1 / 3, 1 / 20, 1
+FRAC_COV = 1 / 4
+COVERAGE = {"top_speaker_missing", "last_third_not_covered"}
 
 
 def h(item_id: str) -> float:
@@ -28,8 +32,11 @@ def h(item_id: str) -> float:
 
 
 def tier(reasons: list[str], note: str) -> str:
-    if any(r != "writer_source_issue" for r in reasons) or (note and IDENTITY_RE.search(note)):
+    strong = [r for r in reasons if r not in COVERAGE and r != "writer_source_issue"]
+    if strong or (note and IDENTITY_RE.search(note)):
         return "A"
+    if any(r in COVERAGE for r in reasons):
+        return "A4"
     return "B" if note and IMPACT_RE.search(note) else "C"
 
 
@@ -53,6 +60,9 @@ def _select(targeted, notes, frac_b, frac_c):
         k = tier(t.get("reasons", []), notes.get(t["item_id"], ""))
         if k == "A":
             out.append({**t, "tier": "A"})
+        elif k == "A4":
+            if h(t["item_id"]) < FRAC_COV:
+                out.append({**t, "tier": "A4"})
         elif k == "B" and h(t["item_id"]) < frac_b and b_used.get(t["batch_id"], 0) < CAP_B_PER_BATCH:
             b_used[t["batch_id"]] = b_used.get(t["batch_id"], 0) + 1
             out.append({**t, "tier": "B"})

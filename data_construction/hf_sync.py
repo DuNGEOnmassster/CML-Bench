@@ -536,7 +536,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**ta, "targeted_pool": rule["targeted_pool"]})
     revoked_list = [{"batch_id": b, "orchestrator": orchestrator_of(b, ranges), "trigger": sorted(trig.get(b) or {"manual"})}
                     for b, s in sorted(states.items()) if s == "revoked"]
-    tiers = {k: sum(t["tier"] == k for t in selected) for k in ("A", "B", "C")}
+    tiers = {k: sum(t["tier"] == k for t in selected) for k in ("A", "A4", "B", "C")}
     audit = {"targeted_items": len(targeted), "targeted_selected": len(selected), "targeted_tiers": tiers,
              "targeted_selected_share": round(len(selected) / merged_items, 4) if merged_items else None,
              "sample_items": len(sample), **rule,
