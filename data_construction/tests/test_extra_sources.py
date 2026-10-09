@@ -13,6 +13,8 @@ from dataset_schema import load_gt_related  # noqa: E402
 from extra_sources.imdb_index import norm_title, title_variants  # noqa: E402
 from extra_sources.quality import script_quality  # noqa: E402
 from extra_sources.text_screenplay import extract_text, html_to_text, looks_like_cue, text_to_scenes  # noqa: E402
+from extra_sources.mislabel import signatures  # noqa: E402
+from extra_sources.verbatim_check import tag_check  # noqa: E402
 
 # Invented text in standard screenplay layout (action at col 15, dialogue 25, cues 37).
 PAGE = """
@@ -108,6 +110,31 @@ class TextParserTests(unittest.TestCase):
         self.assertNotIn("Blue Rev", content)
         self.assertIn("<dialogue>So I-</dialogue>", content)
 
+    def test_dual_dialogue_and_cue_across_page_break(self):
+        page = ("\n               INT. DOCK - NIGHT\n\n               Fog rolls off the water and the two radios crackle at once in the dark.\n\n"
+                "                         BARNES                    TAYLOR\n"
+                "                    We have a visual.         Copy that.\n"
+                "                    (beat)                    Hold position.\n\n"
+                "                                     OTTO\n                         Who said that?\n\n"
+                "                                     MARA\n\n                                                            {n}.\n\n\n"
+                "                         I said no and I meant it.\n\n")
+        scenes, _ = text_to_scenes("".join(page.format(n=i) for i in range(30)))
+        self.assertEqual(scenes[0].elements[2:], [
+            ("character", "BARNES"), ("dialogue", "We have a visual."), ("parenthetical", "(beat)"),
+            ("character", "TAYLOR"), ("dialogue", "Copy that. Hold position."), ("character", "OTTO"), ("dialogue", "Who said that?"),
+            ("character", "MARA"), ("dialogue", "I said no and I meant it.")])
+
+    def test_two_letter_contd_cue_is_not_page_furniture(self):
+        page = ("\nINT. TRUCK STOP - DAY\n\nJo sits beside her on the bench and watches the sky turn green.\n"
+                "                    JO\n          The first time it is upsetting.\n"
+                "Melissa just looks at her and says nothing for a long while.\n"
+                "                    JO (CONT'D)\n          You get used to them.\n"
+                "                                        12A CONTINUED: (2)\n")
+        scenes, _ = text_to_scenes("".join(page for _ in range(30)))
+        self.assertEqual(scenes[0].elements[4:], [
+            ("scene_description", "Melissa just looks at her and says nothing for a long while."),
+            ("character", "JO"), ("dialogue", "You get used to them.")])
+
     def test_cue_rules(self):
         for ok in ("MARA", "DR. OTTO", "MARA (V.O.)", "McCLANE"):
             self.assertTrue(looks_like_cue(ok), ok)
@@ -187,6 +214,40 @@ class WindowNoiseTests(unittest.TestCase):
             self.assertIn(r, reasons)
         action = [("scene_description", "LOIS watches in horror.")] * 6
         self.assertNotIn("speaker_in_action", window_noise([Scene(0, [("stage_direction", "INT. A")] + talk[:2] + action)]))
+
+
+class SpeakerTagTests(unittest.TestCase):
+    RAW = ["               INT. KITCHEN - NIGHT", "",
+           "               Mara stands by the phone, turning a coin over and over in her hand.", "",
+           "                                     MARA", "                         What is the number you wanted me to call?", "",
+           "                                     OTTO", "                              (flat)",
+           "                         Four seven eight and then the rest of it.", ""]
+
+    @staticmethod
+    def cml(*els):
+        return "<script><scene>" + "".join(f"<{t}>{x}</{t}>" for t, x in els) + "</scene></script>"
+
+    def test_raw_cue_speech_must_stay_under_its_speaker(self):
+        head = [("stage_direction", "INT. KITCHEN - NIGHT"),
+                ("scene_description", "Mara stands by the phone, turning a coin over and over in her hand.")]
+        mara = [("character", "MARA"), ("dialogue", "What is the number you wanted me to call?")]
+        otto = [("character", "OTTO"), ("parenthetical", "(flat)"), ("dialogue", "Four seven eight and then the rest of it.")]
+        n = len(self.RAW) - 1
+        ok = tag_check(self.RAW, 0, n, self.cml(*head, *mara, *otto))
+        self.assertEqual((ok["cues_checked"], ok["speech_as_action"], ok["wrong_speaker"]), (2, 0, 0))
+        fused = tag_check(self.RAW, 0, n, self.cml(*head, ("scene_description", "MARA What is the number you wanted me to call?"), *otto))
+        self.assertEqual(fused["speech_as_action"], 1)
+        carried = tag_check(self.RAW, 0, n, self.cml(*head, *mara, *otto[1:]))
+        self.assertEqual(carried["wrong_speaker"], 1)
+
+    def test_mislabel_signatures(self):
+        talkers = {"LOIS", "HENRY", "BARNES", "TAYLOR"}
+        els = [("scene_description", "LOIS Superman! Over here!"), ("scene_description", "LOIS watches in horror."),
+               ("scene_description", "BARNES TAYLOR We have a visual. Copy that."),
+               ("scene_description", "(shaking his head) You're not going."), ("scene_description", "(beat) A door slams."),
+               ("dialogue", "Please come with me. HENRY I'm sure it's fine."), ("dialogue", "We leave at dawn.")]
+        sig = signatures(els, talkers)
+        self.assertEqual((sig["fused_cue"], sig["dual_collapse"], sig["paren_speech"], sig["name_in_dialogue"]), (1, 1, 1, 1))
 
 
 if __name__ == "__main__":
