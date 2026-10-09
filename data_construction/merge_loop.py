@@ -43,6 +43,20 @@ def run(cmd: list[str], cwd: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
 
 
+def _read(path: str) -> str | None:
+    """Read a store file; the store occasionally answers EIO/EAGAIN (e.g. while an orchestrator writes the file).
+    None after a few retries: the caller skips the bundle this round and retries it next round."""
+    for wait in (0.5, 2, None):
+        try:
+            with open(path, encoding="utf-8") as f:
+                return f.read()
+        except OSError:
+            if wait is None:
+                return None
+            time.sleep(wait)
+    return None
+
+
 def bundle_stamps(src: str, names: list[str]) -> dict[str, list]:
     """(size, mtime) of each bundle's two files. The store answers each stat slowly, so they are taken in parallel."""
     def stamp(name):
@@ -79,28 +93,34 @@ def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
         stamp = stamps[batch_id]
         if seen.get(batch_id) == stamp:
             continue
-        seen[batch_id] = stamp
         allowed = set(batches[batch_id]["item_ids"])
         path = os.path.join(bdir, "abstracts.jsonl")
-        if os.path.exists(path):
-            for line in open(path, encoding="utf-8"):
-                if not line.strip():
-                    continue
-                ab = json.loads(line)
-                if ab.get("item_id") not in allowed or ab.get("item_id") in skip:
-                    continue
-                data = json.dumps(ab, ensure_ascii=False)
-                out = os.path.join(run_dir, "abstracts", f"{ab['item_id']}.json")
-                if not os.path.exists(out) or open(out, encoding="utf-8").read() != data:
-                    with open(out, "w", encoding="utf-8") as f:
-                        f.write(data)
-                    stats["abstracts_written"] += 1
         rep = os.path.join(bdir, "writer_report.json")
-        if os.path.exists(rep):
-            data = open(rep, encoding="utf-8").read()
+        text = _read(path) if stamp[0] else ""
+        rep_text = _read(rep) if stamp[1] else None
+        try:
+            rows = [json.loads(l) for l in (text or "").splitlines() if l.strip()]
+            rep_obj = json.loads(rep_text) if rep_text else None
+        except ValueError:
+            rows = None
+        if text is None or rows is None or (stamp[1] and rep_text is None):
+            # unreadable or half-written right now: leave the stamp unrecorded so the next round retries this bundle
+            stats.setdefault("read_errors", []).append(batch_id)
+            continue
+        seen[batch_id] = stamp
+        for ab in rows:
+            if ab.get("item_id") not in allowed or ab.get("item_id") in skip:
+                continue
+            data = json.dumps(ab, ensure_ascii=False)
+            out = os.path.join(run_dir, "abstracts", f"{ab['item_id']}.json")
+            if not os.path.exists(out) or open(out, encoding="utf-8").read() != data:
+                with open(out, "w", encoding="utf-8") as f:
+                    f.write(data)
+                stats["abstracts_written"] += 1
+        if rep_obj is not None:
+            data = rep_text
             if skip & allowed:
-                r = json.loads(data)
-                data = json.dumps({**r, "source_issues": [x for x in r.get("source_issues", []) if x.get("item_id") not in skip]},
+                data = json.dumps({**rep_obj, "source_issues": [x for x in rep_obj.get("source_issues", []) if x.get("item_id") not in skip]},
                                   ensure_ascii=False)
             out = os.path.join(run_dir, "batches", batch_id, "writer_report.json")
             if not os.path.exists(out) or open(out, encoding="utf-8").read() != data:
@@ -306,27 +326,37 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
         ids = set(ids_sorted)
         bdir = os.path.join(src, b["batch_id"])
         changed = False
-        for name in ("abstracts.jsonl.c35tmp", "writer_report.json.c35tmp"):
-            if os.path.exists(os.path.join(bdir, name)):
-                os.remove(os.path.join(bdir, name))
-        p = os.path.join(bdir, "abstracts.jsonl")
-        if os.path.exists(p):
-            lines = [l for l in open(p, encoding="utf-8").read().splitlines() if l.strip()]
-            keep = [l for l in lines if json.loads(l).get("item_id") not in ids]
-            if len(keep) < len(lines):
-                _rewrite(p, "".join(l + "\n" for l in keep))
-                stats["bundle_abstracts_removed"] += len(lines) - len(keep)
-                changed = True
-        for p, key in ((os.path.join(bdir, "writer_report.json"), "bundle_notes_removed"),
-                       (os.path.join(run_dir, "batches", b["batch_id"], "writer_report.json"), "run_notes_removed")):
+        try:
+            for name in ("abstracts.jsonl.c35tmp", "writer_report.json.c35tmp"):
+                if os.path.exists(os.path.join(bdir, name)):
+                    os.remove(os.path.join(bdir, name))
+            p = os.path.join(bdir, "abstracts.jsonl")
             if os.path.exists(p):
-                rep = json.load(open(p, encoding="utf-8"))
-                issues = rep.get("source_issues", [])
-                kept = [x for x in issues if x.get("item_id") not in ids]
-                if len(kept) < len(issues):
-                    _rewrite(p, json.dumps({**rep, "source_issues": kept}, ensure_ascii=False))
-                    stats[key] += len(issues) - len(kept)
-                    changed |= key.startswith("bundle")
+                text = _read(p)
+                if text is None:
+                    raise OSError(f"unreadable {p}")
+                lines = [l for l in text.splitlines() if l.strip()]
+                keep = [l for l in lines if json.loads(l).get("item_id") not in ids]
+                if len(keep) < len(lines):
+                    _rewrite(p, "".join(l + "\n" for l in keep))
+                    stats["bundle_abstracts_removed"] += len(lines) - len(keep)
+                    changed = True
+            for p, key in ((os.path.join(bdir, "writer_report.json"), "bundle_notes_removed"),
+                           (os.path.join(run_dir, "batches", b["batch_id"], "writer_report.json"), "run_notes_removed")):
+                if os.path.exists(p):
+                    text = _read(p)
+                    if text is None:
+                        raise OSError(f"unreadable {p}")
+                    rep = json.loads(text)
+                    issues = rep.get("source_issues", [])
+                    kept = [x for x in issues if x.get("item_id") not in ids]
+                    if len(kept) < len(issues):
+                        _rewrite(p, json.dumps({**rep, "source_issues": kept}, ensure_ascii=False))
+                        stats[key] += len(issues) - len(kept)
+                        changed |= key.startswith("bundle")
+        except (OSError, ValueError):
+            stats.setdefault("read_errors", []).append(b["batch_id"])  # retried next round: its state stays unrecorded
+            continue
         stats["bundles_rewritten"] += changed
         for iid in ids:
             p = os.path.join(run_dir, "abstracts", f"{iid}.json")
