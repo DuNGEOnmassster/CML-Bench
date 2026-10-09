@@ -366,7 +366,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file).
     Excluded items (merge exclusion list, hold films) are left out of data/, of the audit pools and of all release
     statistics; the batch that carries them is still judged on all its items."""
-    from audit_rules import dedupe_verdicts, orchestrator_of, paused_orchestrators, sample_batches, sample_item, stop_rule
+    from audit_rules import dedupe_verdicts, orchestrator_audit, orchestrator_of, sample_batches, sample_item, stop_rule
     from cml_format import count_tokens
     from targeted_rule import select as select_targeted
     from targeted_rule import tier as targeted_tier
@@ -492,24 +492,21 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     targeted_meta = {i: {"tier": targeted_tier(rs, notes.get(i, "")), "reasons": rs} for i, rs in routed.items()}
     rule = stop_rule(verdicts, {x["item_id"] for x in sample}, targeted_meta)
     files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**rule["targeted_alarm"], "targeted_pool": rule["targeted_pool"]})
-    # Pause counts only revocations a random-sample verdict caused; targeted-pool revocations run through the same
-    # last-20 window but raise the targeted alarm instead (coordinator decision with the C31 urgent addendum).
     sample_ids = {x["item_id"] for x in sample}
-    order, trig = [], {}
+    trig = {}
     for v in verdicts:
-        if v["batch_id"] not in trig:
-            order.append(v["batch_id"])
-            trig[v["batch_id"]] = set()
         if v.get("major", 0) or v.get("outside", 0):
-            trig[v["batch_id"]].add("sample" if v["item_id"] in sample_ids else "targeted")
-    paused = paused_orchestrators([(b, "sample" in trig[b]) for b in order], ranges)
-    targeted_heavy = paused_orchestrators([(b, "targeted" in trig[b]) for b in order], ranges)
-    if targeted_heavy:
-        ta = rule["targeted_alarm"]
-        ta["reason"] = "; ".join(filter(None, [ta["reason"], f"{', '.join(targeted_heavy)}: >= 2 targeted-pool revocations among "
-                                                               f"the orchestrator's last 20 audited batches (not a pause)"]))
-        ta["fired"], ta["orchestrators"] = True, targeted_heavy
-        files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**ta, "targeted_pool": rule["targeted_pool"]})
+            trig.setdefault(v["batch_id"], set()).add("sample" if v["item_id"] in sample_ids else "targeted")
+    orch = orchestrator_audit(verdicts, sample_ids, ranges)
+    paused = orch["paused"]
+    ta = rule["targeted_alarm"]
+    ta["by_orchestrator"] = orch["targeted_by_orchestrator"]
+    if orch["targeted_concentrated"]:
+        ta["reason"] = "; ".join(filter(None, [ta["reason"], f"{', '.join(orch['targeted_concentrated'])}: targeted revocations "
+                                                               f"concentrated (>= 3 of the last 20 targeted-audited batches, >= 2x the "
+                                                               f"other orchestrators' rate); the evaluator decides on a pause"]))
+        ta["fired"], ta["orchestrators"] = True, orch["targeted_concentrated"]
+    files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**ta, "targeted_pool": rule["targeted_pool"]})
     revoked_list = [{"batch_id": b, "orchestrator": orchestrator_of(b, ranges), "trigger": sorted(trig.get(b) or {"manual"})}
                     for b, s in sorted(states.items()) if s == "revoked"]
     tiers = {k: sum(t["tier"] == k for t in selected) for k in ("A", "B", "C")}

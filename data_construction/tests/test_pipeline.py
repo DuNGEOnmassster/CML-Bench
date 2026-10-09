@@ -131,6 +131,26 @@ class AuditRuleTests(unittest.TestCase):
         self.assertTrue(stop_rule(([{"item_id": "m", "major": 1}] + ok[:24]) * 4, sample)["stop"])
         self.assertLess(wilson_upper(0, 261), 0.015)
 
+    def test_orchestrator_pause_and_concentration(self):
+        from audit_rules import orchestrator_audit
+
+        ranges = [{"name": "O1", "first": 1, "last": 50}, {"name": "O2", "first": 51, "last": 100}]
+
+        def v(b, item, bad=0):
+            return {"item_id": item, "batch_id": f"moviesum-b{b:04d}", "outside": bad, "major": 0}
+
+        two_targeted = [v(18, "t18", 1), v(20, "t20", 1)] + [v(60 + i, f"u{i}") for i in range(5)]
+        r = orchestrator_audit(two_targeted, set(), ranges)
+        self.assertEqual(r["paused"], [])
+        self.assertEqual(r["targeted_concentrated"], [])
+        self.assertEqual(r["targeted_by_orchestrator"]["O1"]["revoked"], 2)
+        three = two_targeted + [v(22, "t22", 1)]
+        self.assertEqual(orchestrator_audit(three, set(), ranges)["targeted_concentrated"], ["O1"])
+        spread = three + [v(30, "c30"), v(31, "c31"), v(32, "c32"), v(61, "w1", 1), v(62, "w2", 1)]
+        self.assertEqual(orchestrator_audit(spread, set(), ranges)["targeted_concentrated"], [])
+        sampled = [v(3, "s3", 1), v(4, "s4"), v(5, "s5", 1)]
+        self.assertEqual(orchestrator_audit(sampled, {"s3", "s4", "s5"}, ranges)["paused"], ["O1"])
+
     def test_targeted_verdicts_alarm_but_never_stop(self):
         ok = [{"item_id": f"t{i}", "major": 0, "outside": 0} for i in range(38)]
         outs = [{"item_id": f"o{i}", "major": 0, "outside": 1} for i in range(3)]

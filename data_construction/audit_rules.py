@@ -18,8 +18,11 @@ Rules (evaluator-repilot-report.md 5):
              when >= 3 major (not outside) fall within any 50 consecutive targeted verdicts, or when the targeted
              major+outside rate exceeds 25% after >= 40 targeted verdicts (urgent addendum, 2026-10-09 13:46 UTC)
   complete   the Wilson 95% upper bound of the major+outside rate over the random sample only must be <= 3%
-  pause      an orchestrator with >= 2 batches revoked by random-sample verdicts among its last 20 audited batches is
-             paused; >= 2 revoked by targeted verdicts in the same window raise the targeted alarm instead
+  pause      an orchestrator is paused when >= 2 of its last 20 random-sample-audited batches were revoked by a sample
+             verdict. Targeted revocations never pause; they are reported per orchestrator, and an orchestrator whose
+             targeted revocations are concentrated (>= 3 among its last 20 targeted-audited batches and >= 2x the
+             targeted revocation rate of the other orchestrators combined) raises the targeted alarm, so the evaluator
+             can decide on a pause
 """
 from __future__ import annotations
 
@@ -31,6 +34,7 @@ SEED = "c31-20261009"
 WINDOW, WINDOW_MAX_BAD = 50, 2
 MIN_FOR_WILSON, MAX_MAJOR_UPPER = 60, 0.03
 PAUSE_LAST, PAUSE_REVOKED = 20, 2
+CONCENTRATED_REVOKED, CONCENTRATED_RATIO = 3, 2.0
 ALARM_WINDOW, ALARM_MAX_MAJOR, ALARM_MIN, ALARM_MAX_RATE = 50, 3, 40, 0.25
 
 
@@ -154,3 +158,31 @@ def paused_orchestrators(audited_batches: list[tuple[str, bool]], ranges: list[d
         if o:
             per.setdefault(o, []).append(revoked)
     return sorted(o for o, flags in per.items() if sum(flags[-PAUSE_LAST:]) >= PAUSE_REVOKED)
+
+
+def orchestrator_audit(verdicts: list[dict], sample_items: set[str], ranges: list[dict]) -> dict:
+    """verdicts: deduped, in audit order. Two per-orchestrator windows of batches in first-audit order: batches audited
+    by a random-sample verdict (revoked = a sample verdict on it is major/outside) and batches audited by a targeted
+    verdict (revoked = a targeted verdict on it is major/outside)."""
+    windows = {"sample": {}, "targeted": {}}
+    for v in verdicts:
+        kind = "sample" if v["item_id"] in sample_items else "targeted"
+        w = windows[kind].setdefault(v["batch_id"], False)
+        windows[kind][v["batch_id"]] = w or _bad(v)
+    flags = {k: [(b, bad) for b, bad in w.items()] for k, w in windows.items()}
+    per = {}
+    for b, bad in flags["targeted"]:
+        o = orchestrator_of(b, ranges)
+        if o:
+            per.setdefault(o, []).append(bad)
+    targeted = {o: {"audited_batches": len(f), "revoked": sum(f), "last20_audited": len(f[-PAUSE_LAST:]),
+                    "last20_revoked": sum(f[-PAUSE_LAST:])} for o, f in sorted(per.items())}
+    concentrated = []
+    for o, t in targeted.items():
+        others = [x for p, x in targeted.items() if p != o]
+        other_rate = sum(x["revoked"] for x in others) / max(1, sum(x["audited_batches"] for x in others))
+        own_rate = t["last20_revoked"] / max(1, t["last20_audited"])
+        if t["last20_revoked"] >= CONCENTRATED_REVOKED and own_rate >= CONCENTRATED_RATIO * other_rate:
+            concentrated.append(o)
+    return {"paused": paused_orchestrators(flags["sample"], ranges), "targeted_by_orchestrator": targeted,
+            "targeted_concentrated": concentrated}
