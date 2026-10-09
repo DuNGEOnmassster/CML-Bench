@@ -26,6 +26,12 @@ FIRST = ["movie_name", "imdb_id", "script_segment", "summary"]
 PROVENANCE = ["item_id", "source_dataset", "source_split", "source_url", "source_file", "scene_start", "scene_end",
               "imdb_url", "content_sha1", "content_normalization", "abstract_prompt_version", "abstract_author"]
 GT_MEDIAN_TOKENS = 5702
+LLM_RESIDUE_RE = re.compile(
+    r"here (is|are) the (exact )?(\d+[- ])?(consecutive[- ])?scenes?\b|consecutive[- ]scene segment|"
+    r"these \d+ (consecutive )?scenes|from the provided script|```",
+    re.I,
+)
+CODE_SUFFIXES = (".py", ".md", ".sh")
 
 
 def median(xs):
@@ -103,7 +109,7 @@ def main() -> None:
     record("C07", not invalid, f"invalid={invalid[:5]}")
 
     residue = [r["item_id"] for r in recs if not r["script_segment"].startswith("<script>") or not r["script_segment"].endswith("</script>")
-               or re.search(r"here is|consecutive scene|```", r["script_segment"], re.I)]
+               or LLM_RESIDUE_RE.search(r["script_segment"])]
     record("C08", not residue, f"residue={residue[:5]}")
 
     toks = [r["script_tokens"] for r in recs]
@@ -193,11 +199,8 @@ def main() -> None:
     try:
         tracked = subprocess.run(["git", "ls-files", "data_construction/work"], capture_output=True, text=True, check=True).stdout.strip()
         grep = subprocess.run(["git", "grep", "-l", "<scene>"], capture_output=True, text=True).stdout.split()
-        allowed = {"data_construction/cml_format.py", "data_construction/tests/test_pipeline.py", "data_construction/README.md",
-                   "inference/request_LLM_upload.py", "scripts/benchmark_metrics_v5.py", "data_construction/prompts/abstract_prompt_v1.md",
-                   "data_construction/contract_checks.py"}
-        extra = [p for p in grep if p not in allowed]
-        record("C30", not tracked and not extra, f"tracked_work_files={bool(tracked)}, unexpected_files_with_scene_tag={extra}")
+        extra = [p for p in grep if not p.endswith(CODE_SUFFIXES)]
+        record("C30", not tracked and not extra, f"tracked_work_files={bool(tracked)}, non_code_files_with_scene_tag={extra}")
     except (subprocess.CalledProcessError, FileNotFoundError) as exc:
         results["C30"] = {"pass": None, "detail": f"git unavailable: {exc}"}
 

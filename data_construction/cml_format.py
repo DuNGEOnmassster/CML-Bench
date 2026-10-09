@@ -252,7 +252,7 @@ def segment_stats(scenes: list[Scene], content: str | None = None) -> dict:
             name = speaker_name(text)
             speakers[name] = speakers.get(name, 0) + 1
     char_tags = [t for tag, t in elements if tag == "character"]
-    body_text = " ".join(t for _, t in elements)
+    body_text = "\n".join(t for _, t in elements)
     return {
         "num_scenes": len(scenes),
         "content_tokens": count_tokens(content),
