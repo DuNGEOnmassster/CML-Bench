@@ -17,9 +17,7 @@ from collections import Counter
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from cml_format import count_tokens  # noqa: E402
-
-FIRST_FIELDS = ("movie_name", "imdb_id", "script_segment", "summary")
-TAG_KEYS = ("<scene>", "<stage_direction>", "<scene_description>", "<parenthetical>", "<character>", "<dialogue>")
+from dataset_schema import TAG_KEYS, make_record  # noqa: E402
 
 
 def dist(xs):
@@ -32,36 +30,7 @@ def dist(xs):
 
 
 def build_record(item: dict, abstract: dict) -> dict:
-    rec = {k: item[k] for k in FIRST_FIELDS if k != "summary"}
-    rec["summary"] = abstract["abstract"].strip()
-    rec.update(
-        {
-            "item_id": item["item_id"],
-            "segment_index": item["segment_index"],
-            "scene_start": item["scene_start"],
-            "scene_end": item["scene_end"],
-            "num_scenes": item["num_scenes"],
-            "relative_position": item["relative_position"],
-            "script_tokens": item["content_tokens"],
-            "summary_tokens": count_tokens(rec["summary"]),
-            "summary_words": len(rec["summary"].split()),
-            "tag_counts": {k: item["tag_counts"].get(k, 0) for k in TAG_KEYS},
-            "imdb_rating": item.get("imdb_rating"),
-            "imdb_votes": item.get("imdb_votes"),
-            "genres": item.get("genres", []),
-            "year": item.get("year"),
-            "source_dataset": item["source_dataset"],
-            "source_split": item["source_split"],
-            "source_url": item["source_url"],
-            "source_file": item["source_file"],
-            "imdb_url": item["imdb_url"],
-            "content_normalization": item["content_normalization"],
-            "content_sha1": item["content_sha1"],
-            "abstract_prompt_version": abstract.get("prompt_version"),
-            "abstract_author": abstract.get("author"),
-        }
-    )
-    return rec
+    return make_record(item, batch_id=item["batch_id"], build=item["build_id"], abstract=abstract, count_tokens=count_tokens)
 
 
 def info_json(records: list[dict]) -> dict:
