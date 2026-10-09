@@ -85,6 +85,17 @@ class TextParserTests(unittest.TestCase):
         self.assertEqual(scenes[0].elements[2:], [("character", "PIA"), ("dialogue", "We wait."), ("character", "TOM"),
                                                   ("parenthetical", "(sighs)"), ("dialogue", "Fine.")])
 
+    def test_running_headers_and_action_page_numbers(self):
+        page = ("\n               INT. HALL - DAY\n\n               Rain hits the long windows of the hall, and nobody in the room moves.\n"
+                "               12.\n\n               \"Dull Film\" by A. Writer 7/1/99    {n}.\n\n               {n}   WIDE SHOT   {n}\n\n"
+                "                                     MARA\n                         478.\n")
+        scenes, _ = text_to_scenes("".join(page.format(n=i) for i in range(30)))
+        content = render(scenes)
+        self.assertNotIn("Dull Film", content, "running header removed")
+        self.assertNotIn("moves. 12.", content, "page number inside action removed")
+        self.assertIn("WIDE SHOT", content, "numbered shot lines are content, not headers")
+        self.assertIn("<dialogue>478.</dialogue>", content, "a number spoken as dialogue stays")
+
     def test_cue_rules(self):
         for ok in ("MARA", "DR. OTTO", "MARA (V.O.)", "McCLANE"):
             self.assertTrue(looks_like_cue(ok), ok)
@@ -146,6 +157,18 @@ class WindowNoiseTests(unittest.TestCase):
         self.assertEqual(window_noise(seg), ["backslash_residue", "speaker_fission", "orphan_speaker_line", "ocr_symbols"])
         clean = [Scene(0, [("stage_direction", "INT. A"), ("character", "BLAKE"), ("dialogue", "Well... (beat) it's 4:30.")])]
         self.assertEqual(window_noise(clean), [])
+
+    def test_writer_reported_noise(self):
+        talk = [("character", "LOIS"), ("dialogue", "Hi."), ("character", "HENRY"), ("dialogue", "Yes."),
+                ("character", "ENRY"), ("dialogue", "No."), ("character", "TAFFORD"), ("dialogue", "So."),
+                ("character", "STAFFORD"), ("dialogue", "Go.")]
+        fused = [("scene_description", f"LOIS {w}!") for w in ("Superman", "Wait", "Look", "Again", "Now")]
+        letters = [("scene_description", c) for c in ("A", "H", "F")]
+        reasons = window_noise([Scene(0, [("stage_direction", "INT. A")] + talk + fused + letters)])
+        for r in ("speaker_in_action", "drop_cap_names", "margin_letters"):
+            self.assertIn(r, reasons)
+        action = [("scene_description", "LOIS watches in horror.")] * 6
+        self.assertNotIn("speaker_in_action", window_noise([Scene(0, [("stage_direction", "INT. A")] + talk[:2] + action)]))
 
 
 if __name__ == "__main__":

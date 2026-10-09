@@ -47,7 +47,26 @@ def raw_words(path: str, fmt: str) -> list[str]:
         if fmt == "html":
             text = re.sub(r"<[^>]+>", " ", re.sub(r"(?is)<(script|style|head)[^>]*>.*?</\1>", " ", text))
     # declared normalizations: HTML entities (twice), NFKC (ligatures)
-    return words(unicodedata.normalize("NFKC", html.unescape(html.unescape(text))))
+    text = unicodedata.normalize("NFKC", html.unescape(html.unescape(text)))
+    headers = page_headers(text)
+    return words("\n".join(l for l in text.split("\n") if mask(l) not in headers))
+
+
+def mask(line: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"\d+", "#", line.strip().lower()))
+
+
+def page_headers(text: str, min_repeats: int = 5) -> set[str]:
+    """Running page headers/footers, found independently of the parser: lines with a number whose text (numbers
+    masked) repeats >= min_repeats times and is not a scene heading. They are declared page furniture."""
+    def shot_or_cue(l):  # numbered shot headings and cues ("127. CLOSER SHOT") repeat too, but they are content
+        letters = [c for c in l if c.isalpha()]
+        return len(l.split()) <= 6 and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.9
+
+    counts = Counter(mask(l) for l in text.split("\n")
+                     if re.search(r"\d", l) and len(l.strip()) >= 6 and not re.match(r"\s*\d*\s*(int|ext)\b", l, re.I)
+                     and not shot_or_cue(l))
+    return {k for k, c in counts.items() if c >= min_repeats and len(re.sub(r"[^a-z]", "", k)) >= 4}
 
 
 def words(text: str) -> list[str]:

@@ -116,6 +116,27 @@ def _is_noise_line(s: str, prev_blank: bool = True) -> bool:
     )
 
 
+def _header_key(line: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"\d+", "#", line.strip().lower()))
+
+
+def repeated_page_headers(lines: list[str], min_repeats: int = 5) -> set[str]:
+    """Page headers/footers printed on every page ('"Ricky Stanicky" 11.13.09 Bushell 93.', 'Deceptions by Richard
+    Taylor 32.'): lines carrying a number whose text, with numbers masked, repeats >= min_repeats times. Scene
+    headings, cues and transitions never qualify."""
+    counts: dict[str, int] = {}
+    for l in lines:
+        s = l.strip()
+        letters = [c for c in s if c.isalpha()]
+        shot_or_cue = len(s.split()) <= 6 and letters and sum(c.isupper() for c in letters) / len(letters) >= 0.9
+        if len(s) < 6 or not re.search(r"\d", s) or heading_text(s) or is_transition(s) or looks_like_cue(s) or shot_or_cue:
+            continue  # numbered shot headings ("151 SARK 151") repeat too, but they are content
+        k = _header_key(s)
+        if len(re.sub(r"[^a-z]", "", k)) >= 4:
+            counts[k] = counts.get(k, 0) + 1
+    return {k for k, c in counts.items() if c >= min_repeats}
+
+
 def _strip_marks(line: str) -> str:
     """Revision asterisks (with any escaping backslash) and stray backslashes, keeping column positions."""
     line = _REVISION_MARK_RE.sub(lambda m: " " * len(m.group()), line)
@@ -214,10 +235,11 @@ def infer_layout(lines: list[str]) -> dict:
 def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
     """Parse screenplay text into cleaned scenes (content before the first scene heading is dropped)."""
     raw_lines = text.replace("\r\n", "\n").replace("\r", "\n").replace("\f", "\n\n").expandtabs(8).split("\n")
+    headers = repeated_page_headers(raw_lines)
     lines, prev_blank = [], True
     for raw in raw_lines:
         l = _strip_marks(raw).rstrip()
-        lines.append("" if l.strip() and _is_noise_line(l, prev_blank) else l)
+        lines.append("" if l.strip() and (_is_noise_line(l, prev_blank) or _header_key(l) in headers) else l)
         prev_blank = not l.strip()
     lay = infer_layout(lines)
     indented = lay["layout"] == "indented"
@@ -283,7 +305,8 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("("))
         )
         if not is_cue:
-            para.append(s)
+            if not _PAGE_NO_RE.match(s):  # a bare number inside action is a page number (in dialogue it is speech)
+                para.append(s)
             i += 1
             continue
         flush_para()

@@ -90,6 +90,10 @@ SUPPORTED_FORMATS = set(FORMAT_PRIORITY)
 OCR_SYMBOL_RE = re.compile(r"[\\~{}^|]|[_]{2,}[^_\s]|[,.'`]{2,}[_\\]")
 
 
+_SPEAKER_LED_RE = re.compile(r"^([A-Z][A-Z.'\-]+(?: [A-Z][A-Z.'\-]+)?)\s+(?:\(|[A-Z][a-z']|[!?.,\-])")
+_TRAILING_PAGE_NO_RE = re.compile(r"[.!?\"]\s+\d{1,3}\.?$")
+
+
 def window_noise(seg) -> list[str]:
     """Evaluator R3/C12b/C12c/C13b/P2 on one window: backslash residue, speaker names split by noise
     ("BLAKE \\" next to "BLAKE"), orphan speaker lines, OCR symbol debris."""
@@ -107,6 +111,19 @@ def window_noise(seg) -> list[str]:
         reasons.append("ocr_symbols")
     if absorbed_action_rate(seg) > 0.10:
         reasons.append("dialogue_action_merged")
+    # Limits below are the MovieSum p99 per segment (sample of 1,210 segments), found in the pilot writers' reports.
+    talkers = {speaker_name(t) for i, (tag, t) in enumerate(texts)
+               if tag == "character" and i + 1 < len(texts) and texts[i + 1][0] in ("dialogue", "parenthetical")}
+    descs = [t for tag, t in texts if tag == "scene_description"]
+    led = sum(1 for d in descs if (m := _SPEAKER_LED_RE.match(d)) and m.group(1) in talkers)
+    if led > 4:
+        reasons.append("speaker_in_action")  # "LOIS Superman!": cue and line fused into an action element
+    if sum(1 for d in descs if _TRAILING_PAGE_NO_RE.search(d)) > 1:
+        reasons.append("page_numbers_in_text")
+    if sum(1 for n in talkers if len(n) >= 3 and any(o != n and len(o) == len(n) + 1 and o.endswith(n) for o in talkers)) >= 2:
+        reasons.append("drop_cap_names")  # "ENRY" next to "HENRY": first letters lost in a PDF conversion
+    if sum(1 for d in descs if len(re.sub(r"[^A-Za-z]", "", d)) <= 2) >= 3:
+        reasons.append("margin_letters")
     return reasons
 
 

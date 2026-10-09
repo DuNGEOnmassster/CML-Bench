@@ -45,6 +45,7 @@ QUALITY_CONFIG = {
     "min_stopword_share": 0.25,
     "max_median_scene_words": 600,
     "max_absorbed_action_rate": 0.04,
+    "max_oneoff_short_speakers": 4,
 }
 OCR_PRODUCER_RE = re.compile(r"paper capture|image conversion|clearscan|abbyy|finereader|omnipage|readiris|tesseract|ocr", re.I)
 _STOP = set("the a an and of to in is it that he she they you i we his her their was for on with as at but not this be are".split())
@@ -87,6 +88,12 @@ def script_quality(text: str, scenes, diag: dict, pdf_meta: dict, vocab) -> tupl
     metrics["character_cues"] = len(cues)
     metrics["speakers"] = len({speaker_name(c) for c in cues})
     metrics["bad_character_tag_ratio"] = round(sum(map(is_bad_character_tag, cues)) / max(1, len(cues)), 4)
+    short = {}
+    for c in cues:
+        name = speaker_name(c)
+        if len(re.sub(r"[^A-Za-z]", "", name)) <= 2:
+            short[name] = short.get(name, 0) + 1
+    metrics["oneoff_short_speakers"] = sum(1 for v in short.values() if v < 3)
     metrics["speaker_colon_share"] = round(diag.get("speaker_colon_lines", 0) / max(1, diag.get("nonblank_lines", 1)), 4)
     scene_words = sorted(sum(len(x.split()) for _, x in s.elements) for s in scenes) or [0]
     metrics["median_scene_words"] = scene_words[len(scene_words) // 2]
@@ -112,6 +119,8 @@ def script_quality(text: str, scenes, diag: dict, pdf_meta: dict, vocab) -> tupl
         reasons.append("dialogue_structure")
     if metrics["bad_character_tag_ratio"] > cfg["max_bad_character_tag_ratio"]:
         reasons.append("parse_bad_cues")
+    if metrics["oneoff_short_speakers"] >= cfg["max_oneoff_short_speakers"]:
+        reasons.append("watermark_fragments")  # a vertical watermark split into "IM", "AL", "ON" speaker tags
     if metrics["median_scene_words"] > cfg["max_median_scene_words"]:
         reasons.append("merged_scenes")
     if metrics["absorbed_action_rate"] > cfg["max_absorbed_action_rate"]:
