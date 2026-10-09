@@ -75,6 +75,10 @@ _JUNK_DIALOGUE_RE = re.compile(r"^(\((MORE|CONTINUED|CONT'?D)\)|(CONTINUED|OMITT
 # "speaker" is a revision stamp or heading fragment ("6/15/15 - YELLOW", "INT. OFFICE -- CONTINUOUS") that never
 # says anything with letters. "478." from a real speaker stays.
 _NUMBER_LINE_RE = re.compile(r"^\d{1,4}[A-Z]?\.?$")
+_NOT_A_NAME_RE = re.compile(
+    r"[\d/:]|-$|\b(POV|CLOSE|ANGLE|INSERT|SUPER|TITLE|LEGEND|MONTAGE|SERIES|WIDE|SHOT|BACK|DAY|NIGHT|MORNING|EVENING|"
+    r"LATER|CONTINUOUS|SAME|CONTINUED|OMITTED|MORE)\b"
+)
 _HEADING_LEAD_NO_RE = re.compile(r"^\d{1,3}-?[A-Z]{0,2}\.?\s+(?=(INT|EXT|I/E)\b)")
 _HEADING_TAIL_NO_RE = re.compile(
     r"\b(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DAWN|DUSK|LATER|SUNSET|SUNRISE|CONTINUOUS)\s+\d{1,3}-?[A-Z]{0,2}\.?$"
@@ -263,8 +267,9 @@ def known_speakers_of(raw_scenes: list[list[tuple[str, str]]]) -> set[str]:
             if j < len(elements) and elements[j][0] == "dialogue" and re.search(r"[A-Za-z]", elements[j][1]) \
                     and not is_junk_dialogue(elements[j][1]):
                 name = speaker_name(text)
-                # "CUT TO:" or a heading tagged as a speaker is not a name, even when a line follows it.
-                if len(re.sub(r"[^A-Z]", "", name)) >= 2 and not (TRANSITION_RE.match(name) or is_bad_character_tag(name)):
+                # "CUT TO:", "HIS POV" or "DAY." tagged as a speaker is not a name, even when a line follows it.
+                if len(re.sub(r"[^A-Z]", "", name)) >= 2 and not (TRANSITION_RE.match(name) or is_bad_character_tag(name)
+                                                                 or _NOT_A_NAME_RE.search(name)):
                     known.add(name)
     return known
 
