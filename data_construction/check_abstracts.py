@@ -66,7 +66,15 @@ def content_stems(text: str) -> set[str]:
 
 
 def name_tokens(speaker: str) -> list[str]:
-    return [t for t in re.findall(r"[A-Z][A-Z'\-]+", speaker.upper()) if len(t) >= 3 and t not in NAME_TITLES]
+    return [t for t in re.findall(r"[^\W\d_][^\W\d_'\-]+", speaker.upper()) if len(t) >= 3 and t not in NAME_TITLES]
+
+
+def grounded(word: str, content_lower: str) -> bool:
+    """A capitalized abstract word is grounded if it (each capitalized hyphen part) or its singular occurs in the content."""
+    parts = [p.lower() for p in word.split("-") if p and p[0].isupper()]
+    def ok(p):
+        return p in content_lower or (p.endswith("es") and p[:-2] in content_lower) or (p.endswith("s") and p[:-1] in content_lower)
+    return bool(parts) and all(ok(p) for p in parts)
 
 
 def check_one(abstract: str, content: str, target: list[int] | None = None) -> dict:
@@ -115,16 +123,20 @@ def check_one(abstract: str, content: str, target: list[int] | None = None) -> d
 
     speaker_tokens = {t for s in speakers for t in name_tokens(s)}
     caps = [w for w in re.findall(r"\b[A-Z][A-Z'\-]{2,}\b", text) if not ACRONYMS_OK.match(w)]
-    if any(w in speaker_tokens for w in caps):
+    # A name is only "shouted" if the excerpt also writes it in normal case somewhere (Welles vs WELLES);
+    # names that only ever appear in capitals (a crewman called ATM, "SIU DET 1") are written as-is.
+    if any(w in speaker_tokens and re.search(rf"\b{re.escape(w.capitalize())}\b", content) for w in caps):
         hard.append("all_caps_character_name")
 
     initial, inner = set(), set()
     for m in re.finditer(r"\b[A-Z][a-z][A-Za-z'\u2019\-]*", text):
+        if m.group().endswith("-"):
+            continue
         w = re.sub(r"['\u2019]s?$", "", m.group())
         before = text[: m.start()].rstrip(" \"'\u201c(")
         (initial if not before or before[-1] in ".!?:;\n" else inner).add(w)
     candidates = [w for w in inner | (initial & inner) if w not in SENTENCE_STARTERS and w.lower() not in STOPWORDS]
-    ungrounded = sorted({w for w in candidates if w.lower() not in content_lower})
+    ungrounded = sorted({w for w in candidates if not grounded(w, content_lower)})
     if len(ungrounded) >= 3 or (candidates and len(ungrounded) / len(set(candidates)) > 0.25):
         hard.append("ungrounded_proper_nouns")
     elif ungrounded:

@@ -19,7 +19,7 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_segments import CONFIG, norm_title, overlap, shingles, words_of  # noqa: E402
 from check_abstracts import check_one  # noqa: E402
-from cml_format import drop_front_matter, parse_script, render, segment_stats, validate_cml  # noqa: E402
+from cml_format import drop_duplicate_scenes, drop_front_matter, parse_script, render, segment_stats, validate_cml  # noqa: E402
 from make_abstract_batches import target_words  # noqa: E402
 
 FIRST = ["movie_name", "imdb_id", "script_segment", "summary"]
@@ -91,7 +91,7 @@ def main() -> None:
     trace_fail = []
     for r in sample:
         detok = "detok" in r["content_normalization"]
-        scenes = drop_front_matter(parse_script(ms[r["imdb_id"]][r["source_split"]]["script"], detok=detok))
+        scenes = drop_duplicate_scenes(drop_front_matter(parse_script(ms[r["imdb_id"]][r["source_split"]]["script"], detok=detok)))
         sl = [s for s in scenes if r["scene_start"] <= s.index <= r["scene_end"]]
         if render(sl) != r["script_segment"]:
             trace_fail.append(r["item_id"])
@@ -121,17 +121,28 @@ def main() -> None:
     share_pref = sum(15 <= s <= 20 for s in sc) / len(sc)
     record("C10", all(12 <= s <= 24 for s in sc) and share_pref >= 0.8, f"range=[{min(sc)},{max(sc)}], share_15_20={share_pref:.2f}")
 
-    stats = {r["item_id"]: segment_stats(parse_script(r["script_segment"], detok=False), r["script_segment"]) for r in recs}
+    vocab = Counter()
+    for by_split in ms.values():
+        for row in by_split.values():
+            vocab.update(re.findall(r"[a-z]{3,}", row["script"].lower()))
+    parsed = {r["item_id"]: parse_script(r["script_segment"], detok=False) for r in recs}
+    stats = {r["item_id"]: segment_stats(parsed[r["item_id"]], r["script_segment"], vocab) for r in recs}
     bad_dlg = [i for i, s in stats.items() if s["dialogue_turns"] < 20 or s["num_speakers"] < 2 or not 0.10 <= s["dialogue_char_ratio"] <= 0.85]
     record("C11", not bad_dlg, f"violations={bad_dlg[:5]}")
 
     art = sorted(s["tokenization_artefacts_per_1k_words"] for s in stats.values())
     p99 = art[min(len(art) - 1, int(0.99 * len(art)))]
-    junk = [r["item_id"] for r in recs if re.search(r"\ufffd|[\x00-\x08\x0b-\x1f]|&amp;amp;|>\(?(CONTINUED|OMITTED)\)?<|>\d+\.?<", r["script_segment"])]
+    junk = [r["item_id"] for r in recs if re.search(r"\ufffd|[\x00-\x08\x0b-\x1f]|&amp;amp;|>\(?(CONTINUED|OMITTED)\)?<|>\d+\.?<|-[LR][RSC]B-|\*", r["script_segment"])]
     record("C12", p99 <= 2 and not junk, f"artefacts_p99={p99}/1k words, junk_items={junk[:5]}")
 
-    noise = [i for i, s in stats.items() if s["garble_rate"] > 0.005 or s["bad_character_tag_ratio"] > 0.05
-             or s["max_element_chars"] > 3000 or s["heading_ratio"] < 0.7]
+    def has_dup_scene(scenes):
+        bodies = ["\n".join(t for tag, t in sc.elements if tag != "stage_direction") for sc in scenes]
+        bodies = [b for b in bodies if len(b) >= 200]
+        return len(bodies) != len(set(bodies))
+
+    noise = [i for i, s in stats.items() if s["garble_rate"] > 0.005 or s["rare_word_rate"] > 0.01
+             or s["bad_character_tag_ratio"] > 0.05 or s["max_element_chars"] > 3000 or s["heading_ratio"] < 0.7
+             or has_dup_scene(parsed[i])]
     record("C13", not noise, f"violations={noise[:5]}")
 
     def ascii_share(t):
