@@ -176,3 +176,6 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# Dataset construction working data (screenplay text must never be committed)
+data_construction/work/
