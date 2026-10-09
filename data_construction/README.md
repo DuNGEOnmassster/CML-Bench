@@ -18,7 +18,10 @@ is gitignored; releases go only to a private Hugging Face dataset.
 | 4. Checks | `python data_construction/check_abstracts.py --run_dir RUN` (`--batch DIR` for one batch); merge gate: `validate_batch.py` | `RUN/abstract_checks.jsonl`, `RUN/abstract_checks_summary.json` |
 | 5. Assemble | `python data_construction/assemble.py --run_dir RUN --out REL` | `REL/data/*.jsonl`, `REL/info.json`, `REL/stats.json`, `REL/README.md` |
 | 6. Sync | `HF_TOKEN=... python data_construction/hf_sync.py sync --run_dir RUN` (also `pilot`, `status`) | private HF dataset `${HF_ACCOUNT}/CML-Dataset-Expanded` |
-| Contract | `python data_construction/contract_checks.py --release REL --run_dir RUN --out report.json` | automated contract assertions |
+| Contract | `python data_construction/contract_checks.py --release REL [--content_only] --out report.json` | automated contract v2 assertions |
+| — | `python data_construction/verify_alignment.py --items JSONL` | C05′: word alignment of every item with raw MovieSum, sharing no code with the cleaner |
+| — | `python data_construction/residue_scan.py JSONL` | counts of cleaning residue (brackets, `\`, CONT'D, quote spaces, orphan speaker lines, numbered headings) |
+| — | `python data_construction/select_pilot.py --segments SEG --carry IDS... --previous OLD.jsonl --out ids.txt` | re-pilot sample: audited items mapped to the current build + seeded new movies |
 
 Stage 1 downloads MovieSum (`rohitsaxena/MovieSum`) and CML-Bench `gt_100.json` if they are missing; run
 `imdb_meta.py` after it (it reads the MovieSum ids) and rebuild so `imdb_rating`/`genres` are filled.
@@ -35,13 +38,14 @@ abstract batch and from several workers at once.
 
 No LLM API is used. An agent (or several in parallel, one per batch) is given a batch manifest and:
 
-1. reads `prompt_path` (`prompts/abstract_prompt_v1_2.md`) once;
-2. for each item: reads `content_path`, writes `{"item_id", "abstract", "prompt_version", "author"}` to
-   `abstract_path`, keeping the word count inside `target_words`;
+1. reads `prompt_path` (default `prompts/abstract_prompt_v1_5.md`) once;
+2. for each item: reads `content_path`, writes `{"item_id", "content_sha1", "abstract", "prompt_version", "author"}`
+   to `abstract_path`, following the prompt's length rule (aim just under `target_center`, stay inside `target_words`);
 3. skips items whose `abstract_path` already exists (resumable), and keeps any temp files in the
    manifest's `scratch_dir` (parallel agents share `/tmp` and have deleted each other's drafts);
-4. runs `python data_construction/check_abstracts.py --batch <batch_dir>` and rewrites only items with
-   mechanical hard failures (length, markdown, meta phrases, all-caps names, ungrounded names).
+4. runs `python data_construction/check_abstracts.py --batch <batch_dir>` and
+   `python data_construction/validate_batch.py --run_dir RUN --batch <batch_dir>`, and rewrites only items with
+   mechanical hard failures (length, markdown, meta phrases, all-caps names, ungrounded names, merge gates G1–G7).
 
 Writers do not judge their own quality; an independent evaluator audits samples against the contract.
 
