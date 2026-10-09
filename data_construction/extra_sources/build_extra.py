@@ -52,8 +52,12 @@ from extra_sources.imdb_index import id_meta, load_characters, load_index, looku
 from extra_sources.quality import QUALITY_CONFIG, absorbed_action_rate, script_quality  # noqa: E402
 from extra_sources.text_screenplay import PARSER_VERSION, extract_text, text_to_scenes  # noqa: E402
 from extra_sources.verbatim_check import check as verbatim_check  # noqa: E402
+from extra_sources.mislabel import signatures as mislabel_signatures, spk as mislabel_spk  # noqa: E402
 from extra_sources import catalogs  # noqa: E402
 from dataset_schema import gt_relation, load_gt_related  # noqa: E402
+
+# Per-window limits on CML mislabel signatures = MovieSum v3.1 p99 per segment (13,065 segments, extra_sources/mislabel.py)
+MISLABEL_LIMITS = {"dual_collapse": 0, "paren_speech": 1, "name_in_dialogue": 1, "fused_cue": 2}
 
 # parser version + the shared cml_format cleaning version ("moviesum_clean_detok_v3" -> "clean_detok_v3")
 NORMALIZATION_VERSION = f"{PARSER_VERSION.replace('_', '')}_{MOVIESUM_NORMALIZATION.split('_', 1)[1]}"
@@ -165,6 +169,8 @@ def window_noise(seg) -> list[str]:
         reasons.append("parenthetical_in_action")  # "(agonized) Susan! Duck!" with its speaker lost (MovieSum p99 3)
     if any(tag in ("dialogue", "parenthetical", "scene_description") and _GLUED_HEADER_RE.search(t) for tag, t in texts):
         reasons.append("glued_page_header")
+    if sum(1 for d in descs if re.match(r"^(\d{1,3}[A-Z]?)\s+\1\s+\S", d)) > 2:
+        reasons.append("doubled_scene_numbers")  # "16 16 A new season…": margin scene numbers (MovieSum v3: <= 2 per segment)
     if sum(1 for d in descs if _TRAILING_PAGE_NO_RE.search(d)) > 1:
         reasons.append("page_numbers_in_text")
     if sum(1 for n in talkers if len(n) >= 3 and any(o != n and len(o) == len(n) + 1 and o.endswith(n) for o in talkers)) >= 2:
@@ -280,7 +286,10 @@ def main() -> None:
     ap.add_argument("--limit_films", type=int, default=0)
     ap.add_argument("--delay", type=float, default=2.0)
     ap.add_argument("--offline", action="store_true", help="only use cached downloads")
+    ap.add_argument("--ablate", default="", help="comma-separated window rejection reasons (prefixes) to record in "
+                    "`ablated_reasons` instead of rejecting on; for measuring a gate's effect, never for a release")
     args = ap.parse_args()
+    ablate = tuple(p for p in args.ablate.split(",") if p)
     cfg = CONFIG
     t0 = time.time()
     os.makedirs(args.out, exist_ok=True)
@@ -383,6 +392,7 @@ def main() -> None:
         for s in scenes:
             prefix.append(prefix[-1] + count_tokens(render([s])) - wrapper_tokens)
         windows = choose_windows(scenes, prefix, cfg)
+        film_talkers = {mislabel_spk(t) for s in scenes for tag, t in s.elements if tag == "character" and len(mislabel_spk(t)) >= 2}
         kept = 0
         src = offer["source"].split(":")[0]
         for a, b in windows:
@@ -391,16 +401,25 @@ def main() -> None:
             item_id = f"{imdb_id}-s{seg[0].index:04d}-{seg[-1].index:04d}"
             st = segment_stats(seg, content, ref["vocab"])
             reasons = segment_rejections(st, validate_cml(content), cfg) + window_noise(seg)
+            sig = mislabel_signatures([(t, x) for s in seg for t, x in s.elements], film_talkers)
+            reasons += [f"mislabel_{k}" for k, lim in MISLABEL_LIMITS.items() if sig[k] > lim]
             gt_ov = overlap(shingles(words_of(content), cfg["ngram"]), ref["gt_segment_shingles"])
             if gt_ov > cfg["max_gt_segment_overlap"]:
                 reasons.append("gt_segment_overlap")
+            ablated = [r for r in reasons if r.startswith(ablate)] if ablate else []
+            reasons = [r for r in reasons if r not in ablated]
+            tag_check = None
             if not reasons:
                 # independent word alignment against the raw download (verbatim_check, no parser code): any word the
                 # parse lost or invented (e.g. a speaker name split from its line by a blank line) drops the window
                 vc = verbatim_check({"item_id": item_id, "script_segment": content, "source_cache_file": rec["file"],
                                      "source_format": offer["format"]}, args.cache_dir)
+                tag_check = {"cues_checked": vc["cues_checked"], "errors": vc["tag_errors"]}
                 if vc["inserted"] or vc["deleted_other"]:
                     reasons.append("verbatim_mismatch")
+                if vc["tag_errors"]:
+                    # raw cue's speech flattened into action or under another speaker
+                    (ablated if "speaker_tag_mismatch".startswith(ablate) else reasons).append("speaker_tag_mismatch")
             stats["windows_total"] += 1
             if reasons:
                 rejected.append({"item_id": item_id, "movie_name": name, "reasons": reasons, "content_tokens": st["content_tokens"]})
@@ -421,7 +440,8 @@ def main() -> None:
                 "imdb_match_confidence": match.get("confidence"), "imdb_match_verified": verified,
                 "gt_related": gt_rel, "eval_safe": gt_rel is None,
                 "content_normalization": NORMALIZATION_VERSION, "content_sha1": hashlib.sha1(content.encode()).hexdigest(),
-                "gt_ngram_overlap": round(gt_ov, 5), **st,
+                "gt_ngram_overlap": round(gt_ov, 5), "speaker_tag_check": tag_check, **st,
+                **({"ablated_reasons": ablated} if ablate else {}),
             })
             kept += 1
         row.update({"outcome": "accepted" if kept else "accepted_no_windows", "movie_name": name, "source": offer["source"],
