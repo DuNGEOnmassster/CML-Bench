@@ -51,6 +51,7 @@ from extra_sources.fetch import Fetcher, PolicyError  # noqa: E402
 from extra_sources.imdb_index import id_meta, load_characters, load_index, lookup, norm_title  # noqa: E402
 from extra_sources.quality import QUALITY_CONFIG, absorbed_action_rate, script_quality  # noqa: E402
 from extra_sources.text_screenplay import PARSER_VERSION, extract_text, text_to_scenes  # noqa: E402
+from extra_sources.verbatim_check import check as verbatim_check  # noqa: E402
 from extra_sources import catalogs  # noqa: E402
 from dataset_schema import gt_relation, load_gt_related  # noqa: E402
 
@@ -393,6 +394,13 @@ def main() -> None:
             gt_ov = overlap(shingles(words_of(content), cfg["ngram"]), ref["gt_segment_shingles"])
             if gt_ov > cfg["max_gt_segment_overlap"]:
                 reasons.append("gt_segment_overlap")
+            if not reasons:
+                # independent word alignment against the raw download (verbatim_check, no parser code): any word the
+                # parse lost or invented (e.g. a speaker name split from its line by a blank line) drops the window
+                vc = verbatim_check({"item_id": item_id, "script_segment": content, "source_cache_file": rec["file"],
+                                     "source_format": offer["format"]}, args.cache_dir)
+                if vc["inserted"] or vc["deleted_other"]:
+                    reasons.append("verbatim_mismatch")
             stats["windows_total"] += 1
             if reasons:
                 rejected.append({"item_id": item_id, "movie_name": name, "reasons": reasons, "content_tokens": st["content_tokens"]})
