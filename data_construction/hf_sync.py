@@ -206,6 +206,10 @@ def card(status: dict, tree_paths: set[str]) -> bytes:
         + (f" (list `{s['merge_exclusion_list']['file']}`: {s['merge_exclusion_list']['rule']})" if s.get("merge_exclusion_list") else "")
         for src, s in sorted(status["per_source"].items()) if s.get("items_excluded")
     ) or "- none"
+    n_gaps = sum((s.get("writer_notes") or {}).get("source_gaps_released", 0) for s in status["per_source"].values())
+    gaps = (f"{n_gaps:,} released windows have a gap in the source screenplay reported by the abstract writer (a missing page, an "
+            f"omitted sequence, dialogue \"on a separate document\"); they stay in the release, their abstracts are audited "
+            f"for invented bridging (C31 Tier B), and they are listed in `audit/<source>/writer_signals.json`.") if n_gaps else ""
     pilots = "\n".join(f"- `pilot_{n}`: {m.get('items')} items, prompt `{m.get('prompt_version')}`, content `{m.get('content_normalization')}` "
                        f"— {m.get('note', '')}" for n, m in sorted(status["pilots"].items()))
     text = f"""---
@@ -254,6 +258,7 @@ Machine-readable progress: `build_status.json`. Item schema (v{SCHEMA_VERSION}):
 match CML-Bench `ground_truth/gt_100.json` (`movie_name`, `imdb_id`, `script_segment`, `summary`).
 GT segments start with a newline before `<script>` and usually end with one; these items have neither.
 Windows with `relative_position == 0` may open with title-page text.
+{gaps}
 
 ## Provenance and copyright
 
@@ -274,6 +279,49 @@ def write_store_status(status: dict, path: str) -> None:
         with open(path, "w", encoding="utf-8") as f:
             json.dump(status, f, indent=1, ensure_ascii=False)
             f.write("\n")
+
+
+GAP_NOTE_RE = re.compile(r"PAGE MISSING|pages? (?:are |is )?missing|sequence omitted|omitted from (?:the )?original|separate document|"
+                         r"scenes? (?:is |are )?(?:missing|omitted)|cut off mid|excerpt ends (?:with|mid|abruptly)", re.I)
+MARKER_NOTE_RE = re.compile(r"\b(?:SCENES? )?(?:DELETED|OMITTED)\b")
+
+
+def writer_notes(run_dir: str, batches: list[dict]) -> dict[str, str]:
+    """item_id -> the writer's source-issue note (batch order; a later note for the same item wins, as in the
+    evaluator's harness)."""
+    notes = {}
+    for b in batches:
+        path = os.path.join(run_dir, "batches", b["batch_id"], "writer_report.json")
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    rows = json.load(f).get("source_issues", [])
+            except (ValueError, OSError):
+                continue
+            notes.update({x["item_id"]: x.get("note", "") for x in rows if x.get("item_id")})
+    return notes
+
+
+def writer_signals(notes: dict[str, str], items_by_id: dict, released: set[str]) -> dict:
+    """Writer notes read as content signals (C31 amendment notes): source gaps for the card, identity doubts for C33,
+    marker residue and films with >= 3 tagging/OCR noise notes for the next cleaning pass."""
+    from targeted_rule import IDENTITY_RE, IMPACT_RE
+
+    def row(iid):
+        return {"item_id": iid, "movie_name": items_by_id[iid]["movie_name"], "released": iid in released, "note": notes[iid]}
+
+    noisy = {}
+    for iid, note in notes.items():
+        if iid in items_by_id and not IMPACT_RE.search(note) and not IDENTITY_RE.search(note):
+            noisy.setdefault(items_by_id[iid]["imdb_id"], []).append(iid)
+    return {
+        "notes": len(notes),
+        "source_gaps": [row(i) for i in sorted(notes) if i in items_by_id and GAP_NOTE_RE.search(notes[i])],
+        "identity_doubts": [row(i) for i in sorted(notes) if i in items_by_id and IDENTITY_RE.search(notes[i])],
+        "marker_residue": [row(i) for i in sorted(notes) if i in items_by_id and MARKER_NOTE_RE.search(notes[i])],
+        "noisy_films": [{"imdb_id": f, "movie_name": items_by_id[ids[0]]["movie_name"], "noise_notes": len(ids), "items": sorted(ids)}
+                        for f, ids in sorted(noisy.items(), key=lambda kv: (-len(kv[1]), kv[0])) if len(ids) >= 3],
+    }
 
 
 def load_merge_exclusions(exclusions_dir: str | None, build: str, items_by_id: dict) -> tuple[dict[str, str], dict]:
@@ -302,6 +350,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     statistics; the batch that carries them is still judged on all its items."""
     from audit_rules import dedupe_verdicts, paused_orchestrators, sample_batches, sample_item, stop_rule
     from cml_format import count_tokens
+    from targeted_rule import select as select_targeted
     from validate_batch import abstract_set_hash, first8, validate
 
     with open(os.path.join(run_dir, "run.json"), encoding="utf-8") as f:
@@ -405,8 +454,16 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
                 files[f"data/{slug}/{b['batch_id']}.related.jsonl"] = jsonl_bytes(related)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(new_cache, f)
+    notes = writer_notes(run_dir, batches)
+    selected = [{**t, "writer_note": notes.get(t["item_id"], "")} for t in select_targeted(targeted, notes, merged_items)]
+    released = {r["item_id"] for p, data in files.items() if p.startswith(f"data/{slug}/") for r in map(json.loads, data.decode().splitlines())}
+    signals = writer_signals(notes, items_by_id, released)
     if targeted:
         files[f"audit/{slug}/targeted.jsonl"] = jsonl_bytes(targeted)
+    if selected:
+        files[f"audit/{slug}/targeted_selected.jsonl"] = jsonl_bytes(selected)
+    if notes:
+        files[f"audit/{slug}/writer_signals.json"] = json_bytes(signals)
     if sample:
         files[f"audit/{slug}/sample.jsonl"] = jsonl_bytes(sample)
     if raw_verdicts:
@@ -418,7 +475,10 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
             seen_b.add(v["batch_id"])
             audited_batches.append((v["batch_id"], any(x["batch_id"] == v["batch_id"] and (x.get("major", 0) or x.get("outside", 0))
                                                         for x in verdicts)))
-    audit = {"targeted_items": len(targeted), "sample_items": len(sample), **rule,
+    tiers = {k: sum(t["tier"] == k for t in selected) for k in ("A", "B", "C")}
+    audit = {"targeted_items": len(targeted), "targeted_selected": len(selected), "targeted_tiers": tiers,
+             "targeted_selected_share": round(len(selected) / merged_items, 4) if merged_items else None,
+             "sample_items": len(sample), **rule,
              "paused_orchestrators": paused_orchestrators(audited_batches, ranges), "orchestrators": ranges}
 
     checks_path = os.path.join(run_dir, "content_checks.json")
@@ -457,6 +517,10 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         "items_excluded": {r: sum(v == r for v in excluded.values()) for r in sorted(set(excluded.values()))},
         "items_excluded_from_merged": dict(sorted(excluded_from_merged.items())),
         "merge_exclusion_list": exclusion_spec or None,
+        "writer_notes": {"notes": signals["notes"],
+                         "source_gaps_released": sum(r["released"] for r in signals["source_gaps"]),
+                         "identity_doubts": len(signals["identity_doubts"]), "marker_residue": len(signals["marker_residue"]),
+                         "noisy_films": len(signals["noisy_films"])},
         "identity_decisions": dict(sorted({d: sum(it.get("identity_decision") == d for it in items)
                                            for d in {it.get("identity_decision") for it in items} if d}.items())),
         "audit": audit,
@@ -524,22 +588,29 @@ def _write_if_changed(path: str, data: bytes) -> bool:
 def mirror_audit(out_dir: str, slug: str, files: dict) -> None:
     """For auditors without HF access: the audit lists plus every listed item's content and abstract, in the store."""
     os.makedirs(out_dir, exist_ok=True)
-    lists = {name: _records(files, f"audit/{slug}/{name}.jsonl") for name in ("sample", "targeted")}
-    wanted = {}
+    lists = {name: _records(files, f"audit/{slug}/{name}.jsonl") for name in ("sample", "targeted", "targeted_selected")}
+    wanted, note = {}, {}
     for name, rows in lists.items():
         for r in rows:
-            wanted.setdefault(r["item_id"], []).append(name if name == "sample" else "targeted:" + ",".join(r.get("reasons", [])))
+            tag = {"sample": "sample", "targeted": "targeted:" + ",".join(r.get("reasons", []))}.get(name) or f"selected:tier_{r['tier']}"
+            wanted.setdefault(r["item_id"], []).append(tag)
+            if r.get("writer_note"):
+                note[r["item_id"]] = r["writer_note"]
     items = []
     for rec in _records(files, f"data/{slug}/"):
         if rec["item_id"] in wanted:
             items.append({"item_id": rec["item_id"], "batch_id": rec["batch_id"], "movie_name": rec["movie_name"],
                           "summary_sha1": hashlib.sha1(rec["summary"].encode()).hexdigest(), "audit_lists": wanted[rec["item_id"]],
+                          "writer_note": note.get(rec["item_id"], ""),
                           "abstract_prompt_version": rec["abstract_prompt_version"], "abstract_author": rec["abstract_author"],
                           "script_segment": rec["script_segment"], "summary": rec["summary"]})
-    changed = [name for name, data in (("sample.jsonl", jsonl_bytes(lists["sample"])), ("targeted.jsonl", jsonl_bytes(lists["targeted"])),
-                                       ("items.jsonl", jsonl_bytes(items)))
-               if _write_if_changed(os.path.join(out_dir, name), data)]
-    print(f"audit mirror {out_dir}: sample {len(lists['sample'])}, targeted {len(lists['targeted'])}, items {len(items)}, rewrote {changed}")
+    outputs = [(f"{name}.jsonl", jsonl_bytes(rows)) for name, rows in lists.items()] + [("items.jsonl", jsonl_bytes(items))]
+    signals = files.get(f"audit/{slug}/writer_signals.json")
+    if signals:
+        outputs.append(("writer_signals.json", signals))
+    changed = [name for name, data in outputs if _write_if_changed(os.path.join(out_dir, name), data)]
+    print(f"audit mirror {out_dir}: sample {len(lists['sample'])}, targeted {len(lists['targeted'])} "
+          f"(selected {len(lists['targeted_selected'])}), items {len(items)}, rewrote {changed}")
 
 
 def cmd_pilot(repo: Repo, args) -> dict:

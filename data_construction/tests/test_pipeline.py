@@ -159,6 +159,23 @@ class AuditRuleTests(unittest.TestCase):
         self.assertEqual(out[:4], ["He runs.", "She waits.", "They talk.", "Arlo smiles."])
         self.assertEqual(out[4], "INT. MOTEL ROOM 12 - NIGHT")
 
+    def test_targeted_tiers_and_budget(self):
+        from targeted_rule import h, select
+
+        pool = [{"item_id": f"t{i:03d}", "batch_id": f"b{i // 10:02d}", "reasons": ["writer_source_issue"]} for i in range(200)]
+        pool[0]["reasons"] = ["title_mention"]
+        notes = {t["item_id"]: ("Page missing in the bar scene." if i % 2 else "OCR typos; cues tagged as action.")
+                 for i, t in enumerate(pool)}
+        notes["t004"] = "This is a different film's script."
+        sel = {r["item_id"]: r["tier"] for r in select(pool, notes)}
+        self.assertEqual(sel["t000"], "A")
+        self.assertEqual(sel["t004"], "A")
+        self.assertTrue(all(sum(1 for i, k in sel.items() if k == "B" and i[1:3] == f"{b:02d}") <= 1 for b in range(20)))
+        self.assertTrue(all(h(i) < 1 / 20 for i, k in sel.items() if k == "C"))
+        capped = select(pool, notes, merged_items=200)
+        self.assertLessEqual(sum(r["tier"] != "A" for r in capped), sum(r["tier"] != "A" for r in select(pool, notes)))
+        self.assertFalse(any(r["tier"] == "C" for r in capped))
+
     def test_c34_window_score(self):
         from mislabel_gate import score_items
 
