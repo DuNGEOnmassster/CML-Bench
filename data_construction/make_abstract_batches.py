@@ -19,15 +19,20 @@ import random
 from collections import defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1.md")
+DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1_1.md")
+
+
+def target_center(content_tokens: int) -> int:
+    """GT summaries: words ~= 123 + 6.1 per 1k content tokens (r=0.32), median 151."""
+    return round(120 + 6 * content_tokens / 1000)
 
 
 def target_words(content_tokens: int) -> list[int]:
-    """Per-item abstract length range; GT summaries grow ~6 words per 1k content tokens (r=0.32)."""
-    k = content_tokens / 1000
-    lo = max(90, min(260, round(110 + 5 * k)))
-    hi = max(lo + 40, min(300, round(170 + 10 * k)))
-    return [lo, hi]
+    """Per-item abstract length range, +-35 words around the GT-calibrated center.
+    Writers fill whatever ceiling they are given (pilot v1: every abstract landed in the top 15%),
+    so the range is kept narrow."""
+    center = target_center(content_tokens)
+    return [max(90, center - 35), min(300, center + 35)]
 
 
 def select(segments: list[dict], sample: int, one_per_movie: bool, seed: int) -> list[dict]:
@@ -54,7 +59,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=20261009)
     ap.add_argument("--batch_size", type=int, default=10)
     ap.add_argument("--prompt", default=DEFAULT_PROMPT)
-    ap.add_argument("--prompt_version", default="abstract_v1")
+    ap.add_argument("--prompt_version", default="abstract_v1.1")
     args = ap.parse_args()
 
     run_dir = os.path.abspath(args.run_dir)
@@ -87,6 +92,7 @@ def main() -> None:
                     "content_tokens": it["content_tokens"],
                     "num_scenes": it["num_scenes"],
                     "target_words": target_words(it["content_tokens"]),
+                    "target_center": target_center(it["content_tokens"]),
                 }
             )
         manifest = {

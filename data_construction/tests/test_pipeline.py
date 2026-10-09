@@ -113,7 +113,7 @@ class AbstractCheckTests(unittest.TestCase):
         self.assertIn("markdown_or_list", check_one("- Welles talks to Eddie.\n" * 30, self.CONTENT)["hard"])
 
     def test_target_words(self):
-        self.assertEqual(target_words(2000), [120, 190])
+        self.assertEqual(target_words(2000), [97, 167])
         lo, hi = target_words(10000)
         self.assertTrue(90 <= lo < hi <= 300)
 

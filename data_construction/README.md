@@ -18,6 +18,7 @@ is gitignored; releases go only to a private Hugging Face dataset.
 | 4. Checks | `python data_construction/check_abstracts.py --run_dir RUN` | `RUN/abstract_checks.jsonl`, `RUN/abstract_checks_summary.json` |
 | 5. Assemble | `python data_construction/assemble.py --run_dir RUN --out REL` | `REL/data/*.jsonl`, `REL/info.json`, `REL/stats.json`, `REL/README.md` |
 | 6. Upload | `HF_TOKEN=... python data_construction/upload_hf.py --folder REL --repo_id USER/NAME` | private HF dataset |
+| Contract | `python data_construction/contract_checks.py --release REL --run_dir RUN --out report.json` | automated assertions C01–C24, C30 |
 
 Stage 1 downloads MovieSum (`rohitsaxena/MovieSum`) and CML-Bench `gt_100.json` if they are missing.
 Requirements: Python 3.10+, `tiktoken` (stages 1/4/5), `huggingface_hub` (stage 6).
