@@ -196,8 +196,10 @@ def main() -> None:
     ap.add_argument("--imdb_meta", default="data_construction/work/sources/imdb_meta.json")
     ap.add_argument("--out", default="data_construction/work/build")
     ap.add_argument("--limit_movies", type=int, default=0, help="debug: only process the first N candidate movies")
+    ap.add_argument("--no_detok", action="store_true", help="keep MovieSum's PTB tokenization (\"do n't\", \" ,\") verbatim")
     args = ap.parse_args()
     cfg = CONFIG
+    normalization = NORMALIZATION_VERSION.replace("_detok", "") if args.no_detok else NORMALIZATION_VERSION
     t0 = time.time()
     os.makedirs(args.out, exist_ok=True)
 
@@ -245,7 +247,7 @@ def main() -> None:
         if norm_title(name) in gt_titles:
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "gt_title_match"})
             continue
-        scenes = drop_front_matter(parse_script(row["script"]))
+        scenes = drop_front_matter(parse_script(row["script"], detok=not args.no_detok))
         if len(scenes) < cfg["min_movie_scenes"]:
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "too_few_scenes", "num_scenes": len(scenes)})
             continue
@@ -304,7 +306,7 @@ def main() -> None:
                     "imdb_votes": meta.get("votes"),
                     "genres": meta.get("genres", []),
                     "year": meta.get("year"),
-                    "content_normalization": NORMALIZATION_VERSION,
+                    "content_normalization": normalization,
                     "content_sha1": hashlib.sha1(content.encode()).hexdigest(),
                     "gt_ngram_overlap": round(gt_ov, 5),
                     **{k: st[k] for k in st},
@@ -334,7 +336,7 @@ def main() -> None:
     per_movie = Counter(s["imdb_id"] for s in accepted)
     build_stats = {
         "config": cfg,
-        "normalization": NORMALIZATION_VERSION,
+        "normalization": normalization,
         "moviesum_rows": len(rows),
         "unique_imdb_ids": len(by_id),
         "gt_items": len(gt),
