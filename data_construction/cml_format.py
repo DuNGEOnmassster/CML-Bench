@@ -71,6 +71,10 @@ _JUNK_ELEMENT_RE = re.compile(r"^(\(?(MORE|CONTINUED|CONT'?D|OMITTED)\)?[:.]?|[\
 # Dialogue is real speech unless it is empty or an explicit page-break/revision marker ("More.", "...", "?!",
 # "926 - 3143." are lines).
 _JUNK_DIALOGUE_RE = re.compile(r"^(\((MORE|CONTINUED|CONT'?D)\)|(CONTINUED|OMITTED)[:.]?)$")
+# A bare number in a dialogue tag is a page number when nobody real says it: either no speaker precedes it, or the
+# "speaker" is a revision stamp or heading fragment ("6/15/15 - YELLOW", "INT. OFFICE -- CONTINUOUS") that never
+# says anything with letters. "478." from a real speaker stays.
+_NUMBER_LINE_RE = re.compile(r"^\d{1,4}[A-Z]?\.?$")
 _HEADING_LEAD_NO_RE = re.compile(r"^\d{1,3}-?[A-Z]{0,2}\.?\s+(?=(INT|EXT|I/E)\b)")
 _HEADING_TAIL_NO_RE = re.compile(
     r"\b(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DAWN|DUSK|LATER|SUNSET|SUNRISE|CONTINUOUS)\s+\d{1,3}-?[A-Z]{0,2}\.?$"
@@ -225,6 +229,10 @@ def drop_junk_elements(elements: list[tuple[str, str]], known_speakers: set[str]
                     out.append(("scene_description", text))
                 i = j + 1
                 continue
+            if j < n and elements[j][0] == "dialogue" and _NUMBER_LINE_RE.match(elements[j][1]) \
+                    and speaker_name(text) not in known_speakers:
+                i = j + 1
+                continue
             nxt = elements[i + 1][0] if i + 1 < n else None
             if nxt not in ("dialogue", "parenthetical") and not (TRANSITION_RE.match(text) or CAMERA_RE.match(text)) \
                     and speaker_name(text) in known_speakers:
@@ -233,7 +241,8 @@ def drop_junk_elements(elements: list[tuple[str, str]], known_speakers: set[str]
         elif tag == "scene_description" and text.isupper() and text.strip() == speaker_name(text) and text.strip() in known_speakers:
             i += 1
             continue
-        elif tag == "dialogue" and is_junk_dialogue(text):
+        elif tag == "dialogue" and (is_junk_dialogue(text) or (_NUMBER_LINE_RE.match(text) and
+                                                               (not out or out[-1][0] not in ("character", "parenthetical")))):
             i += 1
             continue
         out.append((tag, text))
@@ -251,7 +260,8 @@ def known_speakers_of(raw_scenes: list[list[tuple[str, str]]]) -> set[str]:
             j = k + 1
             while j < len(elements) and elements[j][0] == "parenthetical":
                 j += 1
-            if j < len(elements) and elements[j][0] == "dialogue" and not is_junk_dialogue(elements[j][1]):
+            if j < len(elements) and elements[j][0] == "dialogue" and re.search(r"[A-Za-z]", elements[j][1]) \
+                    and not is_junk_dialogue(elements[j][1]):
                 name = speaker_name(text)
                 # "CUT TO:" or a heading tagged as a speaker is not a name, even when a line follows it.
                 if len(re.sub(r"[^A-Z]", "", name)) >= 2 and not (TRANSITION_RE.match(name) or is_bad_character_tag(name)):
