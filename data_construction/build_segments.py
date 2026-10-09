@@ -44,7 +44,7 @@ MOVIESUM_URL = "https://huggingface.co/datasets/rohitsaxena/MovieSum/resolve/mai
 MOVIESUM_PAGE = "https://huggingface.co/datasets/rohitsaxena/MovieSum"
 GT_URL = "https://huggingface.co/datasets/songdj/CML-Bench/resolve/main/ground_truth/gt_100.json"
 SPLITS = ("train", "val", "test")
-NORMALIZATION_VERSION = "moviesum_clean_detok_v2"
+NORMALIZATION_VERSION = "moviesum_clean_detok_v3"
 
 CONFIG = {
     "scenes_preferred": [15, 20],

@@ -29,6 +29,8 @@ ALLOWED_TAGS = frozenset(("script", "scene") + ELEMENT_TAGS)
 
 SCENE_RE = re.compile(r"<scene>(.*?)</scene>", re.S)
 ELEMENT_RE = re.compile(r"<(" + "|".join(ELEMENT_TAGS) + r")>(.*?)</\1>", re.S)
+# Also matches self-closing elements (`<dialogue />`), which MovieSum uses for empty lines.
+ELEMENT_ANY_RE = re.compile(r"<(" + "|".join(ELEMENT_TAGS) + r")>(.*?)</\1>|<(" + "|".join(ELEMENT_TAGS) + r")\s*/>", re.S)
 
 HEADING_RE = re.compile(r"^\s*(INT|EXT|I/E|INT\.?/EXT|EXT\.?/INT)\b", re.I)
 CONTINUOUS_RE = re.compile(r"\b(CONTINUOUS|SAME|MOMENTS? LATER|SECONDS? LATER|CONT'?D)\b", re.I)
@@ -52,13 +54,27 @@ CREDITS_RE = re.compile(
 
 _CTRL_RE = re.compile(r"[\u0000-\u0008\u000b-\u001f\u007f-\u009f\ufffd]")
 _NOISE_CHARS_RE = re.compile(r"[\u2022\u25a0\u25aa\u00b7\u25cf\u25a1\u2023\u2043]+")
-_INLINE_JUNK_RE = re.compile(r"\(?\b(CONTINUED|CONT'D|OMITTED|OMIT)\b\)?:?")
+_NOISE_IN_WORD_RE = re.compile(r"\b([A-Za-z]+)[\u2022\u25a0\u25aa\u00b7\u25cf\u25a1\u2023\u2043]+([A-Za-z]+)\b")
+# Markdown escapes left by the PDF->text step ("\*", "\[", "\_"); a backslash is never screenplay text.
+_MD_ESCAPE_RE = re.compile(r"\\([^\w\s\\]|_)")
+_BACKSLASH_RE = re.compile(r"\\+")
+# Runs after detokenization so the PTB form "( CONT 'D . )" is caught too; uppercase only.
+_INLINE_JUNK_RE = re.compile(r"\(?\b(CONTINUED|OMITTED|OMIT)\b\)?:?")
+_CONTD_RE = re.compile(r"\s*[;,]?\s*\bCONT\s*['\u2019]?\s*D\b\.?")
+_EMPTY_PARENS_RE = re.compile(r"\(\s*[;,.]?\s*\)")
 _ASTERISK_RE = re.compile(r"\*+")
 # Shooting-script scene numbers printed on both margins ("128A 128A", "132pt 132pt", "64 ... 64").
-_DUP_SCENE_NO_RE = re.compile(r"\b(\d{1,3}[A-Z]{1,3}|\d{1,3}pt)\s+\1\b")
-_MARGIN_SCENE_NO_RE = re.compile(r"^(\d{1,3}[A-Z]{0,3})\s+(.+?)\s+\1$")
-_LEADING_DOT_RE = re.compile(r"^\.\s+(?=\w)")
+_DUP_SCENE_NO_RE = re.compile(r"\b(\d{1,3}-?[A-Z]{1,3}|\d{1,3}pt)\s+\1\b")
+_MARGIN_SCENE_NO_RE = re.compile(r"^(\d{1,3}-?[A-Z]{0,3})\s+(.+?)\s+\1$")
+_LEADING_DOT_RE = re.compile(r"^\.\s+(?=[\w\"'])")
 _JUNK_ELEMENT_RE = re.compile(r"^(\(?(MORE|CONTINUED|CONT'?D|OMITTED)\)?[:.]?|[\W\d_]*)$", re.I)
+# Dialogue is real speech unless it is empty or an explicit page-break/revision marker ("More.", "...", "?!",
+# "926 - 3143." are lines).
+_JUNK_DIALOGUE_RE = re.compile(r"^(\((MORE|CONTINUED|CONT'?D)\)|(CONTINUED|OMITTED)[:.]?)$")
+_HEADING_LEAD_NO_RE = re.compile(r"^\d{1,3}-?[A-Z]{0,2}\.?\s+(?=(INT|EXT|I/E)\b)")
+_HEADING_TAIL_NO_RE = re.compile(
+    r"\b(DAY|NIGHT|MORNING|EVENING|AFTERNOON|DAWN|DUSK|LATER|SUNSET|SUNRISE|CONTINUOUS)\s+\d{1,3}-?[A-Z]{0,2}\.?$"
+)
 _WS_RE = re.compile(r"\s+")
 
 # MovieSum text is partly Penn-Treebank tokenized ("Welles 's", "do n't", "( V.O . )").
@@ -73,11 +89,13 @@ _DETOK_RULES = (
     (re.compile(r"-RCB-"), "}"),
     (re.compile(r"\b(gon|wan|got) (na|ta)\b", re.I), r"\1\2"),
     (re.compile(r"\b(lem|gim) (me)\b", re.I), r"\1\2"),
-    (re.compile(r"``|''"), '"'),
+    (re.compile(r"``\s*"), '"'),
+    (re.compile(r"\s*''"), '"'),
     (re.compile(r"`"), "'"),
     (re.compile(r"(\w) (n't)\b", re.I), r"\1\2"),
     (re.compile(r"(\w) ('(?:s|re|ve|ll|d|m))\b", re.I), r"\1\2"),
-    (re.compile(r"(\w[a-z]s) ' (?=\w)"), r"\1' "),
+    (re.compile(r"(\w) ('(?:s|re|ve|ll|d|m))\b", re.I), r"\1\2"),  # again for doubled clitics ("Jo 's 's")
+    (re.compile(r"(\w[a-z]s) ' (?=\w)(?!(?:nt|t|s|d|ll|re|ve|m)\b)"), r"\1' "),
     (re.compile(r"\( +"), "("),
     (re.compile(r" +\)"), ")"),
     (re.compile(r" ([,.;:!?%])(?=\s|$|[\"')\]])"), r"\1"),
@@ -118,26 +136,127 @@ def detokenize(text: str) -> str:
     return text
 
 
+_OPEN_QUOTE_SPACE_RE = re.compile(r'(^|[\s(\[:,])" (?=\w)')
+_CLOSE_QUOTE_SPACE_RE = re.compile(r'(?<=[\w.!?,;:\'])\s"(?=\s|$|[.,;:!?)\]])')
+
+
+def fix_quote_spaces(text: str) -> str:
+    """`" Son, sit down . "` -> `"Son, sit down."`: pair quotes inside an element when their count is even,
+    otherwise only fix the unambiguous opening/closing positions (a quote spanning two elements)."""
+    if '"' not in text:
+        return text
+    parts = text.split('"')
+    if len(parts) % 2 == 1:
+        for i in range(1, len(parts), 2):
+            parts[i] = parts[i].strip()
+        return '"'.join(parts)
+    text = _OPEN_QUOTE_SPACE_RE.sub(r'\1"', text)
+    if text.startswith('" '):
+        text = '"' + text[2:]
+    return _CLOSE_QUOTE_SPACE_RE.sub('"', text)
+
+
+def _noise_in_word(m: re.Match) -> str:
+    """A bullet between letters stood for an apostrophe ("You•re"), a space ("in·position") or nothing ("J·im")."""
+    left, right = m.group(1), m.group(2)
+    if right.lower() in ("s", "re", "m", "ve", "ll", "d", "t"):
+        return f"{left}'{right}"
+    return f"{left} {right}" if len(left) >= 2 and len(right) >= 2 else left + right
+
+
 def clean_text(text: str, detok: bool = True) -> str:
-    text = html.unescape(text)
+    text = html.unescape(html.unescape(text))  # some sources are escaped twice ("Bed Bath &amp;amp; Beyond")
     text = unicodedata.normalize("NFKC", text)
     text = _CTRL_RE.sub("", text)
+    text = _MD_ESCAPE_RE.sub(r"\1", text)
+    text = _BACKSLASH_RE.sub(" ", text)
+    text = _NOISE_IN_WORD_RE.sub(_noise_in_word, text)
     text = _NOISE_CHARS_RE.sub(" ", text)
     text = _ASTERISK_RE.sub(" ", text)
-    text = _INLINE_JUNK_RE.sub(" ", text)
     text = _WS_RE.sub(" ", text).strip()
     text = _DUP_SCENE_NO_RE.sub(" ", text)
     text = _WS_RE.sub(" ", text).strip()
     text = _MARGIN_SCENE_NO_RE.sub(r"\2", text)
     if detok:
         text = detokenize(text)
+    text = _CONTD_RE.sub("", text)
+    text = _INLINE_JUNK_RE.sub(" ", text)
+    text = _EMPTY_PARENS_RE.sub(" ", text)
+    text = _WS_RE.sub(" ", text).strip()
+    if detok:
         # MovieSum turned a leading ellipsis into ". " ("<dialogue>. just some girl")
         text = _LEADING_DOT_RE.sub("...", text)
+        text = fix_quote_spaces(text)
     return text
+
+
+def clean_heading(text: str) -> str:
+    """Strip shooting-script scene numbers from a scene heading ("64 INT. BAR - NIGHT", "EXT. ROAD - DAY 64").
+    A number is only removed before INT/EXT or after a time of day, so "EXT. ROUTE 66" survives."""
+    return _HEADING_TAIL_NO_RE.sub(r"\1", _HEADING_LEAD_NO_RE.sub("", text)).strip()
 
 
 def is_junk_element(text: str) -> bool:
     return not text or bool(_JUNK_ELEMENT_RE.match(text))
+
+
+def is_junk_dialogue(text: str) -> bool:
+    return not text or bool(_JUNK_DIALOGUE_RE.match(text))
+
+
+def drop_junk_elements(elements: list[tuple[str, str]], known_speakers: set[str]) -> list[tuple[str, str]]:
+    """Remove page-break/revision junk without ever deleting a real line of dialogue.
+
+    - dialogue is dropped only when empty or an explicit marker ((MORE), CONTINUED); its speaker line (and any
+      parentheticals in between) goes with it instead of being left behind as a stray name;
+    - other elements are dropped when they are markers, page numbers or punctuation only;
+    - a bare speaker name that never gets a line (a <character> followed by no dialogue, or a <scene_description>
+      that is exactly a speaker's name) is dropped when it is a known speaker of the script: it carries no text."""
+    elements = [(t, x) for t, x in elements if t == "dialogue" or not is_junk_element(x)]
+    out, i, n = [], 0, len(elements)
+    while i < n:
+        tag, text = elements[i]
+        if tag == "character":
+            j = i + 1
+            while j < n and elements[j][0] == "parenthetical":
+                j += 1
+            if j < n and elements[j][0] == "dialogue" and is_junk_dialogue(elements[j][1]):
+                if TRANSITION_RE.match(text) or CAMERA_RE.match(text):
+                    out.append(("scene_description", text))
+                i = j + 1
+                continue
+            nxt = elements[i + 1][0] if i + 1 < n else None
+            if nxt not in ("dialogue", "parenthetical") and not (TRANSITION_RE.match(text) or CAMERA_RE.match(text)) \
+                    and speaker_name(text) in known_speakers:
+                i += 1
+                continue
+        elif tag == "scene_description" and text.isupper() and text.strip() == speaker_name(text) and text.strip() in known_speakers:
+            i += 1
+            continue
+        elif tag == "dialogue" and is_junk_dialogue(text):
+            i += 1
+            continue
+        out.append((tag, text))
+        i += 1
+    return out
+
+
+def known_speakers_of(raw_scenes: list[list[tuple[str, str]]]) -> set[str]:
+    """Speaker names that have at least one real line somewhere in the script."""
+    known = set()
+    for elements in raw_scenes:
+        for k, (tag, text) in enumerate(elements):
+            if tag != "character":
+                continue
+            j = k + 1
+            while j < len(elements) and elements[j][0] == "parenthetical":
+                j += 1
+            if j < len(elements) and elements[j][0] == "dialogue" and not is_junk_dialogue(elements[j][1]):
+                name = speaker_name(text)
+                # "CUT TO:" or a heading tagged as a speaker is not a name, even when a line follows it.
+                if len(re.sub(r"[^A-Z]", "", name)) >= 2 and not (TRANSITION_RE.match(name) or is_bad_character_tag(name)):
+                    known.add(name)
+    return known
 
 
 def retag_orphan_characters(elements: list[tuple[str, str]]) -> list[tuple[str, str]]:
@@ -164,15 +283,20 @@ def retag_orphan_characters(elements: list[tuple[str, str]]) -> list[tuple[str, 
 def parse_script(script: str, detok: bool = True, dropped: dict | None = None) -> list[Scene]:
     """Parse a MovieSum script into cleaned scenes. Scene.index is the 0-based index in the raw script.
     Scenes left without a body (heading only, or empty) are skipped and recorded in `dropped` as "no_body"."""
-    scenes = []
-    for idx, raw in enumerate(SCENE_RE.findall(script)):
+    raw_scenes = []
+    for raw in SCENE_RE.findall(script):
         elements = []
-        for tag, text in ELEMENT_RE.findall(raw):
-            text = clean_text(text, detok=detok)
-            if is_junk_element(text):
-                continue
+        for m in ELEMENT_ANY_RE.finditer(raw):
+            tag = m.group(1) or m.group(3)
+            text = clean_text(m.group(2) or "", detok=detok)
+            if tag == "stage_direction":
+                text = clean_heading(text)
             elements.append((tag, text))
-        scene = Scene(idx, retag_orphan_characters(elements))
+        raw_scenes.append(elements)
+    known = known_speakers_of(raw_scenes)
+    scenes = []
+    for idx, elements in enumerate(raw_scenes):
+        scene = Scene(idx, retag_orphan_characters(drop_junk_elements(elements, known)))
         if scene.has_body():
             scenes.append(scene)
         elif dropped is not None:

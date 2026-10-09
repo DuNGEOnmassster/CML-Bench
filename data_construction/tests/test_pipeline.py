@@ -8,6 +8,7 @@ from build_segments import CONFIG, choose_windows  # noqa: E402
 from check_abstracts import check_one  # noqa: E402
 from cml_format import (  # noqa: E402
     Scene,
+    clean_heading,
     clean_text,
     drop_front_matter,
     parse_script,
@@ -16,6 +17,7 @@ from cml_format import (  # noqa: E402
     segment_stats,
     validate_cml,
 )
+from dataset_schema import make_record, validate_record  # noqa: E402
 from make_abstract_batches import target_words  # noqa: E402
 
 RAW = """<script>
@@ -74,6 +76,67 @@ class FormatTests(unittest.TestCase):
         self.assertEqual(st["num_scenes"], 1)
         self.assertEqual(st["dialogue_turns"], 1)
         self.assertEqual(st["num_speakers"], 1)
+
+    def test_v3_cleaning(self):
+        self.assertEqual(clean_text("LETO \\* \\[beat\\] \\_\\_"), "LETO [beat] __")
+        self.assertEqual(clean_text("( OFF ; CONT 'D . )"), "(OFF)")
+        self.assertEqual(clean_text("`` Son , sit . ''"), '"Son, sit."')
+        self.assertEqual(clean_text('my father said: " Son , sit'), 'my father said: "Son, sit')
+        self.assertEqual(clean_text("does ` nt"), "does ' nt")
+        self.assertEqual(clean_text("J\u00b7im"), "Jim")
+        self.assertEqual(clean_text("in\u00b7position"), "in position")
+        self.assertEqual(clean_text("You\u2022re"), "You're")
+        self.assertEqual(clean_heading("64 INT. BAR - NIGHT"), "INT. BAR - NIGHT")
+        self.assertEqual(clean_heading("EXT. ROAD - DAY 71-A"), "EXT. ROAD - DAY")
+        self.assertEqual(clean_heading("EXT. ROUTE 66"), "EXT. ROUTE 66")
+
+    def test_dialogue_is_never_junk(self):
+        script = """<script><scene>
+          <stage_direction>INT. BANK - DAY</stage_direction>
+          <character>SAM</character><dialogue>926 - 3143.</dialogue>
+          <character>ODA MAE</character><dialogue>More.</dialogue>
+          <character>SAM</character><dialogue>?!</dialogue>
+          <character>ODA MAE</character><parenthetical>(beat)</parenthetical><dialogue />
+          <character>SAM</character><dialogue>(MORE)</dialogue>
+          <character>ODA MAE</character>
+          <scene_description>SAM</scene_description>
+          <scene_description>MARK SHIELDS (CNN)</scene_description>
+          <character>SAM</character><dialogue>Bye.</dialogue>
+        </scene></script>"""
+        els = parse_script(script)[0].elements
+        self.assertEqual([x for t, x in els if t == "dialogue"], ["926 - 3143.", "More.", "?!", "Bye."])
+        self.assertEqual([x for t, x in els if t == "character"], ["SAM", "ODA MAE", "SAM", "SAM"])
+        self.assertNotIn(("scene_description", "SAM"), els)
+        self.assertIn(("scene_description", "MARK SHIELDS (CNN)"), els)
+        self.assertNotIn("(beat)", [x for _, x in els])
+
+    def test_dropped_scenes_recorded(self):
+        dropped = {}
+        scenes = parse_script(RAW, dropped=dropped)
+        self.assertEqual([s.index for s in scenes], [0])
+        self.assertEqual(dropped, {1: "no_body"})
+
+
+class SchemaTests(unittest.TestCase):
+    def test_record_roundtrip(self):
+        content = render(parse_script(RAW))
+        st = segment_stats(parse_script(RAW), content)
+        seg = {"movie_name": "Eight Millimeter_1999", "imdb_id": "tt0134273", "script_segment": content,
+               "item_id": "tt0134273-s0000-0000", "source_dataset": "MovieSum", "source_split": "train",
+               "source_url": "u", "source_file": "train.jsonl", "imdb_url": "https://www.imdb.com/title/tt0134273/",
+               "segment_index": 0, "scene_start": 0, "scene_end": 0, "dropped_scenes": [], "relative_position": 0.0,
+               "imdb_rating": 6.5, "imdb_votes": 1, "genres": ["Crime"], "year": 1999, "gt_related": None,
+               "content_normalization": "moviesum_clean_detok_v3", "gt_ngram_overlap": 0.0,
+               "content_sha1": __import__("hashlib").sha1(content.encode()).hexdigest(), **st}
+        rec = make_record(seg, batch_id="moviesum-b0001", build="moviesum-detok_v3-00000000")
+        self.assertEqual(validate_record(rec), [])
+        self.assertEqual(list(rec)[:4], ["movie_name", "imdb_id", "script_segment", "summary"])
+        self.assertTrue(rec["eval_safe"])
+        rec2 = make_record(seg, batch_id="moviesum-b0001", build="x", abstract={"abstract": "A b c.", "prompt_version": "v", "author": "a"},
+                           count_tokens=lambda s: 3)
+        self.assertEqual(validate_record(rec2), [])
+        rec2["gt_related"] = {"type": "series", "gt_movie": "M_2000", "gt_imdb_id": "tt0000001"}
+        self.assertIn("eval_safe_inconsistent", validate_record(rec2))
 
 
 class WindowTests(unittest.TestCase):
