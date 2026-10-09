@@ -77,6 +77,8 @@ def unpack(run_dir: str, build_id: str) -> dict:
             data = open(rep, encoding="utf-8").read()
             out = os.path.join(run_dir, "batches", batch_id, "writer_report.json")
             if not os.path.exists(out) or open(out, encoding="utf-8").read() != data:
+                if os.path.exists(out):  # a backfilled report for a batch already unpacked: its G8 pool is recomputed by the sync
+                    stats.setdefault("reports_updated", []).append(batch_id)
                 with open(out, "w", encoding="utf-8") as f:
                     f.write(data)
                 stats["reports_written"] += 1
@@ -90,6 +92,67 @@ def dashboard() -> str:
     run(["git", "checkout", "-q", "--detach", "origin/cursor/cml-dashboard-a0ca"], cwd=DASHBOARD)
     r = run([sys.executable, "dashboard/export_static.py", "--deploy"], cwd=DASHBOARD)
     return "deployed" if "deployed" in r.stdout + r.stderr else f"failed: {(r.stderr or r.stdout)[-300:]}"
+
+
+def ingest_c35(run_dirs: list[str]) -> dict | None:
+    """Merge the evaluator's final content-safety scan (content_safety/c35_candidates.json, "final": true) into the C35 list
+    content_exclusions.json: windows as item_id + content_sha1, whole-film recommendations as imdb_id. Ids only: no names,
+    reasons or descriptions are copied. Entries are only ever added; a scan file is ingested once per content sha1."""
+    cand_path = os.path.join(STORE, "content_safety", "c35_candidates.json")
+    list_path = os.path.join(STORE, "content_exclusions.json")
+    if not os.path.exists(cand_path):
+        return None
+    raw = open(cand_path, "rb").read()
+    try:
+        cand = json.loads(raw)
+    except ValueError:
+        return {"error": "c35_candidates.json is not valid JSON"}
+    if cand.get("final") is not True:
+        return None
+    sha = hashlib.sha1(raw).hexdigest()
+    spec = json.load(open(list_path, encoding="utf-8"))
+    if any(x.get("sha1") == sha for x in spec.get("ingested", [])):
+        return None
+    known = {}
+    for rd in run_dirs:
+        build = json.load(open(os.path.join(rd, "run.json")))["build_id"]
+        for line in open(os.path.join(rd, "items.jsonl"), encoding="utf-8"):
+            it = json.loads(line)
+            known[it["item_id"]] = (it["content_sha1"], it["imdb_id"], build)
+    have_items = {x["item_id"] for x in spec["items"]}
+    have_films = {x["imdb_id"] for x in spec["films"]}
+    now_s = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_items, unknown = [], []
+    for w in cand.get("exclude_windows", []):
+        iid = w["item_id"]
+        if iid in have_items:
+            continue
+        sha1, film, build = known.get(iid, (None, w.get("film_id"), None))
+        if sha1 is None:
+            unknown.append(iid)
+        new_items.append({"item_id": iid, "content_sha1": sha1, "imdb_id": film, "build_id": build, "source": w.get("source"),
+                          "added_by": "evaluator scan", "added_at": now_s})
+        have_items.add(iid)
+    new_films = []
+    for f in cand.get("film_recommendations", []):
+        if f.get("recommend_whole_film_exclusion") and f["film_id"] not in have_films:
+            new_films.append({"imdb_id": f["film_id"], "category": "sexual_content_involving_minor", "decided_by": "evaluator scan",
+                              "decided_at": now_s[:10], "source": f.get("source")})
+            have_films.add(f["film_id"])
+    spec["items"] += sorted(new_items, key=lambda x: x["item_id"])
+    spec["films"] += sorted(new_films, key=lambda x: x["imdb_id"])
+    spec["version"] = spec.get("version", 1) + 1
+    spec["updated_at"] = now_s
+    film_windows = sum(1 for i, (_, f, _) in known.items() if f in {x["imdb_id"] for x in new_films} and i not in {x["item_id"] for x in new_items})
+    record = {"source_file": "content_safety/c35_candidates.json", "sha1": sha, "generated_at": cand.get("generated_at"),
+              "ingested_at": now_s, "windows_added": len(new_items), "films_added": len(new_films),
+              "more_windows_via_films": film_windows, "unknown_item_ids": len(unknown)}
+    spec.setdefault("ingested", []).append(record)
+    tmp = list_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(spec, f, indent=1)
+    os.replace(tmp, list_path)
+    return {**record, "listed_items": len(spec["items"]), "listed_films": len(spec["films"])}
 
 
 def reused_pilot_check(run_dir: str, slug: str) -> dict | None:
@@ -162,6 +225,11 @@ def main() -> None:
         return
     t0 = time.time()
     summary = {"at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
+    srcs = sorted(d for d in os.listdir(args.source_runs) if os.path.exists(os.path.join(args.source_runs, d, "run.json"))) \
+        if os.path.isdir(args.source_runs) else []
+    c35 = ingest_c35([run_dir] + [os.path.join(args.source_runs, s) for s in srcs])
+    if c35:
+        summary["c35_ingest"] = c35
     ms, src = source_round(run_dir)
     summary.update(ms)
     st = json.load(open(os.path.join(STORE, "build_status.json")))
@@ -175,8 +243,6 @@ def main() -> None:
     # Extra sources: abstracts stay drafts until the evaluator records C28' for them (gate c28_sources = "pass: ...").
     c28 = str(st["gates"].get(DRAFT_GATE, ""))
     draft = "" if c28.startswith("pass") else "accept_as_draft: C28' (blind pairwise vs GT) for extra sources pending"
-    srcs = sorted(d for d in os.listdir(args.source_runs) if os.path.exists(os.path.join(args.source_runs, d, "run.json"))) \
-        if os.path.isdir(args.source_runs) else []
     if srcs:
         summary["sources"] = {}
         for slug in srcs:
