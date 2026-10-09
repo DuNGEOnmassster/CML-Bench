@@ -168,7 +168,8 @@ def raw_cues(lines: list[str], lo: int, hi: int) -> list[dict]:
         nxt = lines[j].strip() if j < len(lines) else ""
         letters = [c for c in nxt if c.isalpha()]
         if not (nxt.startswith("(") or (direct and letters and sum(c.isupper() for c in letters) / len(letters) < 0.6
-                                        and not re.match(r"(INT|EXT)\b", nxt) and (flat_speech or flush or ind[j] > action + 2))):
+                                        and not re.match(r"(INT|EXT)\b", nxt)
+                                        and (dual or flat_speech or flush or ind[j] > action + 2))):
             continue
         if dual:
             cols2 = [p for p in re.split(r"\s{3,}", nxt) if p]
