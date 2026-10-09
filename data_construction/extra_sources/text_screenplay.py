@@ -57,7 +57,7 @@ _CUE_EXT_RE = re.compile(r"\s*\([^()]*\)\s*$")
 _CUE_DASH_RE = re.compile(r"^[-\u2013]\s+")
 _CUE_VOICE_RE = re.compile(r"\s+[VO]\.\s?[SOC0]\.?$")  # unbracketed "V.O.", "O.S.", "O.C." (and the "V.0." typo)
 _INITIALISM_END_RE = re.compile(r"(^|\s)([A-Z]\.){1,3}$")  # "M.E.", "STORE P.A."
-_CUE_CHARS_RE = re.compile(r"^[A-Z0-9#'\"][A-Za-z0-9 .,'\u2019\-&#/\"]*$")
+_CUE_CHARS_RE = re.compile(r"^[A-Z0-9#'\"\u201c][A-Za-z0-9 .,'\u2019\-&#/\"\u201c\u201d]*$")
 _HONORIFIC_END_RE = re.compile(r"\b(MR|MRS|MS|DR|JR|SR|ST|LT|SGT|CAPT|COL|GEN|PROF|REV|NO)\.$")
 _NOT_A_NAME = {"THE END", "CONTINUED", "MORE", "OMITTED", "BLACK", "SILENCE", "CREDITS", "TITLE", "SUPER", "INSERT",
                "FADE IN", "FADE OUT", "LATER", "CONTINUOUS", "MONTAGE", "FLASHBACK", "END FLASHBACK", "BACK TO SCENE",
@@ -379,9 +379,13 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
         # runs to a blank line ("LOIS" / "(pre-occupied)" / "Uh-huh ..." all at column 0 under a tab-indented cue)
         flat_dialogue = (indented and ind(line) >= cue_min and ind(nxt) <= a_ind + 2
                          and (nxt.strip().startswith("(") or cue_name(s) in lay["known_cues"]))
+        # a known speaker's cue printed at the action column right above indented speech ("MARSH(cont'd)" after a
+        # page break, "CHEN" where one page lost its cue indent)
+        margin_cue = (indented and ind(line) <= a_ind + 2 and nxt_i == i + 1 and cue_name(s) in lay["known_cues"]
+                      and abs(ind(nxt) - d_ind) <= 3 and ind(nxt) > a_ind + 2)
         is_cue = (
             looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip()) and not is_transition(nxt.strip())
-            and (ind(line) >= cue_min if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
+            and ((ind(line) >= cue_min or margin_cue) if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
             and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("(") or flat_dialogue)
         )
         if not is_cue:
@@ -403,6 +407,19 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                 if t2 and not heading_text(t2) and not is_transition(t2) and not looks_like_cue(t2):
                     i += 1
                     continue
+            if not t and dlg and not paren and indented:
+                # an unfinished speech that goes on after a blank line at the dialogue indent ("... Truly," / "" /
+                # "we can all live like... billionaires.")
+                j = i + 1
+                while j < n and j - i <= 2 and not lines[j].strip():
+                    j += 1
+                nx = lines[j] if j < n else ""
+                nt = nx.strip()
+                if (nt and abs(ind(nx) - d_ind) <= 2 and ind(nx) > a_ind + 2 and not looks_like_cue(nt) and not is_dual_cue(nx)
+                        and not heading_text(nt) and not is_transition(nt) and not nt.startswith("(")
+                        and (nt[:1].islower() or not re.search(r"[.!?\"'\u201d)\-]$", dlg[-1]))):
+                    i = j
+                    continue
             # "(a beat)" at the left margin between two lines of indented dialogue is still a parenthetical
             margin_paren = (t.startswith("(") and t.endswith(")") and len(t) <= 40 and i + 1 < n and lines[i + 1].strip()
                             and ind(lines[i + 1]) > a_ind + 2 and not looks_like_cue(lines[i + 1].strip()))
@@ -411,14 +428,26 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                 break
             if indented and ind(l2) >= cue_min and looks_like_cue(t) and dlg:
                 break
+            if dlg and is_dual_cue(l2):
+                break  # two-column cue line right under a speech
             if paren or t.startswith("("):
                 if dlg and not paren:
                     cur.append(("dialogue", join_lines(dlg)))
                     dlg = []
-                paren.append(t)
-                if ")" in t:
+                # a parenthetical and the speech after it on one line: "(Russian) She broke my nose"
+                rest = t
+                while rest:
+                    if not paren and not rest.startswith("("):
+                        dlg.append(rest)
+                        break
+                    k = rest.find(")")
+                    if k < 0:
+                        paren.append(rest)
+                        break
+                    paren.append(rest[:k + 1])
                     cur.append(("parenthetical", " ".join(paren)))
                     paren = []
+                    rest = rest[k + 1:].strip()
             else:
                 dlg.append(t)
             i += 1

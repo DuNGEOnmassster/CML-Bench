@@ -44,7 +44,7 @@ QUALITY_CONFIG = {
     "min_ascii_letter_share": 0.97,
     "min_stopword_share": 0.25,
     "max_median_scene_words": 600,
-    "max_absorbed_action_rate": 0.04,
+    "max_absorbed_action_rate": 0.019,  # MovieSum segments p95 (the GT p95 0.04 let Margaret's swallowed action through)
     "max_oneoff_short_speakers": 4,
 }
 OCR_PRODUCER_RE = re.compile(r"paper capture|image conversion|clearscan|abbyy|finereader|omnipage|readiris|tesseract|ocr", re.I)

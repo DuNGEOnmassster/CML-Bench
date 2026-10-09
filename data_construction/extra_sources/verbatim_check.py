@@ -113,7 +113,7 @@ def cue_name_key(t: str) -> str:
 
 
 def _cue_like(t: str) -> bool:
-    t = re.sub(r"\s+\*+$", "", t.strip()).replace("\u2019", "'")  # revision mark in the right margin ("MR. LAWSON      *")
+    t = re.sub(r"\s+\*+$", "", t.strip()).replace("\u2019", "'").replace("\u201c", '"').replace("\u201d", '"')  # revision mark ("MR. LAWSON   *")
     name = re.sub(r"\s*\([^)]*\)\s*", " ", t).strip()
     letters = [c for c in name if c.isalpha()]
     last = name.split()[-1] if name.split() else ""
@@ -144,6 +144,12 @@ def raw_cues(lines: list[str], lo: int, hi: int) -> list[dict]:
     under = [ind[k + 1] <= action + 2 for k in range(len(lines) - 1) if ind[k] >= cue_col - 5 and _cue_like(lines[k])
              and lines[k + 1].strip() and not lines[k + 1].strip().startswith("(") and not lines[k + 1].strip().isupper()]
     flat_speech = sum(under) >= 0.3 * max(1, len(under))
+    known = {cue_name_key(lines[k]) for k in range(len(lines) - 1) if ind[k] >= cue_col - 5 and _cue_like(lines[k])
+             and lines[k + 1].strip()}
+
+    def dual_line(t):
+        parts = [p for p in re.split(r"\s{4,}", re.sub(r"\s+\*+$", "", t.strip())) if p]
+        return len(parts) == 2 and all(_cue_like(p) for p in parts)
     out = []
     for k in range(max(0, lo), min(len(lines), hi + 1)):
         t = lines[k]
@@ -155,7 +161,10 @@ def raw_cues(lines: list[str], lo: int, hi: int) -> list[dict]:
         # cues sit at the cue column, or (jittery PDF columns) >= 6 right of the speech line under them; flush-left, a
         # cue starts a block
         at_col = ind[k] >= max(action + 8, cue_col - 5) or (
-            k + 1 < len(lines) and lines[k + 1].strip() and ind[k] >= max(action + 8, ind[k + 1] + 6) and ind[k + 1] > action + 2)
+            k + 1 < len(lines) and lines[k + 1].strip() and ind[k] >= max(action + 8, ind[k + 1] + 6) and ind[k + 1] > action + 2) or (
+            # a known speaker's cue printed at the action column right above indented speech
+            not flat_speech and ind[k] <= action + 2 and cue_name_key(t) in known and k + 1 < len(lines)
+            and lines[k + 1].strip() and ind[k + 1] > action + 3)
         if not dual and (not (flush or at_col) or (flush and k > 0 and lines[k - 1].strip()) or not _cue_like(t)):
             continue
         j = k + 1
@@ -178,15 +187,28 @@ def raw_cues(lines: list[str], lo: int, hi: int) -> list[dict]:
                     {"name": cue_name_key(parts[1]), "words": words(speech[1])[:8], "lines": None}]
             continue
         # key = first speech line after any parenthetical lines ("(shaking his head)" / "You're not gonna...")
-        m, in_paren, key, last, spoken, flat, gap = j, False, nxt, j, False, None, False
+        m, in_paren, key, last, spoken, flat, gap, sp_ind = j, False, nxt, j, False, None, False, None
         while m < len(lines) and m - j < 40:
             ln = lines[m].strip()
             if not ln:
+                if spoken and not flat:
+                    # an unfinished indented speech that goes on after a blank line at the same indent
+                    q = m + 1
+                    while q < len(lines) and q - m <= 2 and not lines[q].strip():
+                        q += 1
+                    nq = lines[q].strip() if q < len(lines) else ""
+                    if (nq and abs(ind[q] - sp_ind) <= 2 and not _cue_like(nq) and not dual_line(lines[q])
+                            and not nq.startswith("(") and not re.match(r"(INT|EXT)\b", nq)
+                            and (nq[:1].islower() or not re.search(r"[.!?\"')\-]$", lines[last].strip()))):
+                        m = q
+                        continue
                 if spoken or m - j >= 12:
                     break
                 gap = True
                 m += 1
                 continue
+            if m > j and dual_line(lines[m]):
+                break  # two-column cue line right under the speech
             if gap and not spoken and not ln.startswith("(") and ind[m] <= action + 2 < ind[j]:
                 break  # after an indented parenthetical-only speech and a blank line, action resumes
             if m > j and (re.match(r"(INT|EXT)\b", ln) or (ln.isupper() and ind[m] >= ind[j] + 6 and not in_paren) or (
@@ -196,7 +218,7 @@ def raw_cues(lines: list[str], lo: int, hi: int) -> list[dict]:
                 in_paren = ")" not in ln
             else:
                 if flat is None:
-                    flat = ind[m] <= action + 2
+                    flat, sp_ind = ind[m] <= action + 2, ind[m]
                 elif not flat and ind[m] <= action + 2:
                     break  # action resumes right under an indented speech
                 if not spoken:

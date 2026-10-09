@@ -135,6 +135,21 @@ class TextParserTests(unittest.TestCase):
             ("scene_description", "Melissa just looks at her and says nothing for a long while."),
             ("character", "JO"), ("dialogue", "You get used to them.")])
 
+    def test_layout_breaks_inside_a_speech(self):
+        page = ("\nINT. LAB - NIGHT\n\nThe meters on the console rise slowly while everyone in the room holds still.\n\n"
+                "                    CHEN\n          We have a split.\n\n"
+                "                    BUCKY\n          (Russian) Truly,\n\n          we can all live like kings.\n"
+                "                    MATT\n          No, no -\n"
+                "                    LILY                    OTTO\n          I can -                 You might -\n\n"
+                "CHEN\n          Output ratio at four.\n\n")
+        scenes, _ = text_to_scenes("".join(page for _ in range(30)))
+        self.assertEqual(scenes[0].elements[2:], [
+            ("character", "CHEN"), ("dialogue", "We have a split."),
+            ("character", "BUCKY"), ("parenthetical", "(Russian)"), ("dialogue", "Truly, we can all live like kings."),
+            ("character", "MATT"), ("dialogue", "No, no -"),
+            ("character", "LILY"), ("dialogue", "I can -"), ("character", "OTTO"), ("dialogue", "You might -"),
+            ("character", "CHEN"), ("dialogue", "Output ratio at four.")])
+
     def test_cue_rules(self):
         for ok in ("MARA", "DR. OTTO", "MARA (V.O.)", "McCLANE"):
             self.assertTrue(looks_like_cue(ok), ok)
