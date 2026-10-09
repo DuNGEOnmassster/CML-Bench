@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.join(HERE, "extra_sources"))
 
 from cml_format import Scene, render, validate_cml  # noqa: E402
 from extra_sources import catalogs  # noqa: E402
-from extra_sources.build_extra import gt_lookalike, window_noise  # noqa: E402
+from extra_sources.build_extra import NOT_PRODUCED_RE, gt_lookalike, window_noise  # noqa: E402
 from dataset_schema import load_gt_related  # noqa: E402
 from extra_sources.imdb_index import norm_title, title_variants  # noqa: E402
 from extra_sources.quality import script_quality  # noqa: E402
@@ -96,6 +96,18 @@ class TextParserTests(unittest.TestCase):
         self.assertIn("WIDE SHOT", content, "numbered shot lines are content, not headers")
         self.assertIn("<dialogue>478.</dialogue>", content, "a number spoken as dialogue stays")
 
+    def test_blank_lines_around_parenthetical_and_glued_header(self):
+        flush = "\n".join(["INT. HALL - DAY", "", "Rain hits the long windows of the hall tonight and nobody moves at all.", "",
+                           "DAVID", "", "(agonized)", "", "Susan! Duck!", "", "[59]", ""]) * 30
+        scenes, _ = text_to_scenes(flush)
+        self.assertEqual(scenes[0].elements[2:], [("character", "DAVID"), ("parenthetical", "(agonized)"), ("dialogue", "Susan! Duck!")])
+        self.assertNotIn("[59]", render(scenes))
+        stamp = "\n          INT. ROOM - DAY\n\n          A quiet room where nothing at all happens for a long while.\n\n                    MARA\n" \
+                "          So I-                    Blue Rev. (mm/dd/yy)    {n}.\n\n                       Blue Rev. (mm/dd/yy)   {n}.\n"
+        content = render(text_to_scenes("".join(stamp.format(n=i) for i in range(30)))[0])
+        self.assertNotIn("Blue Rev", content)
+        self.assertIn("<dialogue>So I-</dialogue>", content)
+
     def test_cue_rules(self):
         for ok in ("MARA", "DR. OTTO", "MARA (V.O.)", "McCLANE"):
             self.assertTrue(looks_like_cue(ok), ok)
@@ -133,6 +145,12 @@ class MatchingTests(unittest.TestCase):
         self.assertIn("weddingdate", v)
         self.assertIn("somethingborrowed", v)
         self.assertIn("jasonx", [norm_title(t) for t in title_variants("Friday the 13th Part 10: Jason X")])
+
+    def test_not_produced(self):
+        for t in ("Carnivore%20(Unproduced).txt", "TheCrow3_unproduced.txt", "Some Film (spec script)", "Film X treatment"):
+            self.assertTrue(NOT_PRODUCED_RE.search(t), t)
+        for t in ("Spectre", "The Specialist", "Inspector Gadget"):
+            self.assertFalse(NOT_PRODUCED_RE.search(t), t)
 
     def test_gt_lookalike(self):
         table = load_gt_related()
