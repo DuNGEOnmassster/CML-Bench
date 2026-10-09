@@ -517,9 +517,18 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     if raw_verdicts:
         files[f"audit/{slug}/verdicts.jsonl"] = jsonl_bytes(raw_verdicts)
     targeted_meta = {i: {"tier": targeted_tier(rs, notes.get(i, "")), "reasons": rs} for i, rs in routed.items()}
-    rule = stop_rule(verdicts, {x["item_id"] for x in sample}, targeted_meta)
+    # Random-sample membership is the design, not the current merge state: the sampled batch's pick among its items
+    # left after exclusions, whether the batch is passed, revoked or rewritten. A revoked batch drops out of
+    # sample.jsonl, but its verdicts stay random-sample verdicts (items in both pools count as random).
+    design_sample = set()
+    for b in batches:
+        if b["batch_id"] in sampled:
+            kept = [i for i in b["item_ids"] if i not in excluded]
+            if kept:
+                design_sample.add(sample_item(kept))
+    rule = stop_rule(verdicts, design_sample, targeted_meta)
     files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**rule["targeted_alarm"], "targeted_pool": rule["targeted_pool"]})
-    sample_ids = {x["item_id"] for x in sample}
+    sample_ids = design_sample
     trig = {}
     for v in verdicts:
         if v.get("major", 0) or v.get("outside", 0):
