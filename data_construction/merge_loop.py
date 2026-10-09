@@ -165,6 +165,54 @@ def ingest_c35(run_dirs: list[str]) -> dict | None:
     return {**record, "listed_items": len(spec["items"]), "listed_films": len(spec["films"])}
 
 
+def ingest_writer_flags(run_dirs: list[str]) -> dict | None:
+    """Standing C35 rule (coordinator, 2026-10-09 16:44 UTC): every window an orchestrator lists in
+    content_safety/writer_flags.jsonl ({item_id, batch, timestamp}) that is not on the C35 list yet is added as a window
+    exclusion (item_id + content_sha1, category writer_flag). Film-level extension stays with the evaluator."""
+    flags_path = os.path.join(STORE, "content_safety", "writer_flags.jsonl")
+    list_path = os.path.join(STORE, "content_exclusions.json")
+    if not os.path.exists(flags_path):
+        return None
+    flagged = []
+    for line in open(flags_path, encoding="utf-8"):
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if row.get("item_id"):
+            flagged.append(row)
+    spec = json.load(open(list_path, encoding="utf-8"))
+    have = {x["item_id"] for x in spec["items"]}
+    todo = [r for r in flagged if r["item_id"] not in have]
+    if not todo:
+        return None
+    known = {}
+    for rd in run_dirs:
+        build = json.load(open(os.path.join(rd, "run.json")))["build_id"]
+        for line in open(os.path.join(rd, "items.jsonl"), encoding="utf-8"):
+            it = json.loads(line)
+            known[it["item_id"]] = (it["content_sha1"], it["imdb_id"], build, it["source_dataset"])
+    now_s = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    added, unknown = 0, 0
+    for r in todo:
+        if r["item_id"] in have:
+            continue
+        sha1, film, build, src = known.get(r["item_id"], (None, r["item_id"].split("-s")[0], None, None))
+        unknown += sha1 is None
+        spec["items"].append({"item_id": r["item_id"], "content_sha1": sha1, "imdb_id": film, "build_id": build,
+                              "batch_id": r.get("batch") or r.get("batch_id"), "source": src, "category": "writer_flag",
+                              "added_by": "writer flag", "flagged_at": r.get("timestamp"), "added_at": now_s})
+        have.add(r["item_id"])
+        added += 1
+    spec["version"] = spec.get("version", 1) + 1
+    spec["updated_at"] = now_s
+    tmp = list_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(spec, f, indent=1)
+    os.replace(tmp, list_path)
+    return {"flags": len(flagged), "windows_added": added, "unknown_item_ids": unknown, "listed_items": len(spec["items"])}
+
+
 def _rewrite(path: str, data: str) -> None:
     """Replace a file's content. The store mount can refuse a rename while it syncs a file (EAGAIN): retry, then fall
     back to writing in place."""
@@ -330,9 +378,13 @@ def main() -> None:
     summary = {"at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")}
     srcs = sorted(d for d in os.listdir(args.source_runs) if os.path.exists(os.path.join(args.source_runs, d, "run.json"))) \
         if os.path.isdir(args.source_runs) else []
-    c35 = ingest_c35([run_dir] + [os.path.join(args.source_runs, s) for s in srcs])
+    all_runs = [run_dir] + [os.path.join(args.source_runs, s) for s in srcs]
+    c35 = ingest_c35(all_runs)
     if c35:
         summary["c35_ingest"] = c35
+    flags = ingest_writer_flags(all_runs)
+    if flags:
+        summary["c35_writer_flags"] = flags
     ms, src = source_round(run_dir)
     summary.update(ms)
     st = json.load(open(os.path.join(STORE, "build_status.json")))
