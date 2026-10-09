@@ -64,23 +64,24 @@ def _base_title(name: str) -> str:
     """Same rule as contract_checks.base_title (title without year, leading 'the', subtitle, sequel number)."""
     t = re.sub(r"_\d{4}$", "", name).lower()
     t = re.sub(r"^the\s+", "", t)
-    t = re.split(r"[:\-\u2013]", t)[0]
+    t = re.split(r":| - | \u2013 ", t)[0]
     t = re.sub(r"\b(part\s+)?([ivx]+|\d+)\b\s*$", "", t.strip())
     return re.sub(r"[^a-z0-9]", "", t)
 
 
 def gt_lookalike(title: str, table: dict, gt_names: dict | None = None) -> str | None:
-    """GT imdb_id the title looks like under contract C15b: a curated IP keyword in the title, or GT base title
-    and film base title containing one another (>= 4 chars). Such films must be listed in gt_related.json (as a
-    relation or as unrelated) before they can be released."""
+    """GT imdb_id the title looks like under contract C15b: a curated IP keyword in the title, the same base title,
+    or a multi-word GT base title (>= 6 chars) inside the film's base title. Such films must be listed in
+    gt_related.json (as a relation or as unrelated) before they can be released."""
     low = title.lower()
     for gt_id, kws in table.get("ip_keywords", {}).items():
         if any(re.search(rf"\b{re.escape(kw)}\b", low) for kw in kws):
             return gt_id
     b = _base_title(title)
     for gt_id, gt_name in (gt_names or {}).items():
-        gb = _base_title(gt_name)
-        if len(gb) >= 4 and len(b) >= 4 and (gb in b or b in gb):
+        gb, plain = _base_title(gt_name), re.sub(r"_\d{4}$", "", gt_name)
+        multi = len(plain.split()) > 1 and not re.match(r"^the \S+$", plain.lower())
+        if (b == gb and len(gb) >= 3) or (multi and len(gb) >= 6 and gb in b):
             return gt_id
     return None
 SOURCE_PRIORITY = ("imsdb", "dailyscript", "awesomefilm", "simplyscripts")
