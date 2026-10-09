@@ -13,6 +13,8 @@ byte-identical in two groups is labeled once and counted in both. DIR/key.json u
 `score` reports, per group, labeled errors per 1,000 dialogue elements (primary labels; sure and sure+likely),
 the share of windows with >= 1 error, a 95% bootstrap interval over windows, agreement on the doubled windows,
 and the CML detector's (mislabel.py) window-level agreement with the labels.
+`pool --dir A --dir B --group NAME=segments.jsonl ...` pools primary labels across samples: a labeled window counts
+for a build when its exact content is in that build.
 DIR holds screenplay text: keep it out of the repository.
 """
 from __future__ import annotations
@@ -217,6 +219,41 @@ def score(args) -> None:
             json.dump(out, f, indent=1)
 
 
+def pool(args) -> None:
+    """Pool primary labels from several samples per target build: a labeled window counts for a build when its
+    exact content (content_sha1) is in that build."""
+    rng = random.Random(1)
+    labeled = {}  # content_sha1 -> (n errors, n sure, dialogue elements, types)
+    for d in args.dir:
+        with open(os.path.join(d, "key.json")) as f:
+            key = json.load(f)
+        labs = {}
+        for path in glob.glob(os.path.join(d, "labels", "*.json")):
+            with open(path) as f:
+                lab = json.load(f)
+            labs[lab["labeler"]] = lab["windows"]
+        for bid, ents in key["windows"].items():
+            errs = [e for e in labs[key["primary"][bid]][bid] if e.get("type") in TYPES]
+            labeled.setdefault(ents[0]["content_sha1"], (len(errs), sum(e.get("confidence") == "sure" for e in errs),
+                                                         ents[0]["dialogue_elements"], Counter(e["type"] for e in errs)))
+    out = {}
+    for g in args.group:
+        name, path = g.split("=", 1)
+        shas = {s.get("content_sha1") for s in load(path)}
+        rows = [v for sha, v in labeled.items() if sha in shas]
+        dlg = sum(r[2] for r in rows) or 1
+        out[name] = {"windows": len(rows), "dialogue_elements": dlg, "errors": sum(r[0] for r in rows),
+                     "per_1k_dialogue": round(1000 * sum(r[0] for r in rows) / dlg, 2),
+                     "per_1k_dialogue_ci95": _boot([(r[0], r[2]) for r in rows], rng) if rows else None,
+                     "per_1k_dialogue_sure": round(1000 * sum(r[1] for r in rows) / dlg, 2),
+                     "windows_with_any": round(sum(r[0] > 0 for r in rows) / max(1, len(rows)), 3),
+                     "by_type": dict(sum((r[3] for r in rows), Counter()))}
+    print(json.dumps(out, indent=1))
+    if args.out:
+        with open(args.out, "w") as f:
+            json.dump(out, f, indent=1)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -231,8 +268,12 @@ def main() -> None:
     s = sub.add_parser("score")
     s.add_argument("--dir", required=True)
     s.add_argument("--out")
+    p = sub.add_parser("pool")
+    p.add_argument("--dir", action="append", required=True, help="sample folder (repeatable)")
+    p.add_argument("--group", action="append", required=True, help="NAME=segments.jsonl of the build to report")
+    p.add_argument("--out")
     args = ap.parse_args()
-    make(args) if args.cmd == "make" else score(args)
+    {"make": make, "score": score, "pool": pool}[args.cmd](args)
 
 
 if __name__ == "__main__":
