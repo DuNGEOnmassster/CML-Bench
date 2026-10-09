@@ -165,6 +165,23 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(int((df["eval_safe"] == True).sum()), 1)  # noqa: E712
         self.assertEqual(df["eval_safe_basis"].iloc[0], "id list")
 
+    def test_static_export(self):
+        import export_static
+
+        write_jsonl(f"{self.root}/content/src/part-00000.jsonl", [make_item("tt0000015", 0, summary="", gt_related=None, eval_safe=True)])
+        out = os.path.join(self.root, "site")
+        site = export_static.export(self.store(), __import__("pathlib").Path(out))
+        self.assertEqual([r["id"] for r in site["releases"]], ["main"])
+        self.assertEqual(set(site["releases"][0]["views"]), {"all", "eval_safe", "gt_related"})
+        with open(os.path.join(out, "items-main.json")) as f:
+            fields, rows = json.load(f)
+        self.assertNotIn("script_segment", fields)
+        self.assertNotIn("<scene>", json.dumps(rows))
+        rec = dict(zip(fields, rows[0]))
+        self.assertEqual(rec["ref"], 0)
+        self.assertGreater(rec["ref_len"], 100)
+        self.assertTrue(os.path.exists(os.path.join(out, "index.html")))
+
     def test_renderers(self):
         rec = make_item("tt0000012", 40)
         html = itemview.screenplay_html(rec["script_segment"], 40)

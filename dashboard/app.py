@@ -20,10 +20,9 @@ from pathlib import Path
 import gradio as gr
 import pandas as pd
 
-import checks
 import itemview
 import views
-from dataio import DataStore, ReleaseView, release_label
+from dataio import DataStore, has_subsets, release_label, selected_view
 
 STORE: DataStore | None = None
 TICK_SECONDS = 20
@@ -62,18 +61,6 @@ def pick_release(snap, current: str | None) -> str | None:
     if current in snap.releases:
         return current
     return next(iter(snap.releases), None)
-
-
-def has_subsets(rv: ReleaseView | None) -> bool:
-    return rv is not None and not rv.df.empty and (rv.df["eval_safe"].notna().any() or rv.df["gt_related"].notna().any())
-
-
-def selected_view(snap, release: str | None, subset: str | None) -> ReleaseView | None:
-    rv = snap.releases.get(release) if release else None
-    if rv is None or subset in (None, "all") or not has_subsets(rv):
-        return rv
-    df = views.subset_frame(rv.df, subset)
-    return ReleaseView(rv.name, df, rv.aux, checks.release_verdicts(df, None))
 
 
 def effective_subset(snap, release, subset) -> str:
@@ -136,7 +123,7 @@ def _render_dashboard(snap, release: str | None, subset: str | None) -> tuple:
 # --- sample browser ------------------------------------------------------------------------------
 
 
-def filter_choices(rv: ReleaseView | None, sources, film, prompts, cleanings):
+def filter_choices(rv, sources, film, prompts, cleanings):
     df = rv.df if rv is not None else pd.DataFrame(columns=["source", "film", "prompt_version", "normalization"])
 
     def opts(col):

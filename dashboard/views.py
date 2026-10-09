@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from checks import CONTRACT, GROUPS
-from dataio import release_label
+from dataio import SUBSETS, release_label, subset_frame  # noqa: F401  (re-exported for app.py)
 
 C_EXP = "#4f46e5"
 C_EXP_LIGHT = "#c7d2fe"
@@ -78,8 +78,8 @@ def header_html(snap, source_label: str, refresh_s: int) -> str:
   <div class="hdr-meta">
     <span class="chip"><span class="dot dot-live"></span>{esc(source_label)}</span>
     {rev_html}
-    <span class="chip">updated {esc(ago(snap.updated_at))}</span>
-    <span class="chip">auto-refresh {refresh_s // 60 if refresh_s >= 60 else refresh_s}{" min" if refresh_s >= 60 else " s"}</span>
+    <span class="chip">updated {esc(ago(snap.updated_at)) if refresh_s > 0 else esc(snap.updated_at.strftime("%Y-%m-%d %H:%M UTC") if snap.updated_at else "—")}</span>
+    <span class="chip">{f"auto-refresh {refresh_s // 60} min" if refresh_s >= 60 else (f"auto-refresh {refresh_s} s" if refresh_s > 0 else "static snapshot")}</span>
   </div>
 </div>"""
 
@@ -358,8 +358,10 @@ def hist_fig(exp: pd.Series, gt: pd.Series | None, title: str, xlabel: str, star
                                    marker=dict(color=C_GT, line=dict(width=0)), opacity=0.55,
                                    hovertemplate="%{x}: %{y:.1f}%<extra>GT-100</extra>"))
         fig.add_vline(x=float(g.median()), line=dict(color=C_GT, width=2, dash="dot"))
-    fig.add_vline(x=float(exp.median()), line=dict(color=C_EXP, width=2, dash="dash"),
-                  annotation=dict(text=f"median {exp.median():,.4g}", font=dict(size=11, color=C_EXP), yanchor="bottom"))
+    med = float(exp.median())
+    fig.add_vline(x=med, line=dict(color=C_EXP, width=2, dash="dash"))
+    fig.add_annotation(x=med, y=0.98, xref="x", yref="paper", text=f" median {med:.0f}" if xlabel == "year" else f" median {med:,.4g}",
+                       showarrow=False, xanchor="left", yanchor="top", font=dict(size=11, color=C_EXP), bgcolor="rgba(255,255,255,0.75)")
     fig.update_layout(barmode="overlay")
     return _style(fig, title, height, xlabel, "% of items")
 
@@ -458,6 +460,7 @@ def box_fig(df: pd.DataFrame, gt: pd.DataFrame | None, label: str, height: int =
             fig.add_trace(go.Box(y=s, name=name, marker_color=color, boxmean=True, showlegend=(i == 1), legendgroup=name,
                                  boxpoints=False), row=1, col=i)
     _style(fig, "Distribution summary: expanded vs GT-100", height)
+    fig.update_layout(legend=dict(orientation="h", yanchor="top", y=-0.06, xanchor="center", x=0.5), margin=dict(b=50))
     fig.update_annotations(font=dict(size=12, color="#475569"))
     fig.update_xaxes(showticklabels=False)
     return fig
@@ -556,11 +559,12 @@ def gt_table_html(df: pd.DataFrame, gt: pd.DataFrame | None, label: str) -> str:
         return '<div class="card"><div class="muted">No items yet.</div></div>'
     ab = df[df["has_abstract"]]
 
-    def q(s):
+    def q(s, spec=",.4g"):
         s = s.dropna().astype(float)
         if not len(s):
             return "—"
-        return (f"<b>{s.median():,.4g}</b> <span class='muted'>({s.quantile(.1):,.4g}–{s.quantile(.9):,.4g}) · mean {s.mean():,.4g}</span>")
+        return (f"<b>{s.median():{spec}}</b> <span class='muted'>({s.quantile(.1):{spec}}–{s.quantile(.9):{spec}}) · "
+                f"mean {s.mean():{spec}}</span>")
 
     def share(s, pred):
         s = s.dropna()
@@ -576,7 +580,7 @@ def gt_table_html(df: pd.DataFrame, gt: pd.DataFrame | None, label: str) -> str:
         ("Abstract tokens", q(ab["summary_tokens"]) if "summary_tokens" in ab else "—", q(gt["summary_tokens"])),
         ("IMDb rating", q(df["imdb_rating"]), q(gt["imdb_rating"])),
         ("IMDb ≥ 7.0 (paper's filter)", share(df["imdb_rating"], lambda s: s >= 7.0), share(gt["imdb_rating"], lambda s: s >= 7.0)),
-        ("Release year", q(df["year"]), q(gt["year"])),
+        ("Release year", q(df["year"], ".0f"), q(gt["year"], ".0f")),
         ("15–20 scenes", share(df["num_scenes"], lambda s: s.between(15, 20)), share(gt["num_scenes"], lambda s: s.between(15, 20))),
         ("Valid CML (C07)", _pct(df, "c07"), _pct(gt, "c07")),
         ("Abstract hard-pass (C19)", _pct(df, "c19"), _pct(gt, "c19")),
@@ -585,7 +589,7 @@ def gt_table_html(df: pd.DataFrame, gt: pd.DataFrame | None, label: str) -> str:
     return (f'<div class="card"><div class="card-title">{esc(label)} vs original GT-100</div>'
             f'<div class="muted small">Median (p10–p90) · mean. GT-100 = <span class="mono">songdj/CML-Bench ground_truth/gt_100.json</span> '
             f'with <span class="mono">gt_100_info.json</span> metadata.</div>'
-            f'<table class="tbl"><thead><tr><th>Metric</th><th class="num">{esc(label)}</th><th class="num">GT-100</th></tr></thead>'
+            f'<table class="tbl gt"><thead><tr><th>Metric</th><th class="num">{esc(label)}</th><th class="num">GT-100</th></tr></thead>'
             f'<tbody>{body}</tbody></table></div>')
 
 
@@ -602,19 +606,6 @@ LENGTH_BUCKETS = {
     "6k–8k": (6000, 8000),
     "≥ 8k": (8000, 10**9),
 }
-
-
-SUBSETS = {"all": "All items", "eval_safe": "Eval-safe only", "gt_related": "GT-related only"}
-
-
-def subset_frame(df: pd.DataFrame, subset: str | None) -> pd.DataFrame:
-    if df.empty or subset in (None, "all"):
-        return df
-    if subset == "eval_safe":
-        return df[df["eval_safe"] == True]  # noqa: E712
-    if subset == "gt_related":
-        return df[df["gt_related"] == True]  # noqa: E712
-    return df
 
 
 def filter_frame(df: pd.DataFrame, sources, film: str | None, lengths, only_failing: bool, query: str,

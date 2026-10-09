@@ -327,7 +327,7 @@ def parse_item_file(local_path: str, rel_path: str, gt_ids: frozenset, gt_titles
                         return ParsedFile([], None)  # not an item file (e.g. a checks log)
                     continue
                 row, _ = normalize(rec, idx, release, gt_ids, gt_titles)
-                row["file"], row["ref"], row["path"] = local_path, offset, rel_path
+                row["file"], row["ref"], row["path"], row["ref_len"] = local_path, offset, rel_path, len(line)
                 rows.append(row)
                 idx += 1
         return ParsedFile(rows, local_path)
@@ -340,7 +340,7 @@ def parse_item_file(local_path: str, rel_path: str, gt_ids: frozenset, gt_titles
     parsed = ParsedFile([], None)
     for idx, rec in enumerate(r for r in recs if isinstance(r, dict) and checks.record_content(r)):
         row, content = normalize(rec, idx, release, gt_ids, gt_titles)
-        row["file"], row["ref"], row["path"] = None, None, rel_path
+        row["file"], row["ref"], row["path"], row["ref_len"] = None, None, rel_path, None
         parsed.rows.append(row)
         parsed.inline[row["check_key"]] = content
     return parsed
@@ -474,6 +474,31 @@ class ReleaseView:
     df: pd.DataFrame
     aux: dict
     verdicts: dict
+
+
+SUBSETS = {"all": "All items", "eval_safe": "Eval-safe only", "gt_related": "GT-related only"}
+
+
+def subset_frame(df: pd.DataFrame, subset: str | None) -> pd.DataFrame:
+    if df.empty or subset in (None, "all"):
+        return df
+    if subset == "eval_safe":
+        return df[df["eval_safe"] == True]  # noqa: E712
+    if subset == "gt_related":
+        return df[df["gt_related"] == True]  # noqa: E712
+    return df
+
+
+def has_subsets(rv: ReleaseView | None) -> bool:
+    return rv is not None and not rv.df.empty and bool(rv.df["eval_safe"].notna().any() or rv.df["gt_related"].notna().any())
+
+
+def selected_view(snap, release: str | None, subset: str | None) -> ReleaseView | None:
+    rv = snap.releases.get(release) if release else None
+    if rv is None or subset in (None, "all") or not has_subsets(rv):
+        return rv
+    df = subset_frame(rv.df, subset)
+    return ReleaseView(rv.name, df, rv.aux, checks.release_verdicts(df, None))
 
 
 @dataclass

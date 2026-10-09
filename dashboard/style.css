@@ -84,6 +84,7 @@
 .tbl tr.grp td { background: #f8fafc; font-weight: 650; color: #3730a3; font-size: 12.5px; text-transform: uppercase;
   letter-spacing: 0.05em; padding-top: 12px; }
 .tbl.contract td.cid { font-weight: 600; color: #4338ca; width: 46px; }
+.tbl.gt td:first-child { white-space: nowrap; color: #334155; }
 
 .rate { display: flex; align-items: center; gap: 8px; }
 .rate-track { flex: 1; height: 8px; background: #eef2f7; border-radius: 999px; overflow: hidden; min-width: 80px; }

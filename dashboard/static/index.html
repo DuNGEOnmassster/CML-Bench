@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CML dataset dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&family=Courier+Prime:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js" charset="utf-8"></script>
+<style>
+  body { margin: 0; background: #f5f6fa; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #0f172a; }
+  .wrap { max-width: 1360px; margin: 0 auto; padding: 18px 20px 60px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 14px 0 6px; }
+  .seg { display: inline-flex; background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 4px; gap: 4px; }
+  .seg-label { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: #64748b; font-weight: 650; padding: 0 6px 0 8px; align-self: center; }
+  .seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 9px; font: 500 13px Inter, sans-serif; color: #334155; cursor: pointer; }
+  .seg button.on { background: #4f46e5; color: #fff; }
+  .spacer { flex: 1; }
+  .btn { border: 1px solid #e2e8f0; background: #fff; padding: 7px 12px; border-radius: 9px; font: 500 13px Inter, sans-serif; color: #334155; cursor: pointer; }
+  .btn:hover { border-color: #c7d2fe; }
+  .btn-primary { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid #e5e7eb; margin: 14px 0 16px; }
+  .tabs button { border: 0; background: none; padding: 10px 14px; font: 500 14px Inter, sans-serif; color: #475569; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tabs button.on { color: #4338ca; border-bottom-color: #4f46e5; }
+  section[data-panel] { display: none; }
+  section[data-panel].on { display: block; }
+  .grid-2 { display: grid; grid-template-columns: 3fr 2fr; gap: 16px; margin-top: 16px; }
+  .grid-eq { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .stack > * + * { margin-top: 16px; }
+  .plot { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 6px; min-height: 300px; }
+  .filters { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; align-items: end; }
+  .filters label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #64748b; font-weight: 650; margin-bottom: 4px; }
+  .filters select, .filters input[type=text] { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 9px; font: 13px Inter, sans-serif; background: #fff; }
+  .checks-inline { display: flex; flex-wrap: wrap; gap: 6px 10px; font-size: 13px; color: #334155; }
+  .items { max-height: 330px; overflow: auto; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; margin-top: 10px; }
+  .items table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .items th { position: sticky; top: 0; background: #f8fafc; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: #64748b; padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
+  .items td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+  .items tr { cursor: pointer; } .items tr:hover td { background: #f8fafc; } .items tr.sel td { background: #eef2ff; }
+  .detail { display: grid; grid-template-columns: 7fr 5fr; gap: 16px; margin-top: 16px; }
+  .subtabs { display: flex; gap: 4px; margin-bottom: 8px; }
+  .subtabs button { border: 1px solid #e2e8f0; background: #fff; padding: 5px 10px; border-radius: 8px; font: 500 12.5px Inter, sans-serif; cursor: pointer; }
+  .subtabs button.on { background: #eef2ff; border-color: #c7d2fe; color: #3730a3; }
+  .auth-box { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: #475569; }
+  .auth-box input { padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 8px; font: 12px "JetBrains Mono", monospace; width: 200px; }
+  .live { margin: 6px 0; }
+  @media (max-width: 1000px) { .grid-2, .grid-eq, .detail { grid-template-columns: 1fr; } .filters { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="header"></div>
+  <div class="bar">
+    <div class="seg" id="release-seg"></div>
+    <div class="seg" id="subset-seg"></div>
+    <div class="spacer"></div>
+    <div class="auth-box" id="auth"></div>
+  </div>
+  <div id="live" class="live"></div>
+  <div id="banner"></div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="overview" class="on">Overview</button>
+    <button data-tab="dist">Distributions</button>
+    <button data-tab="contract">Quality contract</button>
+    <button data-tab="gt">vs GT-100</button>
+    <button data-tab="browser">Sample browser</button>
+  </nav>
+
+  <section data-panel="overview" class="on">
+    <div id="kpis"></div>
+    <div class="grid-2">
+      <div class="stack"><div id="progress"></div><div id="versions"></div></div>
+      <div class="stack"><div id="subsets"></div></div>
+    </div>
+    <div class="grid-eq"><div class="plot" id="fig-sources"></div><div class="plot" id="fig-films"></div></div>
+  </section>
+
+  <section data-panel="dist">
+    <div class="muted small">Indigo = selected release and subset, amber = original GT-100. Histograms are normalized to % of items; dashed lines mark medians.</div>
+    <div class="grid-eq"><div class="plot" id="fig-tokens"></div><div class="plot" id="fig-scenes"></div></div>
+    <div class="grid-eq"><div class="plot" id="fig-words"></div><div class="plot" id="fig-dialogue"></div></div>
+    <div class="grid-eq"><div class="plot" id="fig-rating"></div><div class="plot" id="fig-year"></div></div>
+    <div class="plot" id="fig-genres" style="margin-top:16px"></div>
+  </section>
+
+  <section data-panel="contract">
+    <div id="contract"></div>
+    <div class="grid-2" style="grid-template-columns: 2fr 3fr"><div id="abs-summary"></div><div class="plot" id="fig-flags"></div></div>
+  </section>
+
+  <section data-panel="gt">
+    <div class="grid-2" style="grid-template-columns: 2fr 3fr"><div id="gt-table"></div><div class="plot" id="fig-box"></div></div>
+  </section>
+
+  <section data-panel="browser">
+    <div class="card">
+      <div class="filters">
+        <div><label>Source</label><select id="f-source"></select></div>
+        <div><label>Film</label><input type="text" id="f-film" list="films" placeholder="All films"><datalist id="films"></datalist></div>
+        <div><label>Abstract prompt</label><select id="f-prompt"></select></div>
+        <div><label>Content cleaning</label><select id="f-clean"></select></div>
+        <div style="grid-column: span 2"><label>Search film, abstract or item id</label><input type="text" id="f-query" placeholder="e.g. heist, Toy Story, tt0114709-s0000-0014"></div>
+        <div style="grid-column: span 4"><label>Content length</label><div class="checks-inline" id="f-len"></div></div>
+        <div style="grid-column: span 2"><label>&nbsp;</label><div class="checks-inline"><label style="text-transform:none;letter-spacing:0;font-size:13px;color:#334155;font-weight:500"><input type="checkbox" id="f-fail"> Only items failing a contract check</label></div></div>
+      </div>
+    </div>
+    <div class="bar"><div id="count" class="muted small"></div><div class="spacer"></div>
+      <button class="btn" id="prev">◀ Prev</button><button class="btn" id="rand">Random</button><button class="btn" id="next">Next ▶</button></div>
+    <div class="items"><table><thead><tr><th>Film</th><th>Item</th><th>Source</th><th>Scenes</th><th>Tokens</th><th>Abstract words</th><th>Versions</th><th>Flags</th><th>Failing checks</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="detail">
+      <div>
+        <div class="subtabs"><button data-view="sp" class="on">Screenplay</button><button data-view="raw">Raw CML</button></div>
+        <div class="sp-scroll" id="content"></div>
+      </div>
+      <div id="abstract"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+const S = { site: null, release: null, subset: "all", tab: "overview", items: {}, rows: [], pos: 0, view: "sp",
+            token: localStorage.getItem("cml_token") || null, rendered: new Set() };
+const $ = (q) => document.querySelector(q);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const LENGTHS = { "< 4k tokens": [0, 4000], "4k–6k": [4000, 6000], "6k–8k": [6000, 8000], "≥ 8k": [8000, 1e9] };
+const FIGS = { overview: ["sources", "films"], dist: ["tokens", "scenes", "words", "dialogue", "rating", "year", "genres"],
+               contract: ["flags"], gt: ["box"] };
+const CHECKS = [["c07", "valid CML"], ["c08", "no residue"], ["c09", "2k–10k tokens"], ["c10", "12–24 scenes"], ["c11", "dialogue"],
+                ["c12", "clean text"], ["c13", "low noise"], ["c15", "not GT movie"], ["c16", "no GT overlap"], ["c19", "abstract hard-pass"],
+                ["c20", "in target length"], ["c21", "top speaker named"], ["c22", "all thirds covered"], ["c23", "grounding"], ["c24", "unique opening"]];
+const V2 = [["c12b", "no \\ / CONT'D."], ["c12c", "no orphan speakers"], ["c13b", "no speaker splits"], ["c15b", "not a GT remake"]];
+
+// ---- auth -------------------------------------------------------------------------------------
+let hub = null;
+async function loadHub() {
+  try { hub = await import("https://cdn.jsdelivr.net/npm/@huggingface/hub@0.15.1/+esm"); } catch (e) { hub = null; }
+}
+async function handleOAuth() {
+  if (!hub || !window.huggingface?.variables?.OAUTH_CLIENT_ID) return;
+  try {
+    const r = await hub.oauthHandleRedirectIfPresent();
+    if (r) { S.token = r.accessToken; localStorage.setItem("cml_token", r.accessToken); }
+  } catch (e) { console.warn("oauth", e); }
+}
+function renderAuth() {
+  const box = $("#auth");
+  if (S.token) {
+    box.innerHTML = `<span class="chip chip-ok">signed in · can read the private dataset</span><button class="btn" id="signout">Sign out</button>`;
+    $("#signout").onclick = () => { localStorage.removeItem("cml_token"); S.token = null; renderAuth(); pollLive(); showItem(); };
+    return;
+  }
+  const oauth = hub && window.huggingface?.variables?.OAUTH_CLIENT_ID;
+  box.innerHTML = (oauth ? `<button class="btn btn-primary" id="signin">Sign in with Hugging Face</button><span class="muted">or</span>` : "") +
+    `<input id="tok" type="password" placeholder="paste a read token"><button class="btn" id="usetok">Use token</button>`;
+  if (oauth) $("#signin").onclick = async () => { window.location.href = (await hub.oauthLoginUrl({ scopes: "openid profile read-repos" })) + "&prompt=consent"; };
+  $("#usetok").onclick = () => { const t = $("#tok").value.trim(); if (t) { S.token = t; localStorage.setItem("cml_token", t); renderAuth(); pollLive(); showItem(); } };
+}
+const hfFetch = (url, extra = {}) => fetch(url, { headers: { Authorization: `Bearer ${S.token}`, ...extra } });
+
+// ---- live status ------------------------------------------------------------------------------
+let liveTimer = null;
+async function pollLive() {
+  clearTimeout(liveTimer);
+  const el = $("#live"), site = S.site;
+  if (site.kind !== "hf") { el.innerHTML = ""; return; }
+  if (!S.token) {
+    el.innerHTML = `<div class="banner banner-info">Snapshot of dataset rev <span class="mono">${esc((site.rev || "").slice(0, 7))}</span>, exported ${esc(site.generated_at.replace("T", " "))}. Sign in to see live build progress and to open screenplay segments.</div>`;
+    return;
+  }
+  try {
+    const repo = site.dataset_repo;
+    const info = await (await hfFetch(`https://huggingface.co/api/datasets/${repo}`)).json();
+    const bs = await (await hfFetch(`https://huggingface.co/datasets/${repo}/resolve/main/build_status.json`)).json();
+    const t = bs.totals || {};
+    const fresh = info.sha === site.rev;
+    const pct = t.items_total ? (100 * (t.items_with_abstract || 0) / t.items_total).toFixed(1) : "—";
+    el.innerHTML = `<div class="banner ${fresh ? "banner-info" : "banner-warn"}"><b>Live</b> (build_status.json, ${esc((bs.updated_at || "").replace("T", " "))}):
+      ${(t.items_with_abstract || 0).toLocaleString()} / ${(t.items_total || 0).toLocaleString()} items have abstracts (${pct}%) ·
+      merged ${(t.items_merged || 0).toLocaleString()} · batches ${(t.batches_merged || 0).toLocaleString()} / ${(t.batches_total || 0).toLocaleString()}
+      ${fresh ? "· this snapshot is current." : `· the dataset moved to <span class="mono">${esc(info.sha.slice(0, 7))}</span> since this snapshot (<span class="mono">${esc((site.rev || "").slice(0, 7))}</span>); charts update at the next export.`}</div>`;
+  } catch (e) {
+    el.innerHTML = `<div class="banner banner-warn">Could not read live status (${esc(e.message)}). Is the token allowed to read the dataset?</div>`;
+  }
+  liveTimer = setTimeout(pollLive, 60000);
+}
+
+// ---- release / subset / tabs ------------------------------------------------------------------
+const rel = () => S.site.releases.find((r) => r.id === S.release);
+const view = () => rel().views[S.subset] || rel().views.all;
+function renderSelectors() {
+  const rs = S.site.releases;
+  $("#release-seg").innerHTML = `<span class="seg-label">Release</span>` + rs.map((r) => `<button data-r="${esc(r.id)}" class="${r.id === S.release ? "on" : ""}">${esc(r.label)}</button>`).join("");
+  $("#release-seg").style.display = rs.length > 1 ? "" : "none";
+  const subs = rel().subsets;
+  $("#subset-seg").innerHTML = `<span class="seg-label">Subset</span>` + subs.map(([k, l]) => `<button data-s="${k}" class="${k === S.subset ? "on" : ""}">${esc(l)}</button>`).join("");
+  $("#subset-seg").style.display = subs.length > 1 ? "" : "none";
+  document.querySelectorAll("#release-seg button").forEach((b) => b.onclick = async () => { S.release = b.dataset.r; S.subset = "all"; renderSelectors(); await renderAll(); });
+  document.querySelectorAll("#subset-seg button").forEach((b) => b.onclick = async () => { S.subset = b.dataset.s; renderSelectors(); await renderAll(); });
+}
+function plot(name) {
+  const el = $(`#fig-${name}`), fig = view().figs[name];
+  if (!el || !fig) return;
+  Plotly.react(el, fig.data, fig.layout, { displaylogo: false, responsive: true });
+}
+function renderPlots() {
+  (FIGS[S.tab] || []).forEach(plot);
+  S.rendered.add(S.tab);
+}
+async function renderAll() {
+  const v = view();
+  $("#banner").innerHTML = v.banner;
+  for (const k of ["kpis", "progress", "subsets", "versions", "contract", "gt_table"]) $(`#${k.replace("_", "-")}`).innerHTML = v[k];
+  $("#abs-summary").innerHTML = v.abs_summary;
+  S.rendered.clear();
+  renderPlots();
+  await loadItems();
+  setupFilters();
+  applyFilters();
+}
+document.querySelectorAll("#tabs button").forEach((b) => b.onclick = () => {
+  S.tab = b.dataset.tab;
+  document.querySelectorAll("#tabs button").forEach((x) => x.classList.toggle("on", x === b));
+  document.querySelectorAll("section[data-panel]").forEach((p) => p.classList.toggle("on", p.dataset.panel === S.tab));
+  if (!S.rendered.has(S.tab)) renderPlots(); else (FIGS[S.tab] || []).forEach((n) => Plotly.Plots.resize($(`#fig-${n}`)));
+});
+
+// ---- sample browser ---------------------------------------------------------------------------
+async function loadItems() {
+  const r = rel();
+  if (!S.items[r.id]) {
+    const [fields, rows] = await (await fetch(r.items_file, { cache: "no-store" })).json();
+    S.items[r.id] = rows.map((row) => Object.fromEntries(fields.map((f, i) => [f, row[i]])));
+  }
+}
+function opts(sel, values, all) { $(sel).innerHTML = `<option value="">${all}</option>` + values.map((v) => `<option>${esc(v)}</option>`).join(""); }
+function setupFilters() {
+  const items = S.items[S.release];
+  const uniq = (f) => [...new Set(items.map((i) => i[f] ?? "—"))].sort();
+  opts("#f-source", uniq("source"), "All sources");
+  opts("#f-prompt", uniq("prompt_version"), "All prompt versions");
+  opts("#f-clean", uniq("normalization"), "All cleaning versions");
+  $("#films").innerHTML = uniq("film").map((f) => `<option value="${esc(f)}">`).join("");
+  $("#f-len").innerHTML = Object.keys(LENGTHS).map((k) => `<label style="text-transform:none;letter-spacing:0;font-size:13px;color:#334155;font-weight:500"><input type="checkbox" value="${k}"> ${k}</label>`).join("");
+  ["#f-source", "#f-prompt", "#f-clean", "#f-fail"].forEach((q) => $(q).onchange = applyFilters);
+  ["#f-film", "#f-query"].forEach((q) => $(q).oninput = debounce(applyFilters, 200));
+  document.querySelectorAll("#f-len input").forEach((c) => c.onchange = applyFilters);
+}
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+function applyFilters() {
+  let items = S.items[S.release];
+  if (S.subset === "eval_safe") items = items.filter((i) => i.eval_safe === true);
+  if (S.subset === "gt_related") items = items.filter((i) => i.gt_related === true);
+  const src = $("#f-source").value, prm = $("#f-prompt").value, cln = $("#f-clean").value;
+  const film = $("#f-film").value.trim().toLowerCase(), q = $("#f-query").value.trim().toLowerCase();
+  const lens = [...document.querySelectorAll("#f-len input:checked")].map((c) => LENGTHS[c.value]);
+  items = items.filter((i) => (!src || i.source === src) && (!prm || (i.prompt_version ?? "—") === prm) && (!cln || (i.normalization ?? "—") === cln)
+    && (!film || i.film.toLowerCase().includes(film)) && (!lens.length || lens.some(([lo, hi]) => i.script_tokens >= lo && i.script_tokens < hi))
+    && (!$("#f-fail").checked || i.failed) && (!q || i.film.toLowerCase().includes(q) || (i.summary || "").toLowerCase().includes(q) || i.item_id.toLowerCase() === q));
+  items.sort((a, b) => a.film.localeCompare(b.film) || (a.scene_start ?? 0) - (b.scene_start ?? 0));
+  S.rows = items.slice(0, 1000);
+  $("#count").textContent = `${items.length.toLocaleString()} matching items` + (S.rows.length < items.length ? ` · table shows the first ${S.rows.length.toLocaleString()}` : "") + " · click a row to open it";
+  $("#rows").innerHTML = S.rows.map((i, k) => `<tr data-k="${k}"><td>${esc(i.film)}</td><td class="mono">${esc(i.item_id)}</td><td>${esc(i.source)}</td>
+    <td class="num">${i.num_scenes}</td><td class="num">${(i.script_tokens || 0).toLocaleString()}</td><td class="num">${i.summary_words || "pending"}</td>
+    <td class="mono small">${esc(shortVersion(i))}</td><td class="small">${esc(flags(i))}</td><td class="small">${esc(failing(i))}</td></tr>`).join("");
+  document.querySelectorAll("#rows tr").forEach((tr) => tr.onclick = () => { S.pos = +tr.dataset.k; showItem(); });
+  S.pos = 0;
+  showItem();
+}
+const shortVersion = (i) => `${String(i.prompt_version ?? "—").replace("abstract_", "")} · ${String(i.normalization ?? "—").replace("moviesum_clean_", "").replace("detok_", "")}`;
+const flags = (i) => [i.gt_related ? `GT-${i.gt_rel_type || "related"}${i.gt_rel_movie ? " → " + i.gt_rel_movie : ""}` : "", i.eval_safe ? "eval-safe" : ""].filter(Boolean).join("; ");
+const failing = (i) => (i.failed || (i.checked ? "none" : "checks pending")) + (i.failed_v2 ? ` · v2: ${i.failed_v2}` : "");
+$("#prev").onclick = () => { S.pos = (S.pos - 1 + S.rows.length) % Math.max(1, S.rows.length); showItem(); };
+$("#next").onclick = () => { S.pos = (S.pos + 1) % Math.max(1, S.rows.length); showItem(); };
+$("#rand").onclick = () => { S.pos = Math.floor(Math.random() * S.rows.length); showItem(); };
+document.querySelectorAll(".subtabs button").forEach((b) => b.onclick = () => { S.view = b.dataset.view; document.querySelectorAll(".subtabs button").forEach((x) => x.classList.toggle("on", x === b)); showItem(); });
+
+let contentCache = new Map();
+async function showItem() {
+  document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", +tr.dataset.k === S.pos));
+  const it = S.rows[S.pos];
+  $("#abstract").innerHTML = abstractCard(it);
+  const box = $("#content");
+  if (!it) { box.innerHTML = `<div class="sp-empty">No items match.</div>`; return; }
+  const nav = `<div class="sp-nav muted small">Item ${(S.pos + 1).toLocaleString()} of ${S.rows.length.toLocaleString()} in the table</div>`;
+  if (S.site.kind !== "hf" || it.ref == null) { box.innerHTML = nav + `<div class="sp-empty">Content is only fetched from the Hugging Face dataset.</div>`; return; }
+  if (!S.token) { box.innerHTML = nav + `<div class="sp-empty">Sign in with Hugging Face (top right) to load this screenplay segment from the private dataset.<br>It is not stored in this Space.</div>`; return; }
+  box.innerHTML = nav + `<div class="sp-empty">Loading segment…</div>`;
+  try {
+    const content = await fetchContent(it);
+    if (S.rows[S.pos] !== it) return;
+    box.innerHTML = nav + (S.view === "raw" ? `<pre class="cml-raw">${esc(content)}</pre>` : screenplay(content, it.scene_start));
+  } catch (e) {
+    box.innerHTML = nav + `<div class="banner banner-warn">Could not load the segment (${esc(e.message)}).</div>`;
+  }
+}
+async function fetchContent(it) {
+  const key = `${S.site.rev}/${it.path}/${it.ref}`;
+  if (contentCache.has(key)) return contentCache.get(key);
+  const url = `https://huggingface.co/datasets/${S.site.dataset_repo}/resolve/${S.site.rev}/${it.path}`;
+  const r = await hfFetch(url, { Range: `bytes=${it.ref}-${it.ref + it.ref_len - 1}` });
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  const buf = await r.arrayBuffer();
+  const bytes = r.status === 206 ? buf : buf.slice(it.ref, it.ref + it.ref_len);
+  const rec = JSON.parse(new TextDecoder().decode(bytes));
+  const content = rec.script_segment || rec.content || "";
+  contentCache.set(key, content);
+  return content;
+}
+function screenplay(content, sceneStart) {
+  const doc = new DOMParser().parseFromString(content, "application/xml");
+  if (doc.querySelector("parsererror")) return `<div class="banner banner-warn">Not well-formed XML; showing the raw markup.</div><pre class="cml-raw">${esc(content)}</pre>`;
+  const cls = { stage_direction: "sp-slug", scene_description: "sp-action", action: "sp-action", character: "sp-char", parenthetical: "sp-paren", dialogue: "sp-dlg" };
+  const heading = /^\s*(\d+[A-Z]?\s+)?(INT|EXT|INT\.\/EXT|EXT\.\/INT|I\/E)[\s.:\/-]/i;
+  let out = '<div class="sp-page">';
+  [...doc.documentElement.children].filter((e) => e.tagName === "scene").forEach((sc, i) => {
+    out += `<section class="sp-scene"><div class="sp-scene-no">SCENE ${sceneStart != null ? sceneStart + i : i + 1}</div>`;
+    for (const el of sc.children) {
+      let t = el.textContent.trim(), c = cls[el.tagName] || "sp-action";
+      if (el.tagName === "stage_direction" && !heading.test(t)) c = "sp-direction";
+      if (el.tagName === "parenthetical" && t && !t.startsWith("(")) t = `(${t})`;
+      out += `<p class="${c}" title="&lt;${el.tagName}&gt;">${esc(t)}</p>`;
+    }
+    out += "</section>";
+  });
+  return out + "</div>";
+}
+function badge(ok, label, tip) {
+  if (ok === null || ok === undefined) return `<span class="badge badge-na" title="${esc(tip)}">${esc(label)}</span>`;
+  return `<span class="badge ${ok ? "badge-ok" : "badge-bad"}" title="${esc(tip)}">${ok ? "✓" : "✗"} ${esc(label)}</span>`;
+}
+function abstractCard(it) {
+  if (!it) return `<div class="card abs-card"><div class="muted">Select an item in the table above.</div></div>`;
+  const chips = [
+    it.gt_related ? `<span class="chip chip-warn">GT-related: ${esc(it.gt_rel_type || "related")}${it.gt_rel_movie ? " → " + esc(it.gt_rel_movie) : ""}</span>` : "",
+    it.eval_safe === true ? `<span class="chip chip-ok">eval-safe</span>` : it.eval_safe === false ? `<span class="chip chip-warn">not eval-safe</span>` : "",
+    `<span class="chip">${esc(it.source)}</span>`, it.split ? `<span class="chip">${esc(it.split)} split</span>` : "",
+    it.imdb_rating != null ? `<span class="chip">IMDb ${it.imdb_rating.toFixed(1)}</span>` : "",
+    `<span class="chip">${esc((it.genres || []).join(", ") || "—")}</span>`].join("");
+  const paras = (it.summary || "").split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+  const body = paras.length ? paras.map((p) => `<p>${esc(p)}</p>`).join("") : `<p class="muted">Abstract not written yet.</p>`;
+  const meta = paras.length ? `<div class="abs-meta">${it.summary.split(/\s+/).filter(Boolean).length} words · ${paras.length} paragraph${paras.length > 1 ? "s" : ""}${it.target_lo != null ? ` · target ${it.target_lo}–${it.target_hi}` : ""}</div>` : "";
+  const facts = [["Scenes", `${it.num_scenes}${it.scene_start != null ? ` (${it.scene_start}–${it.scene_end})` : ""}`], ["Content tokens", (it.script_tokens || 0).toLocaleString()],
+    ["Dialogue turns", (it.dialogue_turns || 0).toLocaleString()], ["Position in film", it.relative_position != null ? `${Math.round(100 * it.relative_position)}%` : "—"],
+    ["Abstract prompt", it.prompt_version || "—"], ["Content cleaning", it.normalization || "—"], ["Author", it.author || "—"]];
+  const tips = { c11: `${it.num_speakers ?? "?"} speakers, dialogue share ${it.dialogue_ratio ?? "?"}`, c12: `${it.artefacts_1k ?? "?"} artefacts / 1k words`,
+    c13: `garble ${it.garble_rate}, mis-tagged speakers ${it.bad_char_ratio}`, c16: `13-gram overlap ${it.gt_overlap}`,
+    c19: (it.hard || []).join(", ") || "no hard failures", c22: JSON.stringify(it.thirds), c23: `grounding ${it.grounding}` };
+  const v2tips = { c12b: `${it.backslashes} backslashes, ${it.contd} CONT'D., ${it.quote_inner_1k} quote-inner spaces / 1k words`,
+    c12c: `${it.orphan_lines} orphan speaker lines`, c13b: (it.speaker_splits || []).join(", ") || "none", c15b: "needs the gt_related field" };
+  const links = [it.imdb_url ? `<a href="${esc(it.imdb_url)}" target="_blank" rel="noopener">IMDb</a>` : "", it.source_url ? `<a href="${esc(it.source_url)}" target="_blank" rel="noopener">source</a>` : ""].filter(Boolean);
+  return `<div class="card abs-card"><div class="abs-title">${esc(it.film)}</div>
+    <div class="abs-id mono">${esc(it.item_id)}${links.length ? " · " + links.join(" · ") : ""}</div><div class="chips">${chips}</div>
+    <div class="abs-label">Abstract</div><div class="abs-body">${body}</div>${meta}
+    <dl class="facts">${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>
+    <div class="abs-label">Checks · contract v1.2</div><div class="badges">${CHECKS.map(([c, l]) => badge(it[c], c === "c23" && it.grounding != null ? `grounding ${it.grounding.toFixed(2)}` : l, `${c.toUpperCase()}: ${tips[c] || ""}`)).join("")}</div>
+    <div class="abs-label abs-label-v2">Proposed v2 checks (evaluator)</div><div class="badges">${V2.map(([c, l]) => badge(it[c], l, `${c.toUpperCase()}: ${v2tips[c]}`)).join("")}</div>
+    ${it.checked ? "" : `<div class="muted small">Content checks were still running when this snapshot was exported.</div>`}</div>`;
+}
+
+// ---- boot -------------------------------------------------------------------------------------
+await loadHub();
+await handleOAuth();
+S.site = await (await fetch("site.json", { cache: "no-store" })).json();
+$("#header").innerHTML = S.site.header;
+if (!S.site.releases.length) {
+  $("#banner").innerHTML = `<div class="banner banner-warn">${esc(S.site.message || "No items in the dataset yet.")}</div>`;
+} else {
+  S.release = S.site.releases[0].id;
+  renderSelectors();
+  await renderAll();
+}
+renderAuth();
+pollLive();
+</script>
+</body>
+</html>
