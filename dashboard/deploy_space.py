@@ -6,6 +6,10 @@
 Uploads the dashboard code, a generated Space card and copies of the pipeline modules the checks import
 (`pipeline/`). The Space gets HF_TOKEN as a secret (SPACE_HF_TOKEN if set, e.g. a read-only token) and
 DATASET_REPO / TARGET_ITEMS / REFRESH_SECONDS as variables. Refuses to deploy to an existing public Space.
+
+The Hub only hosts Gradio Spaces on cpu-basic for PRO accounts (otherwise create_repo returns 402); without
+PRO, export_static.py publishes the same views as a static Space under the same id, and running this script
+later switches that Space to the live Gradio app.
 """
 from __future__ import annotations
 
