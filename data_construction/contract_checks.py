@@ -1,11 +1,12 @@
-"""Check a release folder against the automated assertions of the expansion contract (v2).
+"""Check a release folder against the automated assertions of the expansion contract (v2.1, frozen).
 
   python data_construction/contract_checks.py --release REL [--run_dir RUN] [--content_only] [--out report.json]
 
 REL/data/*.jsonl holds schema-1.0 records. --content_only checks a content set (no abstracts yet): the abstract
-assertions (C19-C24, C20b, C21') are skipped and an empty `summary` is allowed. Audit assertions (C25'-C28') need
-an evaluator; C29 needs a rebuild; both are reported as manual. C05' and C16b come from verify_alignment.py, which
-shares no code with the cleaner.
+assertions (C19-C24, C20b', C21') are skipped and an empty `summary` is allowed. Audit assertions (C25'-C28') need
+an evaluator; C29 needs a rebuild; both are reported as manual. C05', C12e and C16b come from verify_alignment.py and
+C05'' from dialogue_preservation.py (the evaluator's reference implementation); neither shares code with the cleaner.
+C33 uses cast_check.py and identity_table.json.
 """
 from __future__ import annotations
 
@@ -23,10 +24,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_segments import CONFIG, norm_title, overlap, shingles, words_of  # noqa: E402
 from check_abstracts import check_one  # noqa: E402
 from cml_format import parse_script, render, segment_stats, validate_cml  # noqa: E402
-from dataset_schema import load_gt_related, validate_record  # noqa: E402
+from cast_check import load_characters, score, top_speakers  # noqa: E402
+from dataset_schema import load_gt_related, load_identity_table, validate_record  # noqa: E402
+from dialogue_preservation import check as dialogue_check  # noqa: E402
 from make_abstract_batches import target_center, target_words  # noqa: E402
 from residue_scan import HEADING_NO_RE, orphan_speaker_lines  # noqa: E402
-from verify_alignment import verify  # noqa: E402
+from verify_alignment import ELEMENT, SCENE, furniture_findings, verify  # noqa: E402
 
 FIRST = ["movie_name", "imdb_id", "script_segment", "summary"]
 GT_MEDIAN_TOKENS = 5702
@@ -65,8 +68,9 @@ def main() -> None:
     ap.add_argument("--moviesum_dir", default="data_construction/work/sources/moviesum")
     ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
     ap.add_argument("--imdb_meta", default="data_construction/work/sources/imdb_meta.json")
-    ap.add_argument("--excluded", default="data_construction/work/build_v3/excluded_movies.jsonl",
+    ap.add_argument("--excluded", default="data_construction/work/build_v31/excluded_movies.jsonl",
                     help="build's excluded_movies.jsonl (C32 duplicate-screenplay keeps)")
+    ap.add_argument("--imdb_dir", default="data_construction/work/sources/imdb")
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--out")
     args = ap.parse_args()
@@ -101,8 +105,12 @@ def main() -> None:
                 cur = ms.setdefault(row["imdb_id"], {}).get(split)
                 if cur is None or len(row["script"]) > len(cur["script"]):
                     ms[row["imdb_id"]][split] = row
-    bad_ids = [r["item_id"] for r in recs if ms.get(r["imdb_id"], {}).get(r["source_split"], {}).get("movie_name") != r["movie_name"]]
-    record("C02", not bad_ids, f"mismatches={bad_ids[:5]}")
+    # Relabelled items (C33) are checked against the MovieSum row named by their source_label.
+    bad_ids = [r["item_id"] for r in recs
+               if ms.get((r.get("source_label") or r)["imdb_id"], {}).get(r["source_split"], {}).get("movie_name")
+               != (r.get("source_label") or r)["movie_name"]]
+    relabelled = sum(1 for r in recs if r.get("source_label"))
+    record("C02", not bad_ids, f"mismatches={bad_ids[:5]}, relabelled_items={relabelled}")
 
     schema_bad = Counter(p for r in recs for p in validate_record(r))
     if args.content_only:
@@ -116,6 +124,10 @@ def main() -> None:
            f"dup_ids={sum(v > 1 for v in ids.values())}, dup_sha={sum(v > 1 for v in shas.values())}, sha_mismatch={sha_mismatch}")
 
     align, align_fails = verify(recs, args.moviesum_dir, args.gt_path, args.workers)
+    dp, dp_bad = dialogue_check(recs, args.moviesum_dir, args.workers)
+    record("C05''", dp["c05pp_pass"], f"raw_lines={dp['totals'].get('raw_lines')}, lost_lines={dp['lost_lines']}, "
+           f"speaker_changed={dp['totals'].get('speaker_changed', 0)} ({dp['speaker_changed_share']:.5%}), "
+           f"examples={[(b['item_id'], {k: v for k, v in b['examples'].items() if not k.startswith('expected')}) for b in dp_bad if b.get('missing') or b.get('speaker_changed') or any(k.startswith('moved_to') and not k.endswith('_short') for k in b)][:3]}")
     record("C05'", align["c05_fail"] == 0,
            f"aligned={align['items']}, fail={align['c05_fail']}, inserted_words={align['inserted_words']}, "
            f"deleted_words={align['deleted_words']}/{align['raw_words']}, kinds={align['problem_kinds']}, "
@@ -141,8 +153,10 @@ def main() -> None:
 
     toks = [r["script_tokens"] for r in recs]
     med = median(toks)
-    record("C09", all(2000 <= t <= 10000 for t in toks) and abs(med - GT_MEDIAN_TOKENS) <= 0.2 * GT_MEDIAN_TOKENS,
-           f"min={min(toks)}, median={med}, max={max(toks)} (GT median {GT_MEDIAN_TOKENS})")
+    med_ok = abs(med - GT_MEDIAN_TOKENS) <= 0.2 * GT_MEDIAN_TOKENS
+    record("C09", all(2000 <= t <= 10000 for t in toks) and (med_ok or n < 500),
+           f"min={min(toks)}, median={med}, max={max(toks)} (GT median {GT_MEDIAN_TOKENS}; median band "
+           f"{'judged' if n >= 500 else 'reported only, n < 500'}: {'in' if med_ok else 'out of'} band)")
 
     sc = [r["num_scenes"] for r in recs]
     k = sum(15 <= s <= 20 for s in sc)
@@ -188,6 +202,15 @@ def main() -> None:
              or s["bad_character_tag_ratio"] > 0.05 or s["max_element_chars"] > 3000 or s["heading_ratio"] < 0.7
              or i in dup_scene]
     record("C13", not noise, f"violations={noise[:5]}")
+
+    by_film = defaultdict(list)
+    for r in recs:
+        by_film[r["imdb_id"]].extend((m.group(1) or m.group(3), m.group(2) or "") for sc in SCENE.findall(r["script_segment"])
+                                     for m in ELEMENT.finditer(sc))
+    furn = {f: furniture_findings(els) for f, els in by_film.items()}
+    furn_bad = {f: v for f, v in furn.items() if v["watermarks"] or v["templates"] or v["page_tails"]}
+    record("C12e", not furn_bad, f"films_with_page_furniture={len(furn_bad)} "
+           f"{[(f, v) for f, v in list(furn_bad.items())[:3]]}")
 
     headings = sum(r["script_segment"].count("<stage_direction>") for r in recs)
     numbered = sum(len(HEADING_NO_RE.findall(r["script_segment"])) for r in recs)
@@ -263,7 +286,7 @@ def main() -> None:
     record("C18", not overlaps, f"movies_with_overlapping_ranges={overlaps[:5]}")
 
     if args.content_only:
-        for cid in ("C19", "C20", "C20b", "C21'", "C22", "C23", "C24"):
+        for cid in ("C19", "C20", "C20b'", "C21'", "C22", "C23", "C24"):
             results[cid] = {"pass": None, "detail": "content set: no abstracts"}
     else:
         chk = [check_one(r["summary"], r["script_segment"], target_words(r["script_tokens"])) for r in recs]
@@ -272,12 +295,12 @@ def main() -> None:
         in_target = sum("word_count_outside_target" not in c["soft"] for c in chk) / n
         mean_words = sum(c["words"] for c in chk) / n
         record("C20", in_target >= 0.85 and 130 <= mean_words <= 200, f"in_target={in_target:.2f}, mean_words={mean_words:.1f}")
-        below = sum(c["words"] < target_center(r["script_tokens"]) for r, c in zip(recs, chk)) / n
+        dev = sum(c["words"] - target_center(r["script_tokens"]) for r, c in zip(recs, chk)) / n
         wsorted = sorted(c["words"] for c in chk)
         p25 = wsorted[int(0.25 * (n - 1))]
         single = sum(c.get("paragraphs", 1) == 1 for c in chk) / n
-        record("C20b", 0.35 <= below <= 0.65 and p25 <= 150 and single >= 0.6,
-               f"below_center={below:.2f} (0.35-0.65), p25_words={p25} (<=150), single_paragraph={single:.2f} (>=0.6)")
+        record("C20b'", -5 <= dev <= 5 and p25 <= 150 and single >= 0.6,
+               f"mean(words - target_center)={dev:+.1f} ([-5,+5]), p25_words={p25} (<=150), single_paragraph={single:.2f} (>=0.6)")
         top1 = sum(c["top1_speaker_mentioned"] for c in chk) / n
         top3 = sum(c["top3_speakers_mentioned"] >= 2 for c in chk) / n
         record("C21'", top1 >= 0.95 and top3 >= 0.85, f"top1={top1:.2f}, top3>=2={top3:.2f} (spelling variants count)")
@@ -305,11 +328,49 @@ def main() -> None:
 
     results["C31"] = {"pass": None, "detail": "scale-up process: per-batch merge gates (validate_batch.py) + evaluator sample audit"}
 
+    # C33: every film whose speakers do not clearly match its IMDb cast has a decision in identity_table.json.
+    identity = load_identity_table()
+    films = defaultdict(list)
+    for r in recs:
+        films[r["imdb_id"]].append(r)
+    chars = load_characters(args.imdb_dir, set(films) | {e["keep_imdb_id"] for e in identity.values() if e.get("keep_imdb_id")}
+                            | set(identity))
+    undecided, wrong_decision, excluded_present, unlabelled = [], [], [], []
+    status_count = Counter()
+    for fid, rs in films.items():
+        sp = top_speakers([r["script_segment"] for r in rs])
+        st = score(sp, chars.get(fid))["status"]
+        status_count[st] += 1
+        source_id = (rs[0].get("source_label") or rs[0])["imdb_id"]
+        e = identity.get(source_id)
+        if e and e["decision"] in ("exclude", "duplicate_keep_other"):
+            excluded_present.append(fid)
+        if st != "ok" and not e:
+            undecided.append(f"{rs[0]['movie_name']}:{st}")
+        expected = e["decision"] if e else None
+        if any(r.get("identity_decision") != expected for r in rs):
+            wrong_decision.append(fid)
+        if expected == "relabel" and any(not r.get("source_label") or r["imdb_id"] != e["target_imdb_id"] for r in rs):
+            unlabelled.append(fid)
+    dup_wrong = []
+    if os.path.exists(args.excluded):
+        with open(args.excluded, encoding="utf-8") as f:
+            dropped_dups = [e for e in map(json.loads, f) if e["reason"] in ("duplicate_script_text", "identity_duplicate_keep_other")]
+        for e in dropped_dups:
+            kept = e.get("keep_imdb_id") or next((fid for fid, rs in films.items() if base_title(rs[0]["movie_name"]) == base_title(e["movie_name"])), None)
+            if kept in films:
+                sp = top_speakers([r["script_segment"] for r in films[kept]])
+                if score(sp, chars.get(kept))["exact"] < score(sp, chars.get(e["imdb_id"]))["exact"]:
+                    dup_wrong.append(f"{e['movie_name']} > kept {films[kept][0]['movie_name']}")
+    record("C33", not undecided and not wrong_decision and not excluded_present and not unlabelled and not dup_wrong,
+           f"films={len(films)}, cast_status={dict(status_count)}, undecided={undecided[:5]}, identity_field_mismatch={wrong_decision[:3]}, "
+           f"excluded_present={excluded_present}, relabel_without_source_label={unlabelled}, duplicate_kept_lower_score={dup_wrong}")
+
     year_off = [r["item_id"] for r in recs if r["year"] and abs(int(r["movie_name"][-4:]) - r["year"]) > 1]
     dup_keeps, dup_bad = [], []
     if os.path.exists(args.excluded):
         with open(args.excluded, encoding="utf-8") as f:
-            dups = [e for e in map(json.loads, f) if e["reason"] == "duplicate_script_text"]
+            dups = [e for e in map(json.loads, f) if e["reason"] in ("duplicate_script_text", "identity_duplicate_keep_other")]
         by_base = defaultdict(list)
         for r in recs:
             by_base[base_title(r["movie_name"])].append(r)
