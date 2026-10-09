@@ -10,10 +10,11 @@ Rules (evaluator-repilot-report.md 5):
              the item with the lowest sha1(seed+item_id) of each is audited (2%; independent of merge order)
   targeted   every merged item routed by merge gate G8 is audited in full, outside the 2% sample
   revoke     a batch with any major or outside verdict on its current abstracts leaves data/ and is rewritten
+  dedupe     one verdict per (item_id, summary_sha1), the stricter one wins; major and outside always count together
   stop       issuing stops for everyone when any 50 consecutive verdicts hold >= 2 major/outside, or when, after >= 60
-             verdicts, the observed major rate exceeds 3%. (The contract's literal "Wilson 95% upper bound > 3% after 60"
-             would stop on zero majors until ~125 verdicts, so the upper bound is reported and used as the release
-             criterion at completion instead: upper bound <= 3%. Pending the evaluator's confirmation.)
+             verdicts, the observed major+outside rate exceeds 3% (all verdicts)
+  complete   the Wilson 95% upper bound of the major+outside rate over the random sample only must be <= 3%; the
+             targeted pool is reported separately (evaluator's final verdict, condition 3)
   pause      an orchestrator with >= 2 revoked batches among its last 20 audited batches is paused
 """
 from __future__ import annotations
@@ -59,23 +60,56 @@ def wilson_upper(k: int, n: int, z: float = 1.96) -> float:
     return (centre + margin) / (1 + z * z / n)
 
 
-def stop_rule(verdicts: list[dict]) -> dict:
-    """verdicts in audit order. Returns {"stop": bool, "reason": str, ...}."""
-    bad = [1 if (v.get("major", 0) or v.get("outside", 0)) else 0 for v in verdicts]
+def _bad(v: dict) -> bool:
+    return bool(v.get("major", 0) or v.get("outside", 0))
+
+
+def dedupe_verdicts(verdicts: list[dict]) -> list[dict]:
+    """One verdict per (item_id, summary_sha1): the stricter reading wins (major/outside, then minor), so a re-check of
+    the same abstract by a second auditor never adds a second observation. Kept in order of first audit."""
+    best: dict[tuple, dict] = {}
+    first: dict[tuple, str] = {}
+    for v in verdicts:
+        k = (v["item_id"], v.get("summary_sha1"))
+        first.setdefault(k, v.get("audited_at", ""))
+        rank = (_bad(v), v.get("major", 0) + v.get("outside", 0), v.get("minor", 0))
+        cur = best.get(k)
+        if cur is None or rank > (_bad(cur), cur.get("major", 0) + cur.get("outside", 0), cur.get("minor", 0)):
+            best[k] = {**v, "auditors": sorted({*(cur or {}).get("auditors", []), v.get("auditor", "")})}
+        else:
+            cur["auditors"] = sorted({*cur.get("auditors", []), v.get("auditor", "")})
+    return sorted(best.values(), key=lambda v: first[(v["item_id"], v.get("summary_sha1"))])
+
+
+def _counts(vs: list[dict]) -> dict:
+    n = len(vs)
+    k = sum(_bad(v) for v in vs)
+    return {"audited": n, "major_or_outside": k, "major": sum(1 for v in vs if v.get("major", 0)),
+            "outside": sum(1 for v in vs if v.get("outside", 0)), "minor": sum(v.get("minor", 0) for v in vs),
+            "claims": sum(v.get("claims", 0) for v in vs)}
+
+
+def stop_rule(verdicts: list[dict], sample_items: set[str] | None = None) -> dict:
+    """verdicts: deduped, in audit order. Major and outside count together everywhere. The stop rule looks at every
+    verdict (random sample and targeted pool); the completion criterion (Wilson 95% upper bound <= 3%) uses the random
+    sample only, and the targeted pool is reported on its own."""
+    bad = [1 if _bad(v) else 0 for v in verdicts]
     worst = max((sum(bad[i : i + WINDOW]) for i in range(max(1, len(bad) - WINDOW + 1))), default=0)
-    majors = sum(1 for v in verdicts if v.get("major", 0))
-    n = len(verdicts)
-    upper = wilson_upper(majors, n)
+    n, k = len(verdicts), sum(bad)
     reasons = []
     if worst >= WINDOW_MAX_BAD:
         reasons.append(f"{worst} major/outside within {WINDOW} consecutive audited items")
-    if n >= MIN_FOR_WILSON and majors / n > MAX_MAJOR_UPPER:
-        reasons.append(f"major rate {majors}/{n} > {MAX_MAJOR_UPPER} after >= {MIN_FOR_WILSON} audited items")
-    return {"stop": bool(reasons), "reason": "; ".join(reasons), "audited": n, "major": majors,
-            "release_criterion_upper95_le_3pct": bool(n) and upper <= MAX_MAJOR_UPPER,
-            "outside": sum(1 for v in verdicts if v.get("outside", 0)),
-            "minor": sum(v.get("minor", 0) for v in verdicts), "claims": sum(v.get("claims", 0) for v in verdicts),
-            "worst_window_bad": worst, "major_rate_upper95": round(upper, 4) if n else None}
+    if n >= MIN_FOR_WILSON and k / n > MAX_MAJOR_UPPER:
+        reasons.append(f"major+outside rate {k}/{n} > {MAX_MAJOR_UPPER} after >= {MIN_FOR_WILSON} audited items")
+    sample_items = sample_items or set()
+    rand = [v for v in verdicts if v["item_id"] in sample_items]
+    targ = [v for v in verdicts if v["item_id"] not in sample_items]
+    rc = _counts(rand)
+    upper = wilson_upper(rc["major_or_outside"], rc["audited"])
+    return {"stop": bool(reasons), "reason": "; ".join(reasons), **_counts(verdicts), "worst_window_bad": worst,
+            "random_sample": {**rc, "upper95": round(upper, 4) if rc["audited"] else None},
+            "targeted_pool": _counts(targ),
+            "release_criterion_upper95_le_3pct": bool(rc["audited"]) and upper <= MAX_MAJOR_UPPER}
 
 
 def orchestrator_of(batch_id: str, ranges: list[dict]) -> str | None:

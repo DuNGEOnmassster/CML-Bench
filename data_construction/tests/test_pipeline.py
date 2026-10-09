@@ -4,7 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from audit_rules import sample_batches, stop_rule, wilson_upper  # noqa: E402
+from audit_rules import dedupe_verdicts, sample_batches, stop_rule, wilson_upper  # noqa: E402
 from build_segments import CONFIG, choose_windows  # noqa: E402
 from check_abstracts import check_one  # noqa: E402
 from cml_format import (  # noqa: E402
@@ -121,14 +121,27 @@ class FormatTests(unittest.TestCase):
 
 class AuditRuleTests(unittest.TestCase):
     def test_stop_rule(self):
-        ok = [{"major": 0, "outside": 0}] * 100
+        ok = [{"item_id": f"i{i}", "major": 0, "outside": 0} for i in range(100)]
         self.assertFalse(stop_rule(ok)["stop"])
-        two_close = ok[:20] + [{"major": 1}] + ok[:10] + [{"outside": 1}] + ok[:20]
+        two_close = ok[:20] + [{"item_id": "m1", "major": 1}] + ok[:10] + [{"item_id": "o1", "outside": 1}] + ok[:20]
         self.assertTrue(stop_rule(two_close)["stop"])
-        spread = ([{"major": 1}] + ok[:59]) * 2
+        spread = ([{"item_id": "m", "major": 1}] + ok[:59]) * 2
         self.assertFalse(stop_rule(spread)["stop"])
-        self.assertTrue(stop_rule(([{"major": 1}] + ok[:24]) * 4)["stop"])
+        self.assertTrue(stop_rule(([{"item_id": "m", "major": 1}] + ok[:24]) * 4)["stop"])
         self.assertLess(wilson_upper(0, 261), 0.015)
+
+    def test_dedupe_and_sample_only_completion(self):
+        v = [{"item_id": "a", "summary_sha1": "x", "auditor": "claude", "major": 0, "outside": 0, "minor": 1},
+             {"item_id": "a", "summary_sha1": "x", "auditor": "gpt", "major": 0, "outside": 1, "minor": 0},
+             {"item_id": "b", "summary_sha1": "y", "auditor": "claude", "major": 0, "outside": 0, "minor": 0}]
+        d = dedupe_verdicts(v)
+        self.assertEqual(len(d), 2)
+        self.assertEqual(d[0]["outside"], 1)
+        self.assertEqual(d[0]["auditors"], ["claude", "gpt"])
+        r = stop_rule(d, sample_items={"b"})
+        self.assertEqual(r["random_sample"]["audited"], 1)
+        self.assertEqual(r["targeted_pool"]["major_or_outside"], 1)
+        self.assertEqual(r["major_or_outside"], 1)
 
     def test_sample_is_two_per_block_and_stable(self):
         ids = [f"moviesum-b{n:04d}" for n in range(1, 31)] + ["moviesum-hold-b0001"]

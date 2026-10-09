@@ -37,6 +37,7 @@ from dataset_schema import SCHEMA_VERSION, make_record, schema_json, source_slug
 
 STORE_STATUS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/build_status.json"
 DEFAULT_VERDICTS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/audit"
+DEFAULT_AUDIT_MIRROR = DEFAULT_VERDICTS + "/{slug}"
 SHARD_BATCHES = 100
 DEFAULT_REPO = f"{os.environ.get('HF_ACCOUNT', '')}/CML-Dataset-Expanded"
 
@@ -260,7 +261,7 @@ def write_store_status(status: dict, path: str) -> None:
 
 def source_state(run_dir: str, verdicts_path: str | None = None):
     """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file)."""
-    from audit_rules import paused_orchestrators, sample_batches, sample_item, stop_rule
+    from audit_rules import dedupe_verdicts, paused_orchestrators, sample_batches, sample_item, stop_rule
     from cml_format import count_tokens
     from validate_batch import abstract_set_hash, first8, validate
 
@@ -289,6 +290,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
         with open(path, encoding="utf-8") as f:
             verdicts += [v for v in map(json.loads, filter(str.strip, f)) if v.get("item_id") in items_by_id]
     verdicts.sort(key=lambda v: v.get("audited_at", ""))
+    raw_verdicts, verdicts = verdicts, dedupe_verdicts(verdicts)
     bad_verdict = {(v["item_id"], v.get("summary_sha1")) for v in verdicts if v.get("major", 0) or v.get("outside", 0)}
     sampled = sample_batches([b["batch_id"] for b in batches])
     targeted, sample = [], []
@@ -359,9 +361,9 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
         files[f"audit/{slug}/targeted.jsonl"] = jsonl_bytes(targeted)
     if sample:
         files[f"audit/{slug}/sample.jsonl"] = jsonl_bytes(sample)
-    if verdicts:
-        files[f"audit/{slug}/verdicts.jsonl"] = jsonl_bytes(verdicts)
-    rule = stop_rule(verdicts)
+    if raw_verdicts:
+        files[f"audit/{slug}/verdicts.jsonl"] = jsonl_bytes(raw_verdicts)
+    rule = stop_rule(verdicts, {x["item_id"] for x in sample})
     audited_batches, seen_b = [], set()
     for v in verdicts:
         if v["batch_id"] not in seen_b:
@@ -434,7 +436,58 @@ def cmd_sync(repo: Repo, args) -> dict:
 
     oid, n = repo.commit(plan, f"sync {slug}: {status['build_id']}, merged {status['items_merged']}/{status['items_total']}")
     print(f"sync {slug}: {n} file operations, head {oid[:8]}")
+    write_local_release(args.run_dir, slug, files)
+    if args.audit_mirror:
+        mirror_audit(args.audit_mirror.format(slug=slug), slug, files)
     return result["status"]
+
+
+def _records(files: dict, prefix: str) -> list[dict]:
+    return [json.loads(line) for p in sorted(files) if p.startswith(prefix) for line in files[p].decode().splitlines() if line]
+
+
+def write_local_release(run_dir: str, slug: str, files: dict) -> None:
+    """The merged items as a release folder (data/merged.jsonl + info.json) for the release-level contract gates."""
+    from assemble import info_json
+
+    out = os.path.join(run_dir, "merged_release")
+    os.makedirs(os.path.join(out, "data"), exist_ok=True)
+    recs = _records(files, f"data/{slug}/")
+    with open(os.path.join(out, "data", "merged.jsonl"), "wb") as f:
+        f.write(jsonl_bytes(recs))
+    with open(os.path.join(out, "info.json"), "w", encoding="utf-8") as f:
+        json.dump(info_json(recs), f, ensure_ascii=False)
+
+
+def _write_if_changed(path: str, data: bytes) -> bool:
+    if os.path.exists(path):
+        with open(path, "rb") as f:
+            if f.read() == data:
+                return False
+    with open(path, "wb") as f:
+        f.write(data)
+    return True
+
+
+def mirror_audit(out_dir: str, slug: str, files: dict) -> None:
+    """For auditors without HF access: the audit lists plus every listed item's content and abstract, in the store."""
+    os.makedirs(out_dir, exist_ok=True)
+    lists = {name: _records(files, f"audit/{slug}/{name}.jsonl") for name in ("sample", "targeted")}
+    wanted = {}
+    for name, rows in lists.items():
+        for r in rows:
+            wanted.setdefault(r["item_id"], []).append(name if name == "sample" else "targeted:" + ",".join(r.get("reasons", [])))
+    items = []
+    for rec in _records(files, f"data/{slug}/"):
+        if rec["item_id"] in wanted:
+            items.append({"item_id": rec["item_id"], "batch_id": rec["batch_id"], "movie_name": rec["movie_name"],
+                          "summary_sha1": hashlib.sha1(rec["summary"].encode()).hexdigest(), "audit_lists": wanted[rec["item_id"]],
+                          "abstract_prompt_version": rec["abstract_prompt_version"], "abstract_author": rec["abstract_author"],
+                          "script_segment": rec["script_segment"], "summary": rec["summary"]})
+    changed = [name for name, data in (("sample.jsonl", jsonl_bytes(lists["sample"])), ("targeted.jsonl", jsonl_bytes(lists["targeted"])),
+                                       ("items.jsonl", jsonl_bytes(items)))
+               if _write_if_changed(os.path.join(out_dir, name), data)]
+    print(f"audit mirror {out_dir}: sample {len(lists['sample'])}, targeted {len(lists['targeted'])}, items {len(items)}, rewrote {changed}")
 
 
 def cmd_pilot(repo: Repo, args) -> dict:
@@ -507,6 +560,7 @@ def main() -> None:
     s = sub.add_parser("sync")
     s.add_argument("--run_dir", required=True)
     s.add_argument("--verdicts", default=DEFAULT_VERDICTS, help="audit verdicts: a jsonl file, or a dir of verdicts*.jsonl (C31); missing = none yet")
+    s.add_argument("--audit_mirror", default=DEFAULT_AUDIT_MIRROR, help="store dir for audit lists + listed items ('' to skip)")
     p = sub.add_parser("pilot")
     p.add_argument("--folder", required=True)
     p.add_argument("--name", required=True)

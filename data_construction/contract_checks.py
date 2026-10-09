@@ -60,11 +60,43 @@ def base_title(movie_name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", t)
 
 
+def abstract_assertions(recs: list[dict], record) -> None:
+    """C19-C24 and C20b' on items with abstracts."""
+    n = len(recs)
+    chk = [check_one(r["summary"], r["script_segment"], target_words(r["script_tokens"])) for r in recs]
+    hard = [r["item_id"] for r, c in zip(recs, chk) if c["hard"]]
+    record("C19", not hard, f"hard_fail={hard[:5]}")
+    in_target = sum("word_count_outside_target" not in c["soft"] for c in chk) / n
+    mean_words = sum(c["words"] for c in chk) / n
+    record("C20", in_target >= 0.85 and 130 <= mean_words <= 200, f"in_target={in_target:.2f}, mean_words={mean_words:.1f}")
+    dev = sum(c["words"] - target_center(r["script_tokens"]) for r, c in zip(recs, chk)) / n
+    wsorted = sorted(c["words"] for c in chk)
+    p25 = wsorted[int(0.25 * (n - 1))]
+    single = sum(c.get("paragraphs", 1) == 1 for c in chk) / n
+    record("C20b'", -5 <= dev <= 5 and p25 <= 150 and single >= 0.6,
+           f"mean(words - target_center)={dev:+.1f} ([-5,+5]), p25_words={p25} (<=150), single_paragraph={single:.2f} (>=0.6)")
+    top1 = sum(c["top1_speaker_mentioned"] for c in chk) / n
+    top3 = sum(c["top3_speakers_mentioned"] >= 2 for c in chk) / n
+    record("C21'", top1 >= 0.95 and top3 >= 0.85, f"top1={top1:.2f}, top3>=2={top3:.2f} (spelling variants count)")
+    all3 = sum(all(c["thirds_covered"]) for c in chk) / n
+    last = sum(c["thirds_covered"][2] for c in chk) / n
+    record("C22", all3 >= 0.90 and last >= 0.95, f"all_thirds={all3:.2f}, last_third={last:.2f}")
+    g = [c["lexical_grounding"] for c in chk]
+    record("C23", sum(g) / n >= 0.55 and min(g) >= 0.35, f"mean={sum(g) / n:.3f}, min={min(g):.3f}")
+    first8 = Counter(" ".join(r["summary"].split()[:8]).lower() for r in recs)
+    open3 = Counter(" ".join(r["summary"].split()[:3]).lower() for r in recs)
+    record("C24", max(first8.values()) == 1 and max(open3.values()) / n <= 0.10,
+           f"max_first8_dup={max(first8.values())}, top_opening_3gram={open3.most_common(1)[0]}")
+
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--release", required=True)
     ap.add_argument("--run_dir", help="unused; kept for older command lines")
     ap.add_argument("--content_only", action="store_true")
+    ap.add_argument("--release_gates", action="store_true",
+                    help="fast merge-loop mode: schema + abstract assertions only (C01, C03, C04, C19-C24, C20b')")
     ap.add_argument("--moviesum_dir", default="data_construction/work/sources/moviesum")
     ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
     ap.add_argument("--imdb_meta", default="data_construction/work/sources/imdb_meta.json")
@@ -94,6 +126,22 @@ def main() -> None:
     bad_first = sum(1 for r in recs if list(r)[:4] != FIRST or not all(isinstance(r[k], str) and r[k].strip() for k in need)
                     or not isinstance(r["summary"], str))
     record("C01", parse_err == 0 and bad_first == 0 and recs, f"{n} items, parse_errors={parse_err}, bad_first_fields={bad_first}")
+    if args.release_gates:
+        bad_schema = Counter(p for r in recs for p in validate_record(r))
+        record("C03", not bad_schema, f"schema_problems={dict(bad_schema)}")
+        ids, shas = Counter(r["item_id"] for r in recs), Counter(r["content_sha1"] for r in recs)
+        record("C04", max(ids.values()) == 1 and max(shas.values()) == 1, f"dup_ids={sum(v > 1 for v in ids.values())}")
+        abstract_assertions(recs, record)
+        summary = {"items": n, "release_gates": True, "automated_pass": sum(v["pass"] is True for v in results.values()),
+                   "automated_fail": sum(v["pass"] is False for v in results.values()),
+                   "failed": sorted(k for k, v in results.items() if v["pass"] is False)}
+        for cid in sorted(results, key=lambda c: (int(re.sub(r"\D", "", c)), c)):
+            print(f"{cid:5} {'PASS' if results[cid]['pass'] else 'FAIL'} {results[cid]['detail']}")
+        print(json.dumps(summary))
+        if args.out:
+            with open(args.out, "w") as f:
+                json.dump({"summary": summary, "results": results}, f, indent=2)
+        return
 
     # An imdb_id can occur twice in one split; the builder (and the verifier) use the longer screenplay.
     ms, vocab = {}, Counter()
@@ -289,30 +337,7 @@ def main() -> None:
         for cid in ("C19", "C20", "C20b'", "C21'", "C22", "C23", "C24"):
             results[cid] = {"pass": None, "detail": "content set: no abstracts"}
     else:
-        chk = [check_one(r["summary"], r["script_segment"], target_words(r["script_tokens"])) for r in recs]
-        hard = [r["item_id"] for r, c in zip(recs, chk) if c["hard"]]
-        record("C19", not hard, f"hard_fail={hard[:5]}")
-        in_target = sum("word_count_outside_target" not in c["soft"] for c in chk) / n
-        mean_words = sum(c["words"] for c in chk) / n
-        record("C20", in_target >= 0.85 and 130 <= mean_words <= 200, f"in_target={in_target:.2f}, mean_words={mean_words:.1f}")
-        dev = sum(c["words"] - target_center(r["script_tokens"]) for r, c in zip(recs, chk)) / n
-        wsorted = sorted(c["words"] for c in chk)
-        p25 = wsorted[int(0.25 * (n - 1))]
-        single = sum(c.get("paragraphs", 1) == 1 for c in chk) / n
-        record("C20b'", -5 <= dev <= 5 and p25 <= 150 and single >= 0.6,
-               f"mean(words - target_center)={dev:+.1f} ([-5,+5]), p25_words={p25} (<=150), single_paragraph={single:.2f} (>=0.6)")
-        top1 = sum(c["top1_speaker_mentioned"] for c in chk) / n
-        top3 = sum(c["top3_speakers_mentioned"] >= 2 for c in chk) / n
-        record("C21'", top1 >= 0.95 and top3 >= 0.85, f"top1={top1:.2f}, top3>=2={top3:.2f} (spelling variants count)")
-        all3 = sum(all(c["thirds_covered"]) for c in chk) / n
-        last = sum(c["thirds_covered"][2] for c in chk) / n
-        record("C22", all3 >= 0.90 and last >= 0.95, f"all_thirds={all3:.2f}, last_third={last:.2f}")
-        g = [c["lexical_grounding"] for c in chk]
-        record("C23", sum(g) / n >= 0.55 and min(g) >= 0.35, f"mean={sum(g) / n:.3f}, min={min(g):.3f}")
-        first8 = Counter(" ".join(r["summary"].split()[:8]).lower() for r in recs)
-        open3 = Counter(" ".join(r["summary"].split()[:3]).lower() for r in recs)
-        record("C24", max(first8.values()) == 1 and max(open3.values()) / n <= 0.10,
-               f"max_first8_dup={max(first8.values())}, top_opening_3gram={open3.most_common(1)[0]}")
+        abstract_assertions(recs, record)
 
     for cid in ("C25'", "C26'", "C27", "C28'"):
         results[cid] = {"pass": None, "detail": "evaluator audit required"}
