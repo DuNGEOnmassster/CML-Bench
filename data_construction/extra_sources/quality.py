@@ -11,6 +11,23 @@ import re
 
 from cml_format import garble_rate, is_bad_character_tag, rare_word_rate, speaker_name
 
+_ABSORBED_RE = re.compile(r"(?:^|[.!?]\s+)([A-Z][A-Za-z'\-]+)\s+([a-z]+(?:s|ed))\b")
+_SPEECH_VERBS = {"was", "has", "is", "does", "says", "needs", "wants", "likes", "loves", "knows", "thinks", "gets", "goes",
+                 "seems", "looks", "called", "said", "used", "asked", "told"}
+
+
+def absorbed_action_rate(scenes) -> float:
+    """Share of dialogue elements containing a sentence that opens with a speaker's name and a third-person
+    verb ("... Like an announcement. Annie confers with Karin"): action lines swallowed by the preceding
+    dialogue when a file has dialogue at the action indent and no blank line after it.
+    Calibration: CML-Bench GT p95 0.040, MovieSum segments p95 0.019 / p99 0.046."""
+    speakers = {speaker_name(t) for s in scenes for tag, t in s.elements if tag == "character"}
+    first = {n.split()[0] for n in speakers if n}
+    dialogue = [t for s in scenes for tag, t in s.elements if tag == "dialogue"]
+    bad = sum(1 for t in dialogue if any(m.group(1).upper() in first and m.group(2) not in _SPEECH_VERBS
+                                         for m in _ABSORBED_RE.finditer(t)))
+    return bad / max(1, len(dialogue))
+
 QUALITY_CONFIG = {
     "min_chars_per_pdf_page": 600,
     "max_letter_spaced_rate": 0.01,
@@ -27,6 +44,7 @@ QUALITY_CONFIG = {
     "min_ascii_letter_share": 0.97,
     "min_stopword_share": 0.25,
     "max_median_scene_words": 600,
+    "max_absorbed_action_rate": 0.04,
 }
 OCR_PRODUCER_RE = re.compile(r"paper capture|image conversion|clearscan|abbyy|finereader|omnipage|readiris|tesseract|ocr", re.I)
 _STOP = set("the a an and of to in is it that he she they you i we his her their was for on with as at but not this be are".split())
@@ -72,6 +90,7 @@ def script_quality(text: str, scenes, diag: dict, pdf_meta: dict, vocab) -> tupl
     metrics["speaker_colon_share"] = round(diag.get("speaker_colon_lines", 0) / max(1, diag.get("nonblank_lines", 1)), 4)
     scene_words = sorted(sum(len(x.split()) for _, x in s.elements) for s in scenes) or [0]
     metrics["median_scene_words"] = scene_words[len(scene_words) // 2]
+    metrics["absorbed_action_rate"] = round(absorbed_action_rate(scenes), 4)
     metrics["garble_rate"] = round(garble_rate(body), 5)
     metrics["rare_word_rate"] = round(rare_word_rate(body, vocab), 5)
     letters = [c for c in body if c.isalpha()]
@@ -95,6 +114,8 @@ def script_quality(text: str, scenes, diag: dict, pdf_meta: dict, vocab) -> tupl
         reasons.append("parse_bad_cues")
     if metrics["median_scene_words"] > cfg["max_median_scene_words"]:
         reasons.append("merged_scenes")
+    if metrics["absorbed_action_rate"] > cfg["max_absorbed_action_rate"]:
+        reasons.append("dialogue_action_merged")
     if metrics["garble_rate"] > cfg["max_garble_rate"] or metrics["rare_word_rate"] > cfg["max_rare_word_rate"]:
         reasons.append("ocr_garbage")
     if metrics["ascii_letter_share"] < cfg["min_ascii_letter_share"] or metrics["stopword_share"] < cfg["min_stopword_share"]:

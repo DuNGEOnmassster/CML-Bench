@@ -78,6 +78,7 @@ def lookup(index: dict, title: str, year: int | None = None, year_kind: str = "r
         d = c[1] - year
         return d if year_kind == "draft" else abs(d)
 
+    conflict = False
     if year is not None:
         lo, hi = (-1, 5) if year_kind == "draft" else (-1, 1)
         close = [c for c in cands if c[1] is not None and lo <= c[1] - year <= hi]
@@ -86,13 +87,17 @@ def lookup(index: dict, title: str, year: int | None = None, year_kind: str = "r
             conf = "high" if len(close) == 1 or best[3] >= 10 * sorted((c[3] for c in close), reverse=True)[1] else "medium"
         else:
             best, conf = max(cands, key=lambda c: c[3]), "low"
+            conflict = True  # nothing near the year hint: the most popular same-title film is a guess
     else:
         best = max(cands, key=lambda c: c[3])
         votes = sorted((c[3] for c in cands), reverse=True)
         conf = "medium" if len(votes) == 1 or votes[0] >= 10 * votes[1] else "low"
     tconst, y, ttype, votes, rating, genres, primary = best
+    if votes < 1000 and conf == "high":
+        conf = "low"  # obscure title sharing the name of the intended film (e.g. a 347-vote video)
+    ambiguous = conflict or (year is None and sum(1 for c in cands if c[3] >= 1000) >= 2)
     return {"imdb_id": tconst, "year": y, "title": primary, "type": ttype, "votes": votes, "rating": rating,
-            "genres": [g for g in genres.split(",") if g and g != "\\N"], "confidence": conf}
+            "genres": [g for g in genres.split(",") if g and g != "\\N"], "confidence": conf, "ambiguous": ambiguous}
 
 
 _ALT_RE = re.compile(r"\((?:was|aka|a\.k\.a\.|originally|written as|formerly|also known as|filmed as|released as|produced as|made as)?\s*\"?([^()\"]+)\"?\)?", re.I)
@@ -166,6 +171,17 @@ def lookup_any(index: dict, title: str, year: int | None = None, year_kind: str 
                 m["confidence"] = "low"
             return {**m, "matched_title": t}
     return None
+
+
+def id_meta(index: dict, ids: set[str]) -> dict[str, dict]:
+    """imdb_id -> {title, year, type, votes, rating, genres} (the metadata of record, whatever matched the title)."""
+    out = {}
+    for cands in index.values():
+        for c in cands:
+            if c[0] in ids and c[0] not in out:
+                out[c[0]] = {"title": c[6], "year": c[1], "type": c[2], "votes": c[3], "rating": c[4],
+                             "genres": [g for g in c[5].split(",") if g and g != "\\N"]}
+    return out
 
 
 def fuzzy_key_buckets(index: dict, min_votes: int = 1000) -> dict:

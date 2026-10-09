@@ -8,8 +8,8 @@ sys.path.insert(0, os.path.join(HERE, "extra_sources"))
 
 from cml_format import Scene, render, validate_cml  # noqa: E402
 from extra_sources import catalogs  # noqa: E402
-from extra_sources.build_extra import window_noise  # noqa: E402
-from extra_sources.gt_related import relate  # noqa: E402
+from extra_sources.build_extra import gt_lookalike, window_noise  # noqa: E402
+from dataset_schema import load_gt_related  # noqa: E402
 from extra_sources.imdb_index import norm_title, title_variants  # noqa: E402
 from extra_sources.quality import script_quality  # noqa: E402
 from extra_sources.text_screenplay import extract_text, html_to_text, looks_like_cue, text_to_scenes  # noqa: E402
@@ -123,11 +123,11 @@ class MatchingTests(unittest.TestCase):
         self.assertIn("somethingborrowed", v)
         self.assertIn("jasonx", [norm_title(t) for t in title_variants("Friday the 13th Part 10: Jason X")])
 
-    def test_gt_related(self):
-        gt = ["Toy Story 4_2019", "Memory_2023", "The Batman_2022"]
-        self.assertEqual(relate("Toy Story 2", gt)["gt_movie"], "Toy Story 4_2019")
-        self.assertEqual(relate("Batman Returns", gt)["gt_movie"], "The Batman_2022")
-        self.assertIsNone(relate("Memento", gt))
+    def test_gt_lookalike(self):
+        table = load_gt_related()
+        self.assertEqual(gt_lookalike("Toy Story 2", table), "tt1979376")
+        self.assertEqual(gt_lookalike("Batman Returns", table), "tt1877830")
+        self.assertIsNone(gt_lookalike("Memento", table))
 
     def test_catalog_parsers(self):
         imsdb = '<a href="/Movie Scripts/Some Film Script.html" title="Some Film Script">Some Film</a> (1997-11 Draft)'

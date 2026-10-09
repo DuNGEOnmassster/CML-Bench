@@ -39,6 +39,7 @@
     {"imdb_id": "tt0120082", "movie_name": "Scream 2_1997", "type": "series", "gt_imdb_id": "tt11245972", "gt_movie": "Scream_2022"},
     {"imdb_id": "tt0134084", "movie_name": "Scream 3_2000", "type": "series", "gt_imdb_id": "tt11245972", "gt_movie": "Scream_2022"},
     {"imdb_id": "tt17663992", "movie_name": "Scream VI_2023", "type": "series", "gt_imdb_id": "tt11245972", "gt_movie": "Scream_2022"},
+    {"imdb_id": "tt1262416", "movie_name": "Scream 4_2011", "type": "series", "gt_imdb_id": "tt11245972", "gt_movie": "Scream_2022", "note": "extra source (IMSDb); same ruling as the other Scream films"},
 
     {"imdb_id": "tt0121765", "movie_name": "Star Wars: Episode II - Attack of the Clones_2002", "type": "series", "gt_imdb_id": "tt0120915", "gt_movie": "Star Wars: Episode I - The Phantom Menace_1999"},
     {"imdb_id": "tt0121766", "movie_name": "Star Wars: Episode III - Revenge of the Sith_2005", "type": "series", "gt_imdb_id": "tt0120915", "gt_movie": "Star Wars: Episode I - The Phantom Menace_1999"},

@@ -45,9 +45,10 @@ def imsdb_detail(detail_html: str) -> dict:
     """Release date and script link from an IMSDb detail page."""
     text = _clean(detail_html[detail_html.find("script-details"):][:6000])
     rel = re.search(r"Movie Release Date\s*:\s*(?:\w+\s+)?(\d{4})", text)
-    link = re.search(r'href="(/scripts/[^"]+)"', detail_html)
+    link = re.search(r'<a href="(/scripts/[^"]+)"[^>]*>Read (?:&quot;|")(.*?)(?:&quot;|") Script</a>', detail_html)
     return {"release_year": int(rel.group(1)) if rel else None,
-            "script_url": "https://imsdb.com" + link.group(1) if link else None}
+            "script_url": "https://imsdb.com" + link.group(1) if link else None,
+            "script_title": html.unescape(link.group(2)) if link else None}
 
 
 def dailyscript(index_html: str, base: str = "https://www.dailyscript.com/") -> list[dict]:

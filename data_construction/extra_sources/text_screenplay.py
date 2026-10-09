@@ -207,6 +207,8 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
     indented = lay["layout"] == "indented"
     a_ind, c_ind, d_ind = lay["action_indent"], lay["cue_indent"], lay["dialogue_indent"]
     cue_min = (d_ind + c_ind) / 2 - 2 if indented else 0
+    # cues indented but dialogue at the action indent (common in IMSDb HTML): cues by indent, dialogue by blank lines
+    cue_by_indent = indented or (lay["cue_candidates"] >= 20 and c_ind >= a_ind + 8)
 
     def ind(l):
         return len(l) - len(l.lstrip())
@@ -247,15 +249,15 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
             i += 1
             continue
         nxt_i = i + 1
-        if indented and nxt_i < n and not lines[nxt_i].strip() and nxt_i + 1 < n:
-            # tolerate one blank line between a cue and its dialogue in indented files
+        if cue_by_indent and nxt_i < n and not lines[nxt_i].strip() and nxt_i + 1 < n:
+            # tolerate one blank line between an indented cue and its parenthetical (or indented dialogue)
             cand = lines[nxt_i + 1]
-            if cand.strip() and a_ind + 3 < ind(cand) < c_ind - 2:
+            if cand.strip().startswith("(") or (indented and cand.strip() and a_ind + 3 < ind(cand) < c_ind - 2):
                 nxt_i += 1
         nxt = lines[nxt_i] if nxt_i < n else ""
         is_cue = (
             looks_like_cue(s) and nxt.strip() != "" and not heading_text(nxt.strip())
-            and (ind(line) >= cue_min if indented else not para)
+            and (ind(line) >= cue_min if indented else (not para and (not cue_by_indent or ind(line) >= c_ind - 4)))
             and (not indented or ind(nxt) > a_ind + 2 or nxt.strip().startswith("("))
         )
         if not is_cue:

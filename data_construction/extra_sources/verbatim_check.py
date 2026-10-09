@@ -55,7 +55,7 @@ def segment_scene_words(segment: str) -> list[list[str]]:
 
 
 def check(item: dict, cache_dir: str) -> dict:
-    raw = raw_words(os.path.join(cache_dir, item["source_file"]), item["source_format"])
+    raw = raw_words(os.path.join(cache_dir, item.get("source_cache_file") or item["source_file"]), item["source_format"])
     seg_scenes = segment_scene_words(item["script_segment"])
     seg = [w for s in seg_scenes for w in s]
     anchor = seg[:12]
@@ -73,8 +73,9 @@ def check(item: dict, cache_dir: str) -> dict:
         if raw[j : j + len(end_anchor)] == end_anchor:
             end = j + len(end_anchor)
     region = raw[start:end]
+    speakers = {w for c in re.findall(r"<character>(.*?)</character>", item["script_segment"]) for w in words(html.unescape(c))}
     sm = difflib.SequenceMatcher(None, region, seg, autojunk=False)
-    inserted, del_white, del_other, runs = 0, 0, 0, []
+    inserted, del_white, del_declared, del_other, runs = 0, 0, 0, 0, []
     for op, a1, a2, b1, b2 in sm.get_opcodes():
         if op in ("insert", "replace"):
             inserted += b2 - b1
@@ -82,11 +83,14 @@ def check(item: dict, cache_dir: str) -> dict:
             run = region[a1:a2]
             other = [w for w in run if not WHITELIST.match(w)]
             del_white += len(run) - len(other)
+            if other and all(w in speakers for w in other):
+                del_declared += len(other)  # bare speaker-name line without dialogue (removed by design, C12c)
+                continue
             del_other += len(other)
             if other:
                 runs.append(" ".join(region[max(0, a1 - 4):a1]) + " [[" + " ".join(run) + "]] " + " ".join(region[a2:a2 + 4]))
     return {"item_id": item["item_id"], "segment_words": len(seg), "region_words": len(region), "inserted": inserted,
-            "deleted_whitelisted": del_white, "deleted_other": del_other, "dropped_scenes": item.get("dropped_scenes", []),
+            "deleted_whitelisted": del_white, "deleted_declared": del_declared, "deleted_other": del_other, "dropped_scenes": item.get("dropped_scenes", []),
             "other_runs": runs[:15]}
 
 
@@ -99,7 +103,7 @@ def main() -> None:
     with open(args.segments, encoding="utf-8") as f:
         items = [json.loads(line) for line in f]
     results = [check(it, args.cache_dir) for it in items]
-    tot = {k: sum(r[k] for r in results) for k in ("segment_words", "inserted", "deleted_whitelisted", "deleted_other")}
+    tot = {k: sum(r[k] for r in results) for k in ("segment_words", "inserted", "deleted_whitelisted", "deleted_declared", "deleted_other")}
     summary = {"items": len(results), **tot,
                "items_with_inserted": sum(r["inserted"] > 0 for r in results),
                "items_with_other_deletions": sum(r["deleted_other"] > 0 for r in results)}
