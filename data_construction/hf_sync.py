@@ -348,9 +348,10 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file).
     Excluded items (merge exclusion list, hold films) are left out of data/, of the audit pools and of all release
     statistics; the batch that carries them is still judged on all its items."""
-    from audit_rules import dedupe_verdicts, paused_orchestrators, sample_batches, sample_item, stop_rule
+    from audit_rules import dedupe_verdicts, orchestrator_of, paused_orchestrators, sample_batches, sample_item, stop_rule
     from cml_format import count_tokens
     from targeted_rule import select as select_targeted
+    from targeted_rule import tier as targeted_tier
     from validate_batch import abstract_set_hash, first8, validate
 
     with open(os.path.join(run_dir, "run.json"), encoding="utf-8") as f:
@@ -386,6 +387,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     bad_verdict = {(v["item_id"], v.get("summary_sha1")) for v in verdicts if v.get("major", 0) or v.get("outside", 0)}
     sampled = sample_batches([b["batch_id"] for b in batches])
     targeted, sample = [], []
+    routed: dict[str, list[str]] = {}  # G8 reasons of every validated batch, revoked ones included
 
     files: dict[str, bytes] = {}
     content_records = []
@@ -430,6 +432,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
             state = "revoked"  # C31: a major/outside verdict on these exact abstracts
         if state != "pending":
             states[b["batch_id"]] = state
+        routed.update({t["item_id"]: t.get("reasons", []) for t in res.get("audit_targets", [])})
         failed_items = {f.split(":")[1] for f in res["failures"] if f.count(":") >= 2}
         with_abstract += len(res["items"])
         checks_passed += sum(1 for p in res["items"] if p["item_id"] not in failed_items)
@@ -468,7 +471,9 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         files[f"audit/{slug}/sample.jsonl"] = jsonl_bytes(sample)
     if raw_verdicts:
         files[f"audit/{slug}/verdicts.jsonl"] = jsonl_bytes(raw_verdicts)
-    rule = stop_rule(verdicts, {x["item_id"] for x in sample})
+    targeted_meta = {i: {"tier": targeted_tier(rs, notes.get(i, "")), "reasons": rs} for i, rs in routed.items()}
+    rule = stop_rule(verdicts, {x["item_id"] for x in sample}, targeted_meta)
+    files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**rule["targeted_alarm"], "targeted_pool": rule["targeted_pool"]})
     audited_batches, seen_b = [], set()
     for v in verdicts:
         if v["batch_id"] not in seen_b:
@@ -479,6 +484,8 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     audit = {"targeted_items": len(targeted), "targeted_selected": len(selected), "targeted_tiers": tiers,
              "targeted_selected_share": round(len(selected) / merged_items, 4) if merged_items else None,
              "sample_items": len(sample), **rule,
+             "revoked_batches": [{"batch_id": b, "orchestrator": orchestrator_of(b, ranges)}
+                                 for b, s in sorted(states.items()) if s == "revoked"],
              "paused_orchestrators": paused_orchestrators(audited_batches, ranges), "orchestrators": ranges}
 
     checks_path = os.path.join(run_dir, "content_checks.json")
@@ -605,9 +612,9 @@ def mirror_audit(out_dir: str, slug: str, files: dict) -> None:
                           "abstract_prompt_version": rec["abstract_prompt_version"], "abstract_author": rec["abstract_author"],
                           "script_segment": rec["script_segment"], "summary": rec["summary"]})
     outputs = [(f"{name}.jsonl", jsonl_bytes(rows)) for name, rows in lists.items()] + [("items.jsonl", jsonl_bytes(items))]
-    signals = files.get(f"audit/{slug}/writer_signals.json")
-    if signals:
-        outputs.append(("writer_signals.json", signals))
+    for name in ("writer_signals.json", "targeted_alarm.json"):
+        if files.get(f"audit/{slug}/{name}"):
+            outputs.append((name, files[f"audit/{slug}/{name}"]))
     changed = [name for name, data in outputs if _write_if_changed(os.path.join(out_dir, name), data)]
     print(f"audit mirror {out_dir}: sample {len(lists['sample'])}, targeted {len(lists['targeted'])} "
           f"(selected {len(lists['targeted_selected'])}), items {len(items)}, rewrote {changed}")

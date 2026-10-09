@@ -122,13 +122,29 @@ class FormatTests(unittest.TestCase):
 class AuditRuleTests(unittest.TestCase):
     def test_stop_rule(self):
         ok = [{"item_id": f"i{i}", "major": 0, "outside": 0} for i in range(100)]
-        self.assertFalse(stop_rule(ok)["stop"])
+        sample = {f"i{i}" for i in range(100)} | {"m", "m1", "o1"}
+        self.assertFalse(stop_rule(ok, sample)["stop"])
         two_close = ok[:20] + [{"item_id": "m1", "major": 1}] + ok[:10] + [{"item_id": "o1", "outside": 1}] + ok[:20]
-        self.assertTrue(stop_rule(two_close)["stop"])
+        self.assertTrue(stop_rule(two_close, sample)["stop"])
         spread = ([{"item_id": "m", "major": 1}] + ok[:59]) * 2
-        self.assertFalse(stop_rule(spread)["stop"])
-        self.assertTrue(stop_rule(([{"item_id": "m", "major": 1}] + ok[:24]) * 4)["stop"])
+        self.assertFalse(stop_rule(spread, sample)["stop"])
+        self.assertTrue(stop_rule(([{"item_id": "m", "major": 1}] + ok[:24]) * 4, sample)["stop"])
         self.assertLess(wilson_upper(0, 261), 0.015)
+
+    def test_targeted_verdicts_alarm_but_never_stop(self):
+        ok = [{"item_id": f"t{i}", "major": 0, "outside": 0} for i in range(38)]
+        outs = [{"item_id": f"o{i}", "major": 0, "outside": 1} for i in range(3)]
+        r = stop_rule(ok + outs, sample_items=set(), targeted_meta={"o0": {"tier": "A", "reasons": ["ungrounded_names"]}})
+        self.assertFalse(r["stop"])
+        self.assertFalse(r["targeted_alarm"]["fired"])
+        self.assertEqual(r["targeted_pool"]["by_tier"]["A"]["outside"], 1)
+        majors = [{"item_id": f"m{i}", "major": 1, "outside": 0} for i in range(3)]
+        r = stop_rule(ok[:10] + majors, sample_items=set())
+        self.assertFalse(r["stop"])
+        self.assertTrue(r["targeted_alarm"]["fired"])
+        r = stop_rule(ok[:29] + [{"item_id": f"x{i}", "outside": 1} for i in range(11)], sample_items=set())
+        self.assertTrue(r["targeted_alarm"]["fired"])
+        self.assertFalse(r["stop"])
 
     def test_dedupe_and_sample_only_completion(self):
         v = [{"item_id": "a", "summary_sha1": "x", "auditor": "claude", "major": 0, "outside": 0, "minor": 1},
