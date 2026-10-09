@@ -373,9 +373,20 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
     return listed, stats
 
 
-def released_ids(run_dir: str) -> set[str]:
+def released_shas(run_dir: str) -> dict[str, tuple[str, str]]:
+    """item_id -> (batch_id, summary_sha1) of the source's released items (the local copy of data/ from the last sync)."""
     p = os.path.join(run_dir, "merged_release", "data", "merged.jsonl")
-    return {json.loads(l)["item_id"] for l in open(p, encoding="utf-8") if l.strip()} if os.path.exists(p) else set()
+    out = {}
+    if os.path.exists(p):
+        for line in open(p, encoding="utf-8"):
+            if line.strip():
+                r = json.loads(line)
+                out[r["item_id"]] = (r["batch_id"], hashlib.sha1(r["summary"].encode()).hexdigest())
+    return out
+
+
+def released_ids(run_dir: str) -> set[str]:
+    return set(released_shas(run_dir))
 
 
 def reused_pilot_check(run_dir: str, slug: str) -> dict | None:
@@ -406,7 +417,8 @@ def source_round(run_dir: str, draft: str = "", full: bool = False) -> tuple[dic
     run_info = json.load(open(os.path.join(run_dir, "run.json")))
     build_id = run_info["build_id"]
     listed, purge = purge_c35(run_dir)
-    in_data_before = len(released_ids(run_dir) & listed)
+    before = released_shas(run_dir)
+    in_data_before = len(set(before) & listed)
     out = {"build_id": build_id, "unpack": unpack(run_dir, build_id, listed)}
     if listed:
         out["c35"] = {**purge, "removed_from_data": in_data_before}
@@ -430,8 +442,12 @@ def source_round(run_dir: str, draft: str = "", full: bool = False) -> tuple[dic
                                     "batches_rejected", "batches_incomplete", "batches_revoked")})
     out["items_excluded_from_merged"] = src.get("items_excluded_from_merged")
     out["items_releasable"] = src.get("items_releasable")
+    after = released_shas(run_dir)
+    replaced = sorted(i for i in set(before) & set(after) if before[i][1] != after[i][1])
+    if replaced:  # rewritten abstracts of already-released items (same content); audit verdicts bind to the new sha1
+        out["abstracts_replaced"] = {"items": len(replaced), "batches": sorted({after[i][0] for i in replaced})}
     if listed:
-        out["c35"]["still_in_data"] = len(released_ids(run_dir) & listed)
+        out["c35"]["still_in_data"] = len(set(after) & listed)
     out["audit"] = {k: src["audit"].get(k) for k in ("targeted_items", "targeted_selected", "sample_items", "audited",
                                                      "major_or_outside", "stop", "reason", "targeted_alarm",
                                                      "paused_orchestrators", "revoked_batch_ids")}
