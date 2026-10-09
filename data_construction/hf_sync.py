@@ -364,7 +364,8 @@ def load_merge_exclusions(exclusions_dir: str | None, build: str, items_by_id: d
 
 
 def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir: str | None = DEFAULT_EXCLUSIONS,
-                 draft_reason: str | None = None, content_exclusions: str | None = DEFAULT_CONTENT_EXCLUSIONS):
+                 draft_reason: str | None = None, content_exclusions: str | None = DEFAULT_CONTENT_EXCLUSIONS,
+                 revalidate_all: bool = False):
     """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file).
     Excluded items (merge exclusion list, hold films) are left out of data/, of the audit pools and of all release
     statistics; the batch that carries them is still judged on all its items."""
@@ -433,21 +434,39 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     states, with_abstract, checks_passed, merged_items, prompt_versions = {}, 0, 0, 0, {}
     excluded_from_merged: dict[str, int] = {}
     new_cache = {}
+    rec_dir = os.path.join(run_dir, "merge_records")
+    os.makedirs(rec_dir, exist_ok=True)
+    validation = {"reused": 0, "validated": 0, "full": bool(revalidate_all)}
     for b in batches:
         bdir = os.path.join(run_dir, "batches", b["batch_id"])
         with open(os.path.join(bdir, "manifest.json"), encoding="utf-8") as f:
             manifest = json.load(f)
         skip = c35_ids & set(b["item_ids"])
         key = abstract_set_hash(manifest) + ("|c35:" + ",".join(sorted(skip)) if skip else "")
+        report = os.path.join(bdir, "writer_report.json")
+        if os.path.exists(report):  # G8 routing reads the writer's notes: a backfilled report re-validates the batch
+            with open(report, "rb") as f:
+                key += "|wr:" + hashlib.sha1(f.read()).hexdigest()[:16]
         hit = cache.get(b["batch_id"])
         reusable = (hit and hit["key"] == key and not any(f.startswith("G6") for f in hit["res"]["failures"])
                     and not (set(hit["first8"]) & merged_first8))
+        rec_path = os.path.join(rec_dir, f"{b['batch_id']}.jsonl")
         if reusable and hit["res"]["state"] in ("pending", "incomplete", "rejected"):
             res, rec_list = hit["res"], []
+        elif reusable and not revalidate_all and hit["res"]["state"] == "passed" and os.path.exists(rec_path):
+            # same abstract files, same C35 skip set, no G6 clash: the records validated earlier still hold
+            res = hit["res"]
+            with open(rec_path, encoding="utf-8") as f:
+                rec_list = [json.loads(line) for line in f]
+            validation["reused"] += 1
         else:
             full = validate(manifest, items_by_id, merged_first8, count_tokens=count_tokens, skip=skip)
             res = {k: full[k] for k in ("state", "failures", "items", "audit_targets")}
             rec_list = full["records"]
+            validation["validated"] += full["state"] != "pending"
+            if res["state"] == "passed":
+                with open(rec_path, "wb") as f:
+                    f.write(jsonl_bytes(rec_list))
         first8s = [first8(r["summary"]) for r in rec_list]
         new_cache[b["batch_id"]] = {"key": key, "res": res, "first8": first8s}
         state = res["state"]
@@ -573,11 +592,12 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         "updated_at": now(),
         "batch_states": states,
     }
+    print(f"validation {slug}: reused {validation['reused']}, validated {validation['validated']}, full {validation['full']}")
     return slug, files, status
 
 
 def cmd_sync(repo: Repo, args) -> dict:
-    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions, args.draft, args.content_exclusions)
+    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions, args.draft, args.content_exclusions, args.full)
     owned = (f"content/{slug}/", f"manifests/{slug}/", f"data/{slug}/", f"audit/{slug}/")
     result = {}
 
@@ -733,6 +753,7 @@ def main() -> None:
     s.add_argument("--exclusions", default=DEFAULT_EXCLUSIONS, help="dir of <build_id>.json merge-time exclusion lists ('' for none)")
     s.add_argument("--draft", default="", help="mark this source's merged abstracts as drafts, with this reason (config release_draft)")
     s.add_argument("--content_exclusions", default=DEFAULT_CONTENT_EXCLUSIONS, help="C35 content-safety list ('' for none)")
+    s.add_argument("--full", action="store_true", help="re-validate every handed-off batch instead of reusing unchanged passed ones")
     p = sub.add_parser("pilot")
     p.add_argument("--folder", required=True)
     p.add_argument("--name", required=True)

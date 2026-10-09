@@ -8,6 +8,10 @@
 3. when the sync changed the hub, re-export the static dashboard from the dashboard branch's code;
 4. release-level contract gates on the merged items (contract_checks.py --release_gates); once >= MIN_FOR_STOP items
    are merged, a failing gate sets mass_abstract_writing to "stop: ...".
+Rounds are incremental: only new or changed bundles (abstracts, writer report, C35 skip set) are re-validated and the
+rest reuse their stored records. Every FULL_EVERY seconds, on --full, and once more when every main batch is merged,
+the round is full: every batch is re-validated and the release gates run. C35 purging, audit mirroring and revocations
+run every round. The dashboard export runs in the background.
 Then the same for every extra-source run dir under --source_runs (wave 2): own build_id, own hand-off folder, own
 audit pools and store mirror (audit/<slug>/). Their release gates only report, and their abstracts are marked drafts
 (config release_draft) until the gate c28_sources starts with "pass".
@@ -24,6 +28,7 @@ import re
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,10 +36,27 @@ STORE = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset
 DASHBOARD = "/home/ubuntu/cml-dashboard"
 MIN_FOR_STOP = 200
 DRAFT_GATE = "c28_sources"
+FULL_EVERY = 3600
 
 
 def run(cmd: list[str], cwd: str | None = None) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True)
+
+
+def bundle_stamps(src: str, names: list[str]) -> dict[str, list]:
+    """(size, mtime) of each bundle's two files. The store answers each stat slowly, so they are taken in parallel."""
+    def stamp(name):
+        out = []
+        for fn in ("abstracts.jsonl", "writer_report.json"):
+            try:
+                st = os.stat(os.path.join(src, name, fn))
+                out.append([st.st_size, st.st_mtime])
+            except OSError:
+                out.append(None)
+        return out
+
+    with ThreadPoolExecutor(32) as ex:
+        return dict(zip(names, ex.map(stamp, names)))
 
 
 def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
@@ -47,14 +69,14 @@ def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
     batches = {json.loads(l)["batch_id"]: json.loads(l) for l in open(os.path.join(run_dir, "batches.jsonl"), encoding="utf-8")}
     seen_path = os.path.join(run_dir, "unpacked.json")  # (size, mtime) of each bundle file already copied
     seen = json.load(open(seen_path)) if os.path.exists(seen_path) else {}
-    for batch_id in sorted(os.listdir(src)):
-        if batch_id.startswith("_") or batch_id not in batches:
-            stats["foreign"] += not batch_id.startswith("_")
-            continue
+    names = sorted(os.listdir(src))
+    stats["foreign"] = sum(1 for n in names if not n.startswith("_") and n not in batches)
+    names = [n for n in names if not n.startswith("_") and n in batches]
+    stamps = bundle_stamps(src, names)
+    for batch_id in names:
         bdir = os.path.join(src, batch_id)
         stats["bundles"] += 1
-        stamp = [[os.path.getsize(p), os.path.getmtime(p)] if os.path.exists(p) else None
-                 for p in (os.path.join(bdir, "abstracts.jsonl"), os.path.join(bdir, "writer_report.json"))]
+        stamp = stamps[batch_id]
         if seen.get(batch_id) == stamp:
             continue
         seen[batch_id] = stamp
@@ -93,10 +115,23 @@ def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
 
 
 def dashboard() -> str:
+    """Re-export the static dashboard in the background (it takes minutes); one export at a time, the previous one's
+    outcome is reported."""
+    log = os.path.join(HERE, "work", "logs", "dashboard_export.log")
+    last = open(log, encoding="utf-8").read()[-2000:] if os.path.exists(log) else ""
+    previous = "deployed" if "deployed" in last else ("failed" if last.strip() else "none")
+    lock = open(os.path.join(HERE, "work", "logs", "dashboard_export.lock"), "w")
+    try:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_UN)
+    except BlockingIOError:
+        return f"busy (previous: {previous})"
     run(["git", "fetch", "-q", "origin", "cursor/cml-dashboard-a0ca"], cwd=DASHBOARD)
     run(["git", "checkout", "-q", "--detach", "origin/cursor/cml-dashboard-a0ca"], cwd=DASHBOARD)
-    r = run([sys.executable, "dashboard/export_static.py", "--deploy"], cwd=DASHBOARD)
-    return "deployed" if "deployed" in r.stdout + r.stderr else f"failed: {(r.stderr or r.stdout)[-300:]}"
+    with open(log, "w", encoding="utf-8") as f:
+        subprocess.Popen(["flock", "-n", lock.name, sys.executable, "dashboard/export_static.py", "--deploy"], cwd=DASHBOARD,
+                         stdout=f, stderr=subprocess.STDOUT, start_new_session=True)
+    return f"started (previous: {previous})"
 
 
 def ingest_c35(run_dirs: list[str]) -> dict | None:
@@ -253,12 +288,23 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
     build = json.load(open(os.path.join(run_dir, "run.json")))["build_id"]
     cache_path = os.path.join(run_dir, "merge_cache.json")
     cache = json.load(open(cache_path)) if os.path.exists(cache_path) else {}
+    state_path = os.path.join(run_dir, "purge_state.json")  # per batch: bundle stamps + listed ids after its last purge
+    state = json.load(open(state_path)) if os.path.exists(state_path) else {}
+    todo = []
     for line in open(os.path.join(run_dir, "batches.jsonl"), encoding="utf-8"):
         b = json.loads(line)
-        ids = listed & set(b["item_ids"])
-        if not ids:
+        ids = sorted(listed & set(b["item_ids"]))
+        if ids:
+            todo.append((b, ids))
+    src = os.path.join(STORE, "abstracts", build)
+    stamps = bundle_stamps(src, [b["batch_id"] for b, _ in todo])
+    stats["bundles_unchanged"] = 0
+    for b, ids_sorted in todo:
+        if state.get(b["batch_id"]) == {"stamp": stamps[b["batch_id"]], "ids": ids_sorted}:
+            stats["bundles_unchanged"] += 1
             continue
-        bdir = os.path.join(STORE, "abstracts", build, b["batch_id"])
+        ids = set(ids_sorted)
+        bdir = os.path.join(src, b["batch_id"])
         changed = False
         for name in ("abstracts.jsonl.c35tmp", "writer_report.json.c35tmp"):
             if os.path.exists(os.path.join(bdir, name)):
@@ -289,8 +335,11 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
                 stats["run_abstracts_removed"] += 1
         if cache.pop(b["batch_id"], None) is not None:
             stats["cache_entries_dropped"] += 1
+        state[b["batch_id"]] = {"stamp": bundle_stamps(src, [b["batch_id"]])[b["batch_id"]], "ids": ids_sorted}
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(cache, f)
+    with open(state_path, "w", encoding="utf-8") as f:
+        json.dump(state, f)
     return listed, stats
 
 
@@ -321,8 +370,9 @@ def reused_pilot_check(run_dir: str, slug: str) -> dict | None:
     return {"listed": len(rows), "merged_in": present, "identical": ok, "mismatch": bad}
 
 
-def source_round(run_dir: str, draft: str = "") -> tuple[dict, dict]:
-    """Unpack, sync and gate one source. Returns its summary and its build_status per-source entry."""
+def source_round(run_dir: str, draft: str = "", full: bool = False) -> tuple[dict, dict]:
+    """Unpack, sync and gate one source. Returns its summary and its build_status per-source entry. Incremental rounds
+    reuse unchanged passed batches; a full round re-validates every batch and runs the release-level contract gates."""
     run_info = json.load(open(os.path.join(run_dir, "run.json")))
     build_id = run_info["build_id"]
     listed, purge = purge_c35(run_dir)
@@ -330,11 +380,15 @@ def source_round(run_dir: str, draft: str = "") -> tuple[dict, dict]:
     out = {"build_id": build_id, "unpack": unpack(run_dir, build_id, listed)}
     if listed:
         out["c35"] = {**purge, "removed_from_data": in_data_before}
-    cmd = [sys.executable, os.path.join(HERE, "hf_sync.py"), "sync", "--run_dir", run_dir] + (["--draft", draft] if draft else [])
+    cmd = [sys.executable, os.path.join(HERE, "hf_sync.py"), "sync", "--run_dir", run_dir] + (["--draft", draft] if draft else []) \
+        + (["--full"] if full else [])
     r = run(cmd)
     text = r.stdout + r.stderr
     m = re.search(r"sync \S+: (\d+) file operations", text)
     out["sync_ops"] = int(m.group(1)) if m else None
+    v = re.search(r"validation \S+: reused (\d+), validated (\d+)", text)
+    if v:
+        out["validation"] = {"reused": int(v.group(1)), "validated": int(v.group(2)), "full": full}
     if r.returncode != 0 or m is None:
         out["sync_error"] = text[-500:]
     st = json.load(open(os.path.join(STORE, "build_status.json")))
@@ -353,7 +407,7 @@ def source_round(run_dir: str, draft: str = "") -> tuple[dict, dict]:
                                                      "paused_orchestrators", "revoked_batch_ids")}
     if src.get("abstracts_draft"):
         out["abstracts_draft"] = src["abstracts_draft"]
-    if src["items_merged"]:
+    if src["items_merged"] and full:
         run([sys.executable, os.path.join(HERE, "contract_checks.py"), "--release", os.path.join(run_dir, "merged_release"),
              "--release_gates", "--out", os.path.join(run_dir, "release_gates.json")])
         rep = json.load(open(os.path.join(run_dir, "release_gates.json")))["summary"]
@@ -366,6 +420,7 @@ def main() -> None:
     ap.add_argument("--run_dir", default="data_construction/work/full_v31", help="MovieSum run dir (its gates can stop the fan-out)")
     ap.add_argument("--source_runs", default=os.path.join(HERE, "work", "wave2_v12"),
                     help="dir of extra-source run dirs (<slug>/run.json), merged after MovieSum; their gates only report")
+    ap.add_argument("--full", action="store_true", help="force a full round: re-validate every batch and run the release gates")
     args = ap.parse_args()
     run_dir = os.path.abspath(args.run_dir)
     lock = open(os.path.join(run_dir, "merge_loop.lock"), "w")
@@ -385,7 +440,17 @@ def main() -> None:
     flags = ingest_writer_flags(all_runs)
     if flags:
         summary["c35_writer_flags"] = flags
-    ms, src = source_round(run_dir)
+    # Incremental by default. A full round (re-validate everything + release-level contract gates) runs hourly, when
+    # forced, and once more whenever every main batch is merged (final release check).
+    state_path = os.path.join(run_dir, "merge_loop_state.json")
+    lstate = json.load(open(state_path)) if os.path.exists(state_path) else {}
+    prev = json.load(open(os.path.join(STORE, "build_status.json")))["per_source"].get("MovieSum", {})
+    main_batches = json.load(open(os.path.join(run_dir, "run.json"))).get("main_batches", 0)
+    all_merged = main_batches and prev.get("batches_merged", 0) >= main_batches
+    full = args.full or time.time() - lstate.get("last_full", 0) >= FULL_EVERY or \
+        (all_merged and lstate.get("final_full_at") != prev.get("batches_merged"))
+    summary["mode"] = "full" if full else "incremental"
+    ms, src = source_round(run_dir, full=full)
     summary.update(ms)
     st = json.load(open(os.path.join(STORE, "build_status.json")))
     summary["gate"] = st["gates"].get("mass_abstract_writing")
@@ -402,9 +467,15 @@ def main() -> None:
         summary["sources"] = {}
         for slug in srcs:
             sd = os.path.join(args.source_runs, slug)
-            res, _ = source_round(sd, draft)
+            res, _ = source_round(sd, draft, full=full)
             res["reused_pilot"] = reused_pilot_check(sd, slug)
             summary["sources"][slug] = res
+    if full:
+        lstate["last_full"] = time.time()
+        if all_merged:
+            lstate["final_full_at"] = prev.get("batches_merged")
+        with open(state_path, "w", encoding="utf-8") as f:
+            json.dump(lstate, f)
     if summary.get("sync_ops") or any(s.get("sync_ops") for s in summary.get("sources", {}).values()):
         summary["dashboard"] = dashboard()
     summary["seconds"] = round(time.time() - t0)
