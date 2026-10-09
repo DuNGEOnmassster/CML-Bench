@@ -15,6 +15,8 @@ Repo layout (`<slug>` = source slug, e.g. moviesum; each source is owned by the 
 Commands:
   sync   --run_dir RUN            reconcile one source with RUN: content + manifests + every batch that passes
                                   validate_batch.py (merged) + status. Run it again whenever abstracts land.
+                                  Merge-time exclusions (merge_exclusions/<build_id>.json, e.g. C34) and hold items
+                                  never enter data/; their batches still pass or fail on G1-G7 as usual.
   pilot  --folder REL --name N    upload a pilot release once; refuses to change an existing pilot
   status [--phase T] [--gate k=v] recompute build_status.json / README (and set phase/gates)
 Every run diffs desired vs remote file hashes, commits only changes against the current head (parent_commit,
@@ -38,6 +40,7 @@ from dataset_schema import SCHEMA_VERSION, make_record, schema_json, source_slug
 STORE_STATUS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/build_status.json"
 DEFAULT_VERDICTS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/audit"
 DEFAULT_AUDIT_MIRROR = DEFAULT_VERDICTS + "/{slug}"
+DEFAULT_EXCLUSIONS = os.path.join(HERE, "merge_exclusions")
 SHARD_BATCHES = 100
 DEFAULT_REPO = f"{os.environ.get('HF_ACCOUNT', '')}/CML-Dataset-Expanded"
 
@@ -152,8 +155,8 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
     for p in sorted({p for p in list(tree) + list(override) if p.startswith("pilots/") and p.endswith("/pilot.json")}):
         meta = get(p)
         pilots[meta["name"]] = meta
-    keys = ("items_total", "movies", "items_eval_safe", "items_gt_related", "items_with_abstract", "items_checks_passed",
-            "items_merged", "batches_total", "batches_merged", "batches_rejected", "content_tokens_total")
+    keys = ("items_total", "items_releasable", "movies", "items_eval_safe", "items_gt_related", "items_with_abstract",
+            "items_checks_passed", "items_merged", "batches_total", "batches_merged", "batches_rejected", "content_tokens_total")
     totals = {k: sum(s.get(k, 0) for s in sources.values()) for k in keys}
     updated = max([s["updated_at"] for s in sources.values()] + [control.get("updated_at", "")] +
                   [m.get("uploaded_at", "") for m in pilots.values()] or [now()])
@@ -172,6 +175,7 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
             "items_with_abstract": "items with an abstract file written against the current content (content_sha1 matches)",
             "items_checks_passed": "items whose abstract passes the per-item merge gates G1-G4, G7 (validate_batch.py)",
             "items_merged": "items in data/ (their whole batch passed all gates and is not revoked by the audit)",
+            "items_releasable": "items_total minus merge-time exclusions (C34 mislabel windows, hold films); the release target",
         },
     }
 
@@ -193,10 +197,15 @@ def card(status: dict, tree_paths: set[str]) -> bytes:
     )
     t = status["totals"]
     rows = "\n".join(
-        f"| {src} | {s['build_id']} | {s['items_total']:,} | {s['movies']:,} | {s['items_eval_safe']:,} | "
-        f"{s['items_with_abstract']:,} | {s['items_merged']:,} |"
+        f"| {src} | {s['build_id']} | {s['items_total']:,} | {s.get('items_releasable', s['items_total']):,} | {s['movies']:,} | "
+        f"{s['items_eval_safe']:,} | {s['items_with_abstract']:,} | {s['items_merged']:,} |"
         for src, s in sorted(status["per_source"].items())
     )
+    exclusions = "\n".join(
+        f"- {src}: " + ", ".join(f"{n:,} `{r}`" for r, n in s["items_excluded"].items())
+        + (f" (list `{s['merge_exclusion_list']['file']}`: {s['merge_exclusion_list']['rule']})" if s.get("merge_exclusion_list") else "")
+        for src, s in sorted(status["per_source"].items()) if s.get("items_excluded")
+    ) or "- none"
     pilots = "\n".join(f"- `pilot_{n}`: {m.get('items')} items, prompt `{m.get('prompt_version')}`, content `{m.get('content_normalization')}` "
                        f"— {m.get('note', '')}" for n, m in sorted(status["pilots"].items()))
     text = f"""---
@@ -221,10 +230,18 @@ AI-written abstracts (`summary`). Built by `data_construction/` in the CML-Bench
 
 **Phase:** {status['phase'] or 'n/a'}
 
-| Source | Build | Items | Movies | Eval-safe | With abstract | Merged |
-|---|---|---|---|---|---|---|
+| Source | Build | Items | Releasable | Movies | Eval-safe | With abstract | Merged |
+|---|---|---|---|---|---|---|---|
 {rows}
-| **Total** | | {t['items_total']:,} | {t['movies']:,} | {t['items_eval_safe']:,} | {t['items_with_abstract']:,} | {t['items_merged']:,} |
+| **Total** | | {t['items_total']:,} | {t.get('items_releasable', t['items_total']):,} | {t['movies']:,} | {t['items_eval_safe']:,} | {t['items_with_abstract']:,} | {t['items_merged']:,} |
+
+Items in the content build that are never released (abstracts may still be written; they are dropped at merge, and
+audit sampling and release statistics are computed without them):
+{exclusions}
+
+`C34` drops a window whose MovieSum markup is structurally mislabelled (dialogue that is only a parenthetical, a
+speaker name tagged as dialogue, a heading/shot/action tagged as a speaker, speech fused into action) at least 4 times.
+`identity_hold` films await a human read of their identity (C33) and stay out of the release until it is done.
 
 ## Configs
 
@@ -259,8 +276,30 @@ def write_store_status(status: dict, path: str) -> None:
             f.write("\n")
 
 
-def source_state(run_dir: str, verdicts_path: str | None = None):
-    """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file)."""
+def load_merge_exclusions(exclusions_dir: str | None, build: str, items_by_id: dict) -> tuple[dict[str, str], dict]:
+    """item_id -> rule for the windows that must not be released from this exact build (one frozen list per build_id:
+    a list made for another build means nothing for this one). Every listed item must match its content_sha1."""
+    path = os.path.join(exclusions_dir, f"{build}.json") if exclusions_dir else ""
+    if not path or not os.path.exists(path):
+        return {}, {}
+    with open(path, encoding="utf-8") as f:
+        spec = json.load(f)
+    if spec.get("build_id") != build:
+        sys.exit(f"{path}: made for build {spec.get('build_id')}, not {build}")
+    rule = spec["rule"].split()[0]
+    out = {}
+    for x in spec["items"]:
+        it = items_by_id.get(x["item_id"])
+        if it is None or it["content_sha1"] != x["content_sha1"]:
+            sys.exit(f"{path}: {x['item_id']} is not in build {build} with content_sha1 {x['content_sha1']}")
+        out[x["item_id"]] = rule
+    return out, {"file": os.path.relpath(path, HERE), "rule": spec["rule"], "listed_items": len(out)}
+
+
+def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir: str | None = DEFAULT_EXCLUSIONS):
+    """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file).
+    Excluded items (merge exclusion list, hold films) are left out of data/, of the audit pools and of all release
+    statistics; the batch that carries them is still judged on all its items."""
     from audit_rules import dedupe_verdicts, paused_orchestrators, sample_batches, sample_item, stop_rule
     from cml_format import count_tokens
     from validate_batch import abstract_set_hash, first8, validate
@@ -274,6 +313,10 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
     items_by_id = {it["item_id"]: it for it in items}
     slug, build = run["source_slug"], run["build_id"]
     source = items[0]["source_dataset"]
+    excluded, exclusion_spec = load_merge_exclusions(exclusions_dir, build, items_by_id)
+    for it in items:
+        if it.get("identity_decision") == "hold":
+            excluded.setdefault(it["item_id"], "identity_hold")
     revoked_path = os.path.join(run_dir, "revoked.json")
     revoked = json.load(open(revoked_path, encoding="utf-8")) if os.path.exists(revoked_path) else {}
     cache_path = os.path.join(run_dir, "merge_cache.json")
@@ -312,6 +355,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
 
     merged_first8: set[str] = set()
     states, with_abstract, checks_passed, merged_items, prompt_versions = {}, 0, 0, 0, {}
+    excluded_from_merged: dict[str, int] = {}
     new_cache = {}
     for b in batches:
         bdir = os.path.join(run_dir, "batches", b["batch_id"])
@@ -342,9 +386,13 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
         checks_passed += sum(1 for p in res["items"] if p["item_id"] not in failed_items)
         if state == "passed":
             merged_first8.update(first8s)
+            for r in rec_list:
+                if r["item_id"] in excluded:
+                    excluded_from_merged[excluded[r["item_id"]]] = excluded_from_merged.get(excluded[r["item_id"]], 0) + 1
+            rec_list = [r for r in rec_list if r["item_id"] not in excluded]
             merged_items += len(rec_list)
-            targeted += [{**t, "summary_sha1": sha[t["item_id"]]} for t in res.get("audit_targets", [])]
-            if b["batch_id"] in sampled:
+            targeted += [{**t, "summary_sha1": sha[t["item_id"]]} for t in res.get("audit_targets", []) if t["item_id"] not in excluded]
+            if b["batch_id"] in sampled and rec_list:
                 pick = sample_item([r["item_id"] for r in rec_list])
                 sample.append({"item_id": pick, "batch_id": b["batch_id"], "summary_sha1": sha[pick], "reason": "stratified_2pct"})
             for r in rec_list:
@@ -405,6 +453,10 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
         "merged_prompt_versions": prompt_versions,
         "content_checks": content_checks,
         "items_held": sum(it.get("identity_decision") == "hold" for it in items),
+        "items_releasable": len(items) - len(excluded),
+        "items_excluded": {r: sum(v == r for v in excluded.values()) for r in sorted(set(excluded.values()))},
+        "items_excluded_from_merged": dict(sorted(excluded_from_merged.items())),
+        "merge_exclusion_list": exclusion_spec or None,
         "identity_decisions": dict(sorted({d: sum(it.get("identity_decision") == d for it in items)
                                            for d in {it.get("identity_decision") for it in items} if d}.items())),
         "audit": audit,
@@ -415,7 +467,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None):
 
 
 def cmd_sync(repo: Repo, args) -> dict:
-    slug, files, status = source_state(args.run_dir, args.verdicts)
+    slug, files, status = source_state(args.run_dir, args.verdicts, args.exclusions)
     owned = (f"content/{slug}/", f"manifests/{slug}/", f"data/{slug}/", f"audit/{slug}/")
     result = {}
 
@@ -561,6 +613,7 @@ def main() -> None:
     s.add_argument("--run_dir", required=True)
     s.add_argument("--verdicts", default=DEFAULT_VERDICTS, help="audit verdicts: a jsonl file, or a dir of verdicts*.jsonl (C31); missing = none yet")
     s.add_argument("--audit_mirror", default=DEFAULT_AUDIT_MIRROR, help="store dir for audit lists + listed items ('' to skip)")
+    s.add_argument("--exclusions", default=DEFAULT_EXCLUSIONS, help="dir of <build_id>.json merge-time exclusion lists ('' for none)")
     p = sub.add_parser("pilot")
     p.add_argument("--folder", required=True)
     p.add_argument("--name", required=True)

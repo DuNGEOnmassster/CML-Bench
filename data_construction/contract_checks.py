@@ -6,7 +6,7 @@ REL/data/*.jsonl holds schema-1.0 records. --content_only checks a content set (
 assertions (C19-C24, C20b', C21') are skipped and an empty `summary` is allowed. Audit assertions (C25'-C28') need
 an evaluator; C29 needs a rebuild; both are reported as manual. C05', C12e and C16b come from verify_alignment.py and
 C05'' from dialogue_preservation.py (the evaluator's reference implementation); neither shares code with the cleaner.
-C33 uses cast_check.py and identity_table.json.
+C33 uses cast_check.py and identity_table.json; C34 uses mislabel_gate.py and merge_exclusions/<build_id>.json.
 """
 from __future__ import annotations
 
@@ -90,13 +90,41 @@ def abstract_assertions(recs: list[dict], record) -> None:
 
 
 
+def c34_assertion(recs: list[dict], record, content_only: bool) -> None:
+    """C34: no mislabel-heavy window (score >= 4) and no hold-film item is released. A build with a frozen merge-exclusion
+    list (merge_exclusions/<build_id>.json) is checked against it; a content set must flag nothing outside that list
+    (a build that rejects these windows itself flags nothing). Talkers are pooled over the records checked."""
+    from mislabel_gate import THRESHOLD, score_items
+
+    by_build = defaultdict(list)
+    for r in recs:
+        by_build[r.get("build_id")].append(r)
+    listed_present, held_present, unlisted, lists = [], [], [], {}
+    for build, rs in by_build.items():
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "merge_exclusions", f"{build}.json")
+        listed = set()
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                listed = {x["item_id"] for x in json.load(f)["items"]}
+            lists[build] = len(listed)
+        if not content_only:
+            listed_present += [r["item_id"] for r in rs if r["item_id"] in listed]
+            held_present += [r["item_id"] for r in rs if r.get("identity_decision") == "hold"]
+        if content_only or not listed:
+            sig = score_items(rs)
+            unlisted += sorted(i for i, s in sig.items() if s["score"] >= THRESHOLD and i not in listed)
+    record("C34", not listed_present and not held_present and not unlisted,
+           f"merge_exclusion_lists={lists}, listed_items_released={listed_present[:5]}, hold_items_released={held_present[:5]}, "
+           f"score>={THRESHOLD}_not_excluded={len(unlisted)} {unlisted[:5]}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--release", required=True)
     ap.add_argument("--run_dir", help="unused; kept for older command lines")
     ap.add_argument("--content_only", action="store_true")
     ap.add_argument("--release_gates", action="store_true",
-                    help="fast merge-loop mode: schema + abstract assertions only (C01, C03, C04, C19-C24, C20b')")
+                    help="fast merge-loop mode: schema + abstract assertions only (C01, C03, C04, C19-C24, C20b', C34)")
     ap.add_argument("--moviesum_dir", default="data_construction/work/sources/moviesum")
     ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
     ap.add_argument("--imdb_meta", default="data_construction/work/sources/imdb_meta.json")
@@ -132,6 +160,7 @@ def main() -> None:
         ids, shas = Counter(r["item_id"] for r in recs), Counter(r["content_sha1"] for r in recs)
         record("C04", max(ids.values()) == 1 and max(shas.values()) == 1, f"dup_ids={sum(v > 1 for v in ids.values())}")
         abstract_assertions(recs, record)
+        c34_assertion(recs, record, content_only=False)
         summary = {"items": n, "release_gates": True, "automated_pass": sum(v["pass"] is True for v in results.values()),
                    "automated_fail": sum(v["pass"] is False for v in results.values()),
                    "failed": sorted(k for k, v in results.items() if v["pass"] is False)}
@@ -407,6 +436,7 @@ def main() -> None:
     record("C32", not dup_bad and len(year_off) <= 0.01 * n,
            f"duplicate_keeps={sorted(set(dup_keeps))}, keep_metadata_mismatch={dup_bad[:3]}, "
            f"items_with_title_year_vs_imdb_year_gap>1={len(year_off)}")
+    c34_assertion(recs, record, args.content_only)
 
     summary = {"items": n, "content_only": args.content_only, "build_id": recs[0].get("build_id") if recs else None,
                "automated_pass": sum(v["pass"] is True for v in results.values()),

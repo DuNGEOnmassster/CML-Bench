@@ -159,6 +159,39 @@ class AuditRuleTests(unittest.TestCase):
         self.assertEqual(out[:4], ["He runs.", "She waits.", "They talk.", "Arlo smiles."])
         self.assertEqual(out[4], "INT. MOTEL ROOM 12 - NIGHT")
 
+    def test_c34_window_score(self):
+        from mislabel_gate import score_items
+
+        cml = ("<script><scene><stage_direction>INT. ROOM - DAY</stage_direction>"
+               "<character>ANNA</character><dialogue>(quietly)</dialogue>"
+               "<scene_description>ANNA I can't do this.</scene_description>"
+               "<character>BOB</character><dialogue>ANNA</dialogue>"
+               "<character>ACROSS THE STREET - MOMENTS LATER</character><dialogue>Hello.</dialogue>"
+               "<character>BOB</character><dialogue>Fine.</dialogue></scene></script>")
+        sig = score_items([{"item_id": "w", "imdb_id": "f", "script_segment": cml}])["w"]
+        self.assertEqual((sig["paren_only"], sig["cue_as_dlg"], sig["bad_cue"], sig["fused"], sig["score"]), (1, 1, 1, 1, 4))
+
+    def test_merge_exclusions_bind_to_build_and_content(self):
+        import json
+        import tempfile
+
+        from hf_sync import load_merge_exclusions
+
+        items = {"a": {"content_sha1": "1"}, "b": {"content_sha1": "2"}}
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(load_merge_exclusions(d, "build-x", items), ({}, {}))
+            spec = {"rule": "C34 mislabel window gate: ...", "build_id": "build-x", "items": [{"item_id": "a", "content_sha1": "1"}]}
+            with open(os.path.join(d, "build-x.json"), "w") as f:
+                json.dump(spec, f)
+            excluded, meta = load_merge_exclusions(d, "build-x", items)
+            self.assertEqual(excluded, {"a": "C34"})
+            self.assertEqual(meta["listed_items"], 1)
+            for bad in ({**spec, "build_id": "build-y"}, {**spec, "items": [{"item_id": "a", "content_sha1": "9"}]}):
+                with open(os.path.join(d, "build-x.json"), "w") as f:
+                    json.dump(bad, f)
+                with self.assertRaises(SystemExit):
+                    load_merge_exclusions(d, "build-x", items)
+
 
 class SchemaTests(unittest.TestCase):
     def test_record_roundtrip(self):

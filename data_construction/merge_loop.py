@@ -113,6 +113,7 @@ def main() -> None:
     src = st["per_source"]["MovieSum"]
     summary.update({k: src[k] for k in ("items_with_abstract", "items_checks_passed", "items_merged", "batches_merged",
                                         "batches_rejected", "batches_incomplete", "batches_revoked")})
+    summary["items_excluded_from_merged"] = src.get("items_excluded_from_merged")
     summary["audit"] = {k: src["audit"].get(k) for k in ("targeted_items", "sample_items", "audited", "major_or_outside",
                                                          "stop", "reason", "paused_orchestrators")}
     summary["gate"] = st["gates"].get("mass_abstract_writing")

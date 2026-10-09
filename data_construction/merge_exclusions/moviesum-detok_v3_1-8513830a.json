@@ -1,0 +1,5805 @@
+{
+"rule": "C34 mislabel window gate: drop a window when paren_only + cue_as_dlg + bad_cue + fused >= 4 (definitions in ms_mislabel_gate.py; fused = sources mislabel.py fused_cue + paren_speech + dual_collapse at PR #2 b0a475c)",
+"build_id": "moviesum-detok_v3_1-8513830a",
+"threshold": 4,
+"count": 644,
+"count_in_main_batches": 644,
+"items": [
+{
+"item_id": "tt0022626-s0001-0012",
+"content_sha1": "1a0ff8aea50aadd719d511be368b32f954a991e2",
+"score": 25,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 25,
+"fused": 0
+},
+{
+"item_id": "tt0022626-s0027-0038",
+"content_sha1": "fb236757796c53f17539c5c83adb8510633e0e89",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 12,
+"fused": 0
+},
+{
+"item_id": "tt0022626-s0039-0050",
+"content_sha1": "603fa7e3fceb6e960b276f3d63659a5952f2d6cb",
+"score": 16,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 16,
+"fused": 0
+},
+{
+"item_id": "tt0022626-s0067-0081",
+"content_sha1": "c5fe95835a9bd47b550f9b3aba30e443acf75792",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0022626-s0082-0097",
+"content_sha1": "a499b01d57d0e0551e11e68338dd04ed1c8fd004",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0027996-s0001-0012",
+"content_sha1": "49998986744bf7c466d8c646fad989fe74b2afd8",
+"score": 25,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 25,
+"fused": 0
+},
+{
+"item_id": "tt0027996-s0028-0039",
+"content_sha1": "78b9b8cceb1cf800284a51db69ef83ac5f07914e",
+"score": 19,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 19,
+"fused": 0
+},
+{
+"item_id": "tt0027996-s0040-0054",
+"content_sha1": "fb36d21b4db00654d66a4d5d7f6d4d1b91d5bc7a",
+"score": 30,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 30,
+"fused": 0
+},
+{
+"item_id": "tt0027996-s0055-0069",
+"content_sha1": "db445ca65847de897fdfda5c517c6040fab83d5e",
+"score": 23,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 23,
+"fused": 0
+},
+{
+"item_id": "tt0029162-s0001-0015",
+"content_sha1": "7bd13e9013c473af093feeb0fb1e1903e3e8b263",
+"score": 41,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 41,
+"fused": 0
+},
+{
+"item_id": "tt0029162-s0016-0033",
+"content_sha1": "65b40157c531f16856e33e94e4b66a06b2236a06",
+"score": 21,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 21,
+"fused": 0
+},
+{
+"item_id": "tt0029162-s0054-0068",
+"content_sha1": "da9ce90c7b2dac12acd7398f4e3009046edec5ad",
+"score": 30,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 30,
+"fused": 0
+},
+{
+"item_id": "tt0029162-s0069-0084",
+"content_sha1": "cdfb2b4f8b72e02e80b54656b4bd72c8b4a6c123",
+"score": 40,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 40,
+"fused": 0
+},
+{
+"item_id": "tt0029162-s0085-0096",
+"content_sha1": "36263c4fc55e83bf6e85c0c385af0396b2b33cb9",
+"score": 35,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 35,
+"fused": 0
+},
+{
+"item_id": "tt0058150-s0001-0016",
+"content_sha1": "8d34305ad3f7e133b143cd9dc60621a2c114ffb1",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0068451-s0000-0014",
+"content_sha1": "ef8ead222790a786d7d64bb2bd010a3936353ad2",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 13,
+"fused": 0
+},
+{
+"item_id": "tt0068451-s0022-0033",
+"content_sha1": "5472ac75435c2b3b699acc0019d1865689149f32",
+"score": 18,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 18,
+"fused": 0
+},
+{
+"item_id": "tt0068451-s0050-0061",
+"content_sha1": "3906ef6df2de760bb87dbf543c5bd577dfdabd98",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 12,
+"fused": 0
+},
+{
+"item_id": "tt0073486-s0068-0082",
+"content_sha1": "e0e181356f358fc6b7e10b4ffeab630aa9feef92",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0076913-s0061-0075",
+"content_sha1": "0a690467ad8c3929becf82c99367fe988e303413",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0077681-s0013-0027",
+"content_sha1": "67acc1526d1cd008d2f243655a03d68db6012e49",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0077681-s0028-0042",
+"content_sha1": "9e0c8a7230e29e6bf92320516d9ac398343eae1c",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0077681-s0059-0077",
+"content_sha1": "2ed7609195da35eec8f296bc1d21ff714581c2f0",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0077681-s0078-0092",
+"content_sha1": "2d8d42cdfc9b30022d4ce29afa333481ee46efeb",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0077681-s0093-0107",
+"content_sha1": "4953caac090b349cd63bad40706f3b8982e07515",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0080678-s0032-0048",
+"content_sha1": "39fb7e206a7630bc8978c4721d464d277e2fe3e1",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 13,
+"fused": 0
+},
+{
+"item_id": "tt0080678-s0049-0060",
+"content_sha1": "f613383b0a2733949a3f939feb1eece62920ab6b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0080678-s0088-0102",
+"content_sha1": "3e9922bb360e994db5f657383af355e5a026c5e0",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0082340-s0066-0085",
+"content_sha1": "fa791efbe0bbb13aa6f78e4f25bff4c48625bb2c",
+"score": 14,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 14,
+"fused": 0
+},
+{
+"item_id": "tt0083190-s0020-0037",
+"content_sha1": "e378421d97216bb06e25a809e9a2f7ec1203c62e",
+"score": 10,
+"paren_only": 5,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 2
+},
+{
+"item_id": "tt0083190-s0038-0052",
+"content_sha1": "a912abc1f7f224b2f5b3b65f1e85652d302d7dc9",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt0083190-s0053-0068",
+"content_sha1": "1082afad3f90dba7642ff7258cd2eb0724b3418f",
+"score": 8,
+"paren_only": 3,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0083190-s0090-0109",
+"content_sha1": "9242379b84a07d3842ce173fe0a5619b47f9433d",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt0084489-s0005-0016",
+"content_sha1": "e98375412dc1874453988a2ffdb9bf705ea9d794",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0084516-s0021-0035",
+"content_sha1": "00aee0840ddddc655f6b9fa27db9f1cd4ece6467",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0084516-s0036-0050",
+"content_sha1": "ff66f90a7af5ec8cc43dc49762fe5afa82ce2968",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0084516-s0051-0067",
+"content_sha1": "2b357b28be13d82f798dfb236d26234c2c0f57ab",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0084516-s0068-0087",
+"content_sha1": "037d4549d376535a4ba52a7090caeb23ebe65154",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0084516-s0088-0103",
+"content_sha1": "3c8f02e013111d38ac889a0aabcba6951aecf772",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0084602-s0050-0069",
+"content_sha1": "c93cb15f6fa5432541b7167184177691c351d91b",
+"score": 11,
+"paren_only": 1,
+"cue_as_dlg": 3,
+"bad_cue": 6,
+"fused": 1
+},
+{
+"item_id": "tt0086336-s0036-0055",
+"content_sha1": "53783373432a6d167ed9f2ebfc27251c7366828c",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0086336-s0056-0070",
+"content_sha1": "621eca52519183fcda679dd8209eae67aac6539d",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt0086336-s0075-0089",
+"content_sha1": "72803052744a13c6c0b8184ffc82342dd0255a91",
+"score": 20,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 16,
+"fused": 0
+},
+{
+"item_id": "tt0086336-s0130-0144",
+"content_sha1": "913b6f55ad83e9d08dacc214dfadc41ee1fca4dc",
+"score": 18,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 16,
+"fused": 0
+},
+{
+"item_id": "tt0086336-s0145-0161",
+"content_sha1": "b12a20d18ba28837e02bfade12bf581b6ef5f5d3",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 8,
+"fused": 1
+},
+{
+"item_id": "tt0088117-s0086-0105",
+"content_sha1": "692b2e31257e61fc477b80bb33465e8a00309eb9",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0088128-s0031-0045",
+"content_sha1": "ee4a7a662f12a5fddbfec64950016919b4fb4e50",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0088128-s0063-0077",
+"content_sha1": "dc1e09a2ad6ebf81261f5e8aa7ffe07340ca42af",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt0088247-s0193-0210",
+"content_sha1": "b650e84f8efac01a17234358fc41813e0ae317e7",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0088763-s0031-0045",
+"content_sha1": "cbd3d9dd3cf34378faa47df4874d73fd8235878f",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0088763-s0046-0060",
+"content_sha1": "c7f19aa3b39bed5c36091131f57db3d30ff501aa",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0089155-s0001-0015",
+"content_sha1": "fad2c1f9697094b6895b5c3eb1993a940edd6e9e",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0089155-s0016-0030",
+"content_sha1": "e48b3ce854eab647e4a8e299071af51b6d7ab56b",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt0089886-s0066-0080",
+"content_sha1": "027f59bf1cb91c952251d9242156ee220d53bceb",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0091875-s0028-0039",
+"content_sha1": "10b81245f7a3a18ae0275ab337b33dd3c8c87608",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt0092106-s0009-0020",
+"content_sha1": "b5d7ed608729a6c00d6706624faf728d663b5915",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0093058-s0016-0031",
+"content_sha1": "a93b261d13a86b832f110562731283c3f9fac7f9",
+"score": 19,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 18
+},
+{
+"item_id": "tt0093058-s0032-0050",
+"content_sha1": "5b291b98803b688d15bbd0320b0d85286db8bd6f",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 9
+},
+{
+"item_id": "tt0093058-s0051-0065",
+"content_sha1": "a085c35479e5268c59289beafaff21983316320e",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 11
+},
+{
+"item_id": "tt0093058-s0066-0077",
+"content_sha1": "d030b9c19696374b6ef4415b4b4e654b9b22eee9",
+"score": 14,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 12
+},
+{
+"item_id": "tt0093260-s0015-0027",
+"content_sha1": "13b67a101cad11701818ac1e3f5e3dd0a5585e09",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0094155-s0138-0152",
+"content_sha1": "07409ba87a5956f4df13f2eeb1bad91cd0743bdc",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0095174-s0045-0056",
+"content_sha1": "b5e981fc87cadce9dab6420d7680ddb1bb0380f0",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0095583-s0000-0016",
+"content_sha1": "887d8d1372eb4e08c2ca4f27e850b87ce8214de4",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0095583-s0032-0048",
+"content_sha1": "9bbb70930c3aef6dc2b639a90e8a4c00417c87e0",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0095583-s0071-0087",
+"content_sha1": "497b2946d97390e53967b8094e09f118f4ecc611",
+"score": 11,
+"paren_only": 1,
+"cue_as_dlg": 6,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0096734-s0001-0012",
+"content_sha1": "2fab03bdf57c101b389b70dbe974d102d9e85420",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0096734-s0029-0041",
+"content_sha1": "dc7c753c0e1a65c9837440ac1b32e7db15e006f6",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0096734-s0049-0061",
+"content_sha1": "9ca37c799c0e803cde3492da8e4867ae95e59465",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0096754-s0118-0132",
+"content_sha1": "0b1f7517f87169b8187671eb8f75195a4962287b",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0098554-s0001-0020",
+"content_sha1": "f6dbb2c4a889de4bd3e68ce65533bf1ae19145ff",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 12
+},
+{
+"item_id": "tt0098554-s0041-0060",
+"content_sha1": "f4a73f14e38afa132fa3f6b39912364d803820f7",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0098554-s0061-0080",
+"content_sha1": "e610fe08f3eb155ba985dbb4b0b03795bd1d1628",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0098554-s0081-0100",
+"content_sha1": "7ec28171615b494cbf908e923a1b0935a831ad48",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 8
+},
+{
+"item_id": "tt0098554-s0101-0120",
+"content_sha1": "fa8f701b64ff4e01b333e8d903b63d446bfb9275",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 13
+},
+{
+"item_id": "tt0098554-s0121-0140",
+"content_sha1": "de8e06386741320bbef625405a02025ffd25bace",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 5
+},
+{
+"item_id": "tt0098554-s0161-0180",
+"content_sha1": "e746cc89a0ce216bbd609a26312ea4bb1d8e4bd4",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0098554-s0181-0200",
+"content_sha1": "d0a2cdc34fd2726986cd2568eeeda5f5d180a31d",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 7
+},
+{
+"item_id": "tt0098554-s0221-0240",
+"content_sha1": "5c944b83d36d8cb6e6c67bed28df8347a9f294df",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0099044-s0000-0011",
+"content_sha1": "7629d8da0de41220b95a667d223c348967d4f9fb",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0100403-s0031-0045",
+"content_sha1": "74ae412110d61ac0d7cebc4aeb3e02e91f00df39",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt0101786-s0000-0015",
+"content_sha1": "91d99b70e720561dfe5b241ec31783308d5a5645",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 3
+},
+{
+"item_id": "tt0101786-s0016-0036",
+"content_sha1": "dd7a6286e871fd54c3bcdb831f66ad67a29b273d",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt0101786-s0037-0058",
+"content_sha1": "f7ba9564c1c26b998a8778b9b273de67f9313826",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 3,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0101786-s0097-0115",
+"content_sha1": "cf9f8d91faa7495ae09b6edd05ee25324d64867f",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 2
+},
+{
+"item_id": "tt0101786-s0117-0132",
+"content_sha1": "0d887f0183e53598b99f2ad4dbc346d3f6a7fea9",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 6,
+"fused": 1
+},
+{
+"item_id": "tt0103064-s0049-0060",
+"content_sha1": "8e9c13514778a7a0f44b2290ec69c50d7b20d83c",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0103639-s0024-0035",
+"content_sha1": "fcb4095a97f503904bdccf4fcc8ba4039020236b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt0104990-s0001-0018",
+"content_sha1": "bb47d87c839569d429a6a7a1c7bb23fd6142b79a",
+"score": 26,
+"paren_only": 0,
+"cue_as_dlg": 13,
+"bad_cue": 12,
+"fused": 1
+},
+{
+"item_id": "tt0104990-s0019-0033",
+"content_sha1": "c5fa7bcadcab0c0d7953f614821dfbf20e76f570",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0104990-s0034-0045",
+"content_sha1": "7cb03beafaf572b758a28eb7612a866712285ddf",
+"score": 22,
+"paren_only": 0,
+"cue_as_dlg": 13,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt0104990-s0046-0060",
+"content_sha1": "fb273e004d16cdb9c935c0867eff6944f67c4395",
+"score": 17,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0104990-s0061-0072",
+"content_sha1": "c0be1f99e8f1610fa4cfeec8ab181e6c5db44d40",
+"score": 19,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 16,
+"fused": 0
+},
+{
+"item_id": "tt0104990-s0088-0102",
+"content_sha1": "f6dcd25e27fe9bec70dae4bbd1fa4c1b9fba743c",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0105695-s0000-0014",
+"content_sha1": "23d46d066a6145e23b73c7d263e0defba507dff4",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0105695-s0034-0045",
+"content_sha1": "c02d9ffba3ea0d112421ccc4efde33aacaee0c1a",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0105695-s0061-0075",
+"content_sha1": "b2544d98f12dcce0b7828a203d38fb0b7352c91b",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt0105695-s0076-0090",
+"content_sha1": "61395d6cb05c8c8b51881457170be1ed7e13f8fb",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 11,
+"fused": 0
+},
+{
+"item_id": "tt0106220-s0027-0038",
+"content_sha1": "e1ee1aa5f08f8db49ca6552e6b7c5895b48abe71",
+"score": 16,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 7
+},
+{
+"item_id": "tt0106220-s0040-0051",
+"content_sha1": "86d09e246787d97b0e34c80bf985aff48d62e35a",
+"score": 9,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 4
+},
+{
+"item_id": "tt0106611-s0000-0018",
+"content_sha1": "d76991deef6d54c6f58965aaa3d303daf1950cae",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0106611-s0019-0033",
+"content_sha1": "11af4beceb2bc009c709a200cc2b6ec933220823",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt0106611-s0034-0051",
+"content_sha1": "718bf01cecd0ddfadefb9e27111143803931ba29",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0106611-s0052-0071",
+"content_sha1": "7c773de2e455860c7540ed4a52012e809835c47c",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0106611-s0072-0089",
+"content_sha1": "00aaefe5378af26b0b8d661545b95aa29cdeee1a",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0106611-s0090-0104",
+"content_sha1": "2c8fef05238a7634a4176f3fe5ac9875c94e251d",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0106611-s0125-0142",
+"content_sha1": "42b0f6c714e0725ec0952f0f9f1b21b78a461a6c",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0106873-s0005-0016",
+"content_sha1": "bdd8dbb9e03126610d3bfb8b13e5d4799c1f686a",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0000-0015",
+"content_sha1": "28beaf9264cdb1c19a640e552f349350378f4226",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0016-0030",
+"content_sha1": "b967e6f12491b447c1dc3eecd0485bc687b8207a",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0031-0046",
+"content_sha1": "cb09a6e80599b2c99542251b5faf3eeb1db62cd4",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0047-0061",
+"content_sha1": "5d4ec474b9133746758b67cffad337d6ca28fb79",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0062-0077",
+"content_sha1": "e2e962fee15fdd5b1c12b8707a2d9abf5c0dca02",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0078-0093",
+"content_sha1": "ea118eb8daceb8d3144074065aad8331fd9c214c",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0094-0113",
+"content_sha1": "ce9181c4729e4ec02657409d42409994c8f0a51d",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0114-0128",
+"content_sha1": "2e51ca5080a3edd7e391c2d7c3974a96a85f5df5",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107048-s0129-0143",
+"content_sha1": "b4ad1595d6f8eb1c6c24c031ef3cb553f3b74c5d",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0107688-s0001-0015",
+"content_sha1": "1827b505cf1b369713dabd33eab3161f450a16f3",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0107688-s0032-0048",
+"content_sha1": "350f225ac133ada6acf7520722c2a5c4eec12371",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0107688-s0049-0063",
+"content_sha1": "34be7723c157f9b6c9be1792b7450519bc19a426",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0109836-s0016-0030",
+"content_sha1": "3ecf29c4c0df700d9c057f26ed355c596a4a987b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0109838-s0061-0072",
+"content_sha1": "dfbb40af2cc607051c04d23bdf7b158bbc73446c",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt0110357-s0000-0014",
+"content_sha1": "839b72c628f44a9e098b70f0560d0469e41c3f61",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0110357-s0031-0042",
+"content_sha1": "d5ccd2d71c0fb8a277d01dc5319e91548574d7eb",
+"score": 17,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 11,
+"fused": 0
+},
+{
+"item_id": "tt0110478-s0068-0079",
+"content_sha1": "d3e0de010cbb1494ab71d9345d22a65a7dc19810",
+"score": 5,
+"paren_only": 2,
+"cue_as_dlg": 3,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0112462-s0039-0053",
+"content_sha1": "f6e09653099754fdad9dc78452a772dddf2d840a",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 2
+},
+{
+"item_id": "tt0112572-s0033-0047",
+"content_sha1": "47a68c2a039198cd21c99252e5f2df3c4296e76f",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0112572-s0082-0096",
+"content_sha1": "a4ec5ac4e65167b53c1776139fa898d69ccb38f8",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0113118-s0016-0030",
+"content_sha1": "4bb7fe21abf4964456c9d9bc87062594f1019c8a",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0113118-s0046-0060",
+"content_sha1": "a4539c7d653358532fdcd4aaec0e776c576d060d",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0113118-s0077-0095",
+"content_sha1": "eb286e00423948fcb77a917650b79c49dbcc5650",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0113497-s0032-0046",
+"content_sha1": "315c81980d85452d069f7e79e405802470eb1206",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0114436-s0000-0014",
+"content_sha1": "3f799e0ab51dd1ca5b33f00ff0e0ea248ae5fa56",
+"score": 14,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 14
+},
+{
+"item_id": "tt0114436-s0015-0029",
+"content_sha1": "18c5f74fc7c45a966cbecb9105b1556be735374c",
+"score": 14,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 14
+},
+{
+"item_id": "tt0114436-s0030-0044",
+"content_sha1": "168dbc1201b316008f4e0a134adb5b92ab94a02e",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0114436-s0045-0059",
+"content_sha1": "43614098545227a4a8057d81a3c16dd9ae60fa68",
+"score": 16,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 15
+},
+{
+"item_id": "tt0114436-s0060-0074",
+"content_sha1": "9142fab42c8db8e6659d1991b419aa9ecc6a0e5e",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 11
+},
+{
+"item_id": "tt0114436-s0075-0089",
+"content_sha1": "f5b4f2f222264c74c94e3b77e82571484c44fa49",
+"score": 20,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 20
+},
+{
+"item_id": "tt0114436-s0090-0104",
+"content_sha1": "edcd2d63ee110cc5e8c29159156f1087ad6c79b2",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 5
+},
+{
+"item_id": "tt0114436-s0105-0119",
+"content_sha1": "0fbd382c1b7317688a9096dbfa40e16977814d5b",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 9
+},
+{
+"item_id": "tt0114436-s0120-0139",
+"content_sha1": "81b18d9791c3eb2bf6b79c33038b084d16f8005c",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0115610-s0032-0047",
+"content_sha1": "e16c5701b6c7491d9509650c6f1051b2ecc0859f",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0118607-s0045-0056",
+"content_sha1": "9fb52ac37d07e19c5e732129314f91c3a8bc0627",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0118749-s0030-0041",
+"content_sha1": "944092070eab0b6a652e839ffbabcb0ed35d6def",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0118749-s0073-0087",
+"content_sha1": "1a5dd7b92b4334c22ca02e615ed15bd31d93133e",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0118749-s0118-0132",
+"content_sha1": "9aa115ae91fa560b430a87b415047fc71a0e63a2",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0118749-s0133-0147",
+"content_sha1": "2cf23df31cb0af387ec0c40002ec9e9ef431ad94",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt0119528-s0030-0041",
+"content_sha1": "a08383a0c213f3b5a90ec0ce4f50a9fd2849f1d9",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0120751-s0043-0057",
+"content_sha1": "98a9cbddfc3d5bb95d5cf8655fba475bd936a1b4",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0120751-s0073-0092",
+"content_sha1": "784ad67284027cca4bd5c14b80dc9c0b8f255861",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0121164-s0016-0028",
+"content_sha1": "41d2cd9a3c741b29bdbb38b55d0cc0bcc0e99fe5",
+"score": 38,
+"paren_only": 6,
+"cue_as_dlg": 26,
+"bad_cue": 5,
+"fused": 1
+},
+{
+"item_id": "tt0121164-s0029-0043",
+"content_sha1": "23faa3adb5001847b19e50e020361ef7ceef709b",
+"score": 42,
+"paren_only": 1,
+"cue_as_dlg": 36,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt0129167-s0035-0054",
+"content_sha1": "923df96b3285e23bbee9df85ceca81c3d7edf145",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0137523-s0020-0039",
+"content_sha1": "abc5901c2aa549a71d42269837df43a4f4417ea7",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 10
+},
+{
+"item_id": "tt0137523-s0040-0059",
+"content_sha1": "aed07ea860c7be754d0311b7e305f268e6da5203",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt0137523-s0060-0079",
+"content_sha1": "ddb91b5d12a44f5873b0bd21e7c9fbfa8f2e40b1",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0137523-s0080-0098",
+"content_sha1": "c2e1450f5d966c03e9f123ef43495e8570cb0d9b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0137523-s0099-0118",
+"content_sha1": "ad1a94149c9779326f757331ad5dfa14c68d4a92",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 8
+},
+{
+"item_id": "tt0137523-s0139-0158",
+"content_sha1": "2d789ef2873caf3b17c0f84a40045372334a7073",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt0137523-s0199-0218",
+"content_sha1": "a3ad545b896243323c744a2227044e5dc9d82da3",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0137523-s0219-0238",
+"content_sha1": "86c5002cf1096e0e9ff789304134d846274bf974",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0139134-s0089-0105",
+"content_sha1": "ea34fa4f8c62ad0ae2ed03e0ebc150bd105adcb3",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0144120-s0045-0061",
+"content_sha1": "7834b23a836179b6f759163ca91136d3371ed98f",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0144120-s0062-0076",
+"content_sha1": "cdb31643aa73dae2a6eb7c3ad3ad561a63c12ad8",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0146675-s0021-0037",
+"content_sha1": "3d02c5d69c4f4429801fb2f2fc2ee6446c73ac91",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0183790-s0034-0048",
+"content_sha1": "a94b6cc81cfc12a6bfe1692e74f1c7574e46cae0",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt0210094-s0035-0046",
+"content_sha1": "2bbf7618e89782f2ee662a0f4749533a95643723",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0210094-s0082-0096",
+"content_sha1": "04255931e3c86fec7e6a7377854b4dff450e1133",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0210094-s0097-0116",
+"content_sha1": "edd3205d15cd71bc5c790bd7a7de7e852b607ceb",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0212338-s0014-0025",
+"content_sha1": "ac15ed8f3a2190a0d5755ce96c25396f6d62672d",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0212338-s0033-0044",
+"content_sha1": "f230083b80a18f1c31be111c7c7379adb6706ee2",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0212338-s0076-0091",
+"content_sha1": "0ef64528b74da08ad60e684ded0f58dfc46f7dbb",
+"score": 7,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0220506-s0052-0071",
+"content_sha1": "6985be9e7a51bf3e5dc8b7706c52e93beeef443c",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0230838-s0061-0072",
+"content_sha1": "ec0233fa91f4f54b5565f21d814ef1567350381f",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0243585-s0001-0015",
+"content_sha1": "8cf0df99600150e9909147ee332a7c56131ca6cf",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0250494-s0033-0048",
+"content_sha1": "5249ef0163e22920a898b8ffbfb3a21e96fd5e7f",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0259324-s0001-0015",
+"content_sha1": "48d97647682436b2e3dff6b7e391c11b293d9858",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt0265086-s0175-0193",
+"content_sha1": "574b217ebae57c94a04e9e18cf265b17037679b7",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0265086-s0194-0212",
+"content_sha1": "118963441967bf0207bb84923c5a85fb3d93ee7d",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0272020-s0083-0097",
+"content_sha1": "c52caa6fceec47e375f9a19cafaca7a9f4b68e09",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0272152-s0027-0041",
+"content_sha1": "2f1906f31625607a692b769b943d00f1120e5b32",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0272152-s0042-0053",
+"content_sha1": "3ab6145af0bb0c4a038c49b4097a8f2622a4d9b9",
+"score": 8,
+"paren_only": 4,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt0272152-s0086-0102",
+"content_sha1": "348794eb88cf0919157dd27e68ecbf07de82bdff",
+"score": 18,
+"paren_only": 10,
+"cue_as_dlg": 3,
+"bad_cue": 3,
+"fused": 2
+},
+{
+"item_id": "tt0285742-s0020-0034",
+"content_sha1": "26e301afc6fe6e8f2b3ff0fe6b4a917a4db3ae48",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt0285742-s0096-0115",
+"content_sha1": "4b22f82e6b6d84ad8cc256f7cc23b7da3ace580c",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0285742-s0157-0176",
+"content_sha1": "bedf37f31d21c7639308533063cfa1b28cc17126",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0292963-s0015-0029",
+"content_sha1": "0bf19b39efbc19712963f75e51faafb087c43812",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0295297-s0094-0105",
+"content_sha1": "5cf7a150fe8e7342cb05db5a21a596502142b8a9",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0301470-s0000-0014",
+"content_sha1": "60f18dbef2281dd093d82ef1e837b031ef1bc7df",
+"score": 8,
+"paren_only": 5,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0301470-s0074-0088",
+"content_sha1": "ea9fba9f169a3aafd9829d8d838dbc603c13cd99",
+"score": 11,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0301470-s0089-0103",
+"content_sha1": "47bae48d8661890e34266c4ae128864d54b7b8ea",
+"score": 15,
+"paren_only": 9,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt0301470-s0124-0138",
+"content_sha1": "86a1aeeedc9432e4bb18e4d637a688ec9a1c6e2f",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0307901-s0004-0015",
+"content_sha1": "3b1a2be18be022d7c373ff618f961f03374ac9e0",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 1
+},
+{
+"item_id": "tt0315327-s0066-0080",
+"content_sha1": "e3e0f07c7ca1cba25d286b25aafc0699351fd219",
+"score": 6,
+"paren_only": 2,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0315327-s0081-0095",
+"content_sha1": "f93c15e994b6f83e1e747f39483161895cc6265b",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0315327-s0113-0132",
+"content_sha1": "714d1d155ed84c37732a834631c766f221968921",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt0317919-s0237-0251",
+"content_sha1": "d9fb46fff8f0cd225c5de929c83be760ad1f91d7",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0318155-s0002-0019",
+"content_sha1": "e4e65de82c4365a7c3523cf4450da7ec6881a9e7",
+"score": 23,
+"paren_only": 16,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 2
+},
+{
+"item_id": "tt0318155-s0020-0039",
+"content_sha1": "6f3a9eefa07162794a20b53972901c3cae84ae9b",
+"score": 5,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0318155-s0040-0057",
+"content_sha1": "5d8309f86d7bb97f6bd2678c43895083b7bf50c2",
+"score": 10,
+"paren_only": 5,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0318155-s0095-0114",
+"content_sha1": "a3bc074e369cab8279b4aca376891dbec9430156",
+"score": 9,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 1
+},
+{
+"item_id": "tt0318155-s0115-0129",
+"content_sha1": "75fe9efc1ac7fa29ec74b8bc0640cab70139e251",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0325805-s0125-0142",
+"content_sha1": "7cbe6e8282e6b4fec4b6873d51c4dd5ed7023f80",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0338751-s0001-0012",
+"content_sha1": "81425e172e5c812b5165bb94ad02e07686e21623",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt0338751-s0013-0027",
+"content_sha1": "386aaa62e46940c68ede20a2d5c2f45afb07c3c1",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0338751-s0028-0042",
+"content_sha1": "1a5567256b67cbc7a4e5830b91f3d59a47239325",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0338751-s0043-0054",
+"content_sha1": "f8449d96a7f822d832dd4171678364c2779f2bac",
+"score": 9,
+"paren_only": 1,
+"cue_as_dlg": 8,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0338751-s0055-0066",
+"content_sha1": "1271af98f086c1a5c2746003c100d5c1553504d1",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0343818-s0032-0046",
+"content_sha1": "54ef63c34dbfa2cbcd71e9f96d46312aee6745c3",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt0352248-s0050-0065",
+"content_sha1": "87be398d3466aa61084b23594fe77e7e8033222b",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0368008-s0001-0015",
+"content_sha1": "deada9cfca0da565d84d1759113a2ebd88e48cc6",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0371746-s0017-0034",
+"content_sha1": "9930e6a5aef6f4bdab009a061b96f454ba07d7b4",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0371746-s0053-0070",
+"content_sha1": "a3a967bd40999c29c1c00c1451627bcb5a622a4d",
+"score": 7,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0371746-s0091-0106",
+"content_sha1": "ccd68912c82185cccc903e412fb9069d36d4bb79",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0372183-s0061-0078",
+"content_sha1": "580f078713376970e35ca1318196c75d455bfcc4",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0372183-s0079-0097",
+"content_sha1": "187e9fb5ed7ec58efcfa5993aabe2edde8eb4021",
+"score": 10,
+"paren_only": 5,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt0372183-s0098-0115",
+"content_sha1": "62a7dcbf0087206c1266c3ff5ecdd5ce860cc07c",
+"score": 7,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt0372183-s0136-0154",
+"content_sha1": "c6e25a902c5da600a4aa6a0982ae2a225ecc8ae4",
+"score": 7,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0372183-s0155-0174",
+"content_sha1": "1ea565c7b5d616c007dcc6c825285c33bf8d1a20",
+"score": 6,
+"paren_only": 2,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt0372183-s0175-0194",
+"content_sha1": "9c6c332bdc49fb5480aca0a140eb835900cde47f",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0372183-s0215-0234",
+"content_sha1": "bb7df6a78c88e8cc43493ca84136d82ef9b7d15d",
+"score": 7,
+"paren_only": 3,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt0372183-s0235-0254",
+"content_sha1": "32fca4d34625fd8ac7c6e89ec4274d2031643492",
+"score": 9,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0372183-s0299-0311",
+"content_sha1": "b01cd3cb96ad4c394889cafbf49b56cd693646cb",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0381849-s0001-0019",
+"content_sha1": "d5a197bbcfda708e0119782e40ef78b9335f86f4",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0389722-s0122-0138",
+"content_sha1": "bfec00bf3cbcb02c356fefab0337a9bfc2eed62e",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0395169-s0000-0018",
+"content_sha1": "18aa38ce766e7494ffb55beafffedb32ee30e7e9",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt0395169-s0039-0057",
+"content_sha1": "b7c7579638f43ef3cacafdef88cf4b146bc3b566",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt0395169-s0058-0076",
+"content_sha1": "5e872e3595c7ddf8fcc5217bb8501b96bad2b6f2",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0395169-s0077-0096",
+"content_sha1": "979d689425da22e90744e7b5e3d36228083f72f4",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0399146-s0028-0039",
+"content_sha1": "3dd7576283b4a784c8faab9b2c9a06d10f71ec8d",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0399146-s0040-0051",
+"content_sha1": "46c6bd3e776f64ddc6c77f1070bd6d1a7490afee",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0399201-s0001-0015",
+"content_sha1": "88095645bccb8cc918b3d7d03c62c52fdc4ce522",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt0401997-s0016-0035",
+"content_sha1": "e472691b02730bb7a08bcd294601617c1685ad7e",
+"score": 7,
+"paren_only": 1,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0401997-s0081-0100",
+"content_sha1": "c417a1f5462a7e7331979d94e05c5171f2136b45",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0401997-s0158-0176",
+"content_sha1": "8bbf9856fd8bd1380ceee575c08e287be5463d86",
+"score": 7,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 2
+},
+{
+"item_id": "tt0409459-s0031-0045",
+"content_sha1": "d61bf0fcb5e801ae7d611cfcbd861d8b980b9948",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0409459-s0076-0090",
+"content_sha1": "8b411fdaea0edff9544a728ac2af4eba1e430a02",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0410097-s0001-0015",
+"content_sha1": "6c8307591356148a1cbdb1d35cbf7a1da708cd63",
+"score": 8,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0410097-s0016-0034",
+"content_sha1": "b471219ab1eac0f93e89eefa735a525745f96322",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0410097-s0039-0051",
+"content_sha1": "057e11d6c7188430eab65fb0055d48a491c8c986",
+"score": 10,
+"paren_only": 7,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt0410097-s0052-0066",
+"content_sha1": "46baf42ae6c45afca33846ecb0ce64be7888105e",
+"score": 17,
+"paren_only": 16,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0410097-s0068-0079",
+"content_sha1": "fe765c3c1cbdd52d87c7be6de369b458d829b6df",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt0429493-s0000-0014",
+"content_sha1": "ea3e77097d422ce5cb0a416b97899c986a9a071a",
+"score": 7,
+"paren_only": 2,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0443706-s0052-0069",
+"content_sha1": "0de1b5a1da08045961388b430d58f1faa1b72321",
+"score": 11,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt0445934-s0003-0015",
+"content_sha1": "86a3e02d9b58a0601b83bde6f6263096580bead2",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0445934-s0016-0027",
+"content_sha1": "a6c53e74c3c8603a914e745a94e3c2c07b2e7405",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0446029-s0045-0059",
+"content_sha1": "709c8317730b4de9ee30758714d6e01cd845b868",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0446029-s0084-0095",
+"content_sha1": "4a96fc00e3277bd871b6f03ae77c225e8e251ad6",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0449088-s0035-0049",
+"content_sha1": "108c997c037bbf543f5f39b809acb2ea3be668cc",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt0450405-s0041-0052",
+"content_sha1": "1139ba784bab40eb995a0d844cb15490791e7edf",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt0453562-s0001-0015",
+"content_sha1": "8d30cb7a1428f1c901e62c0fb63f461b8347f4e8",
+"score": 5,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0453562-s0062-0076",
+"content_sha1": "579fb2030ec17974a914a94649c75143f7ba1857",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0453562-s0093-0107",
+"content_sha1": "4ab0384df055705da5ab192ab5c8992ee9e075c6",
+"score": 5,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0454082-s0182-0201",
+"content_sha1": "e0dcb2a90a61a0978f8cc8e48bda0d05413eff5b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0458413-s0017-0031",
+"content_sha1": "1d240493c1b11290434aa25e22a170cbac3a1c25",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0458413-s0032-0046",
+"content_sha1": "a1a2a1c296f2a170b75bb4f2b60004bebc7a6aac",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0458413-s0064-0078",
+"content_sha1": "debbff4ae0a673271f47520a6a3dd5c3127b0b41",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0458413-s0079-0093",
+"content_sha1": "93c9bef2aac2f44b6bb99953d80114f1c666e965",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0462499-s0001-0015",
+"content_sha1": "ce844c60cdc40715fa9dfd6cd09a3a326b4bdfa1",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0462499-s0016-0032",
+"content_sha1": "0d74fd511d54f7afb7b7eb5d6c1ac726ab9a8c23",
+"score": 17,
+"paren_only": 11,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt0462499-s0062-0076",
+"content_sha1": "4c5e1db5dc336ce3f19fe56c5c3b898b8bbfc3ed",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0462499-s0077-0096",
+"content_sha1": "12628cf2b3977d2b69a5b996854f61070caa5381",
+"score": 6,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt0465538-s0070-0085",
+"content_sha1": "c2b79bd2c68916727bc0b50d831d15d50c744ef2",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt0469494-s0020-0032",
+"content_sha1": "191ba9f4166c444e72edc77e2dd2da7001744fec",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt0469494-s0033-0047",
+"content_sha1": "71480312925540349ce2efbdb74aa48f08078f0c",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0469494-s0063-0077",
+"content_sha1": "97b1b2c8d92f51a3faebede1d21f94d6ad046e41",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0469494-s0078-0095",
+"content_sha1": "fcbb8c5466488a96588759fb5a66b7833b5bdd00",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 5,
+"fused": 1
+},
+{
+"item_id": "tt0471042-s0015-0029",
+"content_sha1": "98ec7105204e5d5c09b6ccc55d49ac71b229ce18",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0473705-s0001-0019",
+"content_sha1": "c4ed68612dc02ff187fa0fc4fd76e022f2b0c1e4",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0479884-s0011-0022",
+"content_sha1": "a4199bb638692fa5495f634965fbc76c71395acd",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0480687-s0001-0015",
+"content_sha1": "8ba4ca7d9826ad75a0123a4bc31ab99c1dce05b8",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt0480687-s0016-0031",
+"content_sha1": "42f04e26c2752e19d79084ff925235f46df4d5e0",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 5
+},
+{
+"item_id": "tt0480687-s0063-0074",
+"content_sha1": "aeb1f3b707e61a18bc0d1c9b0126da2b2f69fd6c",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 5
+},
+{
+"item_id": "tt0758774-s0017-0032",
+"content_sha1": "f05e9653d7dd0b7e02576bbde53a1b80e1ad98a5",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt0775529-s0047-0061",
+"content_sha1": "1c5b5a1ca0cb995bbb21eda7f60433b9fec94d1e",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 7
+},
+{
+"item_id": "tt0775529-s0062-0076",
+"content_sha1": "2b0ad40d79ff4dbb86473bbcf35b2b89cd8daf76",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 2
+},
+{
+"item_id": "tt0784972-s0015-0029",
+"content_sha1": "a03f3fcbc75b4d89f556cf374bcb2a8409356a03",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0800039-s0033-0047",
+"content_sha1": "cd351bf8bab71ddc3fed319794da0cbba1110661",
+"score": 12,
+"paren_only": 9,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt0800039-s0048-0062",
+"content_sha1": "085a0fb446f662e1d43965fdf1e45da7c0b70854",
+"score": 13,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 5
+},
+{
+"item_id": "tt0800039-s0079-0095",
+"content_sha1": "4009a61fe71b04e77e0c0624ac5f2ee3870eebed",
+"score": 13,
+"paren_only": 10,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0800039-s0096-0110",
+"content_sha1": "5ff21f3abcbe19f6d42318d478c15c78f3849e8f",
+"score": 12,
+"paren_only": 10,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt0805564-s0000-0017",
+"content_sha1": "0b2e319d337b4b86f6ede37856e15124e0526e8e",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 6,
+"fused": 2
+},
+{
+"item_id": "tt0805564-s0018-0034",
+"content_sha1": "1d4e12de440de0322bbee75e3ff330b8925225ff",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 8,
+"fused": 3
+},
+{
+"item_id": "tt0805564-s0035-0050",
+"content_sha1": "e0bf516f0eca0fc6a865a385a82c3b2f4e171f26",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt0805564-s0051-0067",
+"content_sha1": "99dc1307b7c59e690f6a7e2d6fef487d224cacfc",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt0805564-s0068-0085",
+"content_sha1": "53b39f0cf6b58225d94abef072ae4cdbdacb35dc",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 8,
+"fused": 1
+},
+{
+"item_id": "tt0810819-s0020-0034",
+"content_sha1": "dd743ddf7859bc1cfa9420b71d570e5f96e24651",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt0838283-s0034-0051",
+"content_sha1": "e235f08640418947a66f6e6cf0f056f6eccd8205",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0838283-s0068-0083",
+"content_sha1": "1a74d7f2d5771b9555d5861b18f4db39772c8036",
+"score": 9,
+"paren_only": 3,
+"cue_as_dlg": 5,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0838283-s0084-0098",
+"content_sha1": "72d8db7813a44b7d3fa282da3aea28106c4d7162",
+"score": 6,
+"paren_only": 3,
+"cue_as_dlg": 3,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt0838283-s0099-0113",
+"content_sha1": "cc5f8bf8db908322a9b535b3ab877f8e6c10f365",
+"score": 16,
+"paren_only": 1,
+"cue_as_dlg": 11,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt0848228-s0080-0099",
+"content_sha1": "3e8de1bc1c039e26eb79f6b49f9a9ad3d0e0eb39",
+"score": 6,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt0913354-s0121-0140",
+"content_sha1": "0115789a8120ccda8e8f5b3ecf2d1f97438ff92c",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt10023286-s0001-0020",
+"content_sha1": "0317c4a6f8fa97d6063681e4190539e1ef583f3a",
+"score": 6,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt10023286-s0021-0035",
+"content_sha1": "09118dcd33e619487251c1341831e2b7160d209e",
+"score": 5,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt10023286-s0111-0122",
+"content_sha1": "a030545f4029563ab07ade87eb58e2faf63f587f",
+"score": 8,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt10023286-s0123-0137",
+"content_sha1": "2b8f1e4d10917e6556aa36645f5324b9a4e11e55",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt10161886-s0000-0014",
+"content_sha1": "c8d866cd74e2168768adabd81149aafc32aa6d24",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt10161886-s0015-0026",
+"content_sha1": "4e0fff4c6c7aa46525f77c9c3e3b89e3161806bd",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 2
+},
+{
+"item_id": "tt10161886-s0027-0041",
+"content_sha1": "aff02c9a837e28631a39c03d60ec1f7f3ab7763b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 4
+},
+{
+"item_id": "tt10161886-s0080-0094",
+"content_sha1": "771248ac87cdcad677b6872561a701443e0c1d4c",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt1060277-s0000-0014",
+"content_sha1": "191920b35ff1976b136997d8b7830540e60f48be",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1060277-s0015-0034",
+"content_sha1": "ed7545f3f31e4c6dd98951d0c49364ff547e5714",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1060277-s0050-0064",
+"content_sha1": "8423a6e4c087f8184522aa6c2bb2fefdf8e8f8b6",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1060277-s0082-0096",
+"content_sha1": "ab25a80e16204c9b7bfead15af330c283fe4f4f0",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1060277-s0097-0112",
+"content_sha1": "08eb313be93d0ff26f6da5e3369353ebd8c2344a",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt10618286-s0045-0059",
+"content_sha1": "3df414b45cb2714ee2af703c5e35246cdf1257e6",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt10618286-s0060-0074",
+"content_sha1": "22471e28495b6bef87c9fba6ae876b058cdd5f69",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt10618286-s0075-0086",
+"content_sha1": "f66a530df9b63edac21956fcf1f24f1d72260f37",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt10640346-s0000-0014",
+"content_sha1": "fde44862686f6eb52bd0872b57c8ea2b71a64ded",
+"score": 7,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt10640346-s0030-0044",
+"content_sha1": "eecaa9260aab439af64ca9acb5ae94eaa41c0e2c",
+"score": 8,
+"paren_only": 5,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt10640346-s0097-0111",
+"content_sha1": "73cca76e60fb02fa62af1b9537f3b1156b366155",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1068680-s0020-0034",
+"content_sha1": "ea72da9ff4bdc20daccee373c82cca37edee0b79",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt1068680-s0130-0147",
+"content_sha1": "830c29ed2065d13d43c3577a6d92fc410ae73456",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1086064-s0016-0030",
+"content_sha1": "dc4209b96d9008354bb70b28718e6acd698a27cc",
+"score": 58,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 58,
+"fused": 0
+},
+{
+"item_id": "tt1086064-s0031-0046",
+"content_sha1": "f9556d3e02ee8405ca0026aac105ce0d1c3f9ae2",
+"score": 61,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 60,
+"fused": 0
+},
+{
+"item_id": "tt1086064-s0047-0061",
+"content_sha1": "5645b4013f206f81a223c22f82f622adb069288c",
+"score": 24,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 24,
+"fused": 0
+},
+{
+"item_id": "tt10986222-s0058-0073",
+"content_sha1": "6fa6328f9ebb13d098a051e5eaeb835eb7dce0a6",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1107319-s0033-0047",
+"content_sha1": "284cde7150be810a83efcacebfea1fba5904a485",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt11145118-s0018-0033",
+"content_sha1": "5d32f123ce686f1ac5e5bb2b304ceae290c0f313",
+"score": 7,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt11145118-s0034-0050",
+"content_sha1": "ce29277f025df3d6044713a4801e7640c3288e55",
+"score": 7,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 4
+},
+{
+"item_id": "tt11145118-s0066-0082",
+"content_sha1": "7ae2b77a141d52d5c4e05751d8f48b25038e0192",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt11145118-s0083-0102",
+"content_sha1": "8289548e5f58103751a768bbb909382a7a47cc2a",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt11286314-s0081-0100",
+"content_sha1": "b9955e1177675211c7b32e88a1be10eda325979f",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1135487-s0000-0014",
+"content_sha1": "2e457dd0a98e610b44a7e02ec22a118cd44c6d85",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt1135487-s0062-0078",
+"content_sha1": "f88450144004831551da2b78e43ddc3b3fe489f1",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt1135487-s0094-0108",
+"content_sha1": "90bc859a9cf7d8fbcc7509c1c421cac32d09612d",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt11389748-s0000-0015",
+"content_sha1": "48ad13002e82d7fb8c33c646b7b7df2d013e79ce",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1160419-s0001-0015",
+"content_sha1": "7d6a77fd2bbb27f5000ead3027a8fec3cef5e5e4",
+"score": 17,
+"paren_only": 8,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 6
+},
+{
+"item_id": "tt1160419-s0016-0031",
+"content_sha1": "d5919f987f2420a9bea1c93477971fca5f85402b",
+"score": 8,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt1160419-s0062-0081",
+"content_sha1": "482c095c08695c3da29f176486bad4fa8bb44b49",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1174730-s0020-0034",
+"content_sha1": "8f8edcd9543daaf7ebaae313cb7595becdf31e72",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 12
+},
+{
+"item_id": "tt1174730-s0035-0053",
+"content_sha1": "0db8b2c15a6d2556d7f4ab67d173de2ece5e00c2",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 11
+},
+{
+"item_id": "tt1174730-s0054-0068",
+"content_sha1": "858870599dc4e27b202c88f41bc2356276d7b06d",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 8
+},
+{
+"item_id": "tt1174730-s0089-0108",
+"content_sha1": "ef0971ea1c21afd4f0c8ffe0c4a9f141dc9bbf4c",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt11777738-s0000-0014",
+"content_sha1": "2f63cb6ebd96b49a3fc79bee92681917d6ac5f34",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt11777738-s0015-0029",
+"content_sha1": "a7f8834d4dbdccf5361332caa9e8ab2df8edeead",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt11777738-s0030-0044",
+"content_sha1": "fb76da646b92dce78f8131de2439f9f62f397062",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt11777738-s0045-0059",
+"content_sha1": "c7202d8f86b17a46adcea3a17d55dfb2c22b5ed7",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt11777738-s0060-0074",
+"content_sha1": "d4fd649c80dee93c99bdce56a7afe6bfc63d9e81",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt11777738-s0075-0089",
+"content_sha1": "7bc410f12a70fae41d495103448d81a626a1e0b9",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt11777738-s0090-0104",
+"content_sha1": "4e36a050e96a0c5d2e3cef7f9aa06ff0d3626e31",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1200263-s0073-0092",
+"content_sha1": "4855f5a9b1d05dac203da78f2bb5239d4ea645e4",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt1212428-s0001-0015",
+"content_sha1": "6af38b3192dd841a01a96ca66b5c6dd0ec78f828",
+"score": 10,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 2
+},
+{
+"item_id": "tt1212428-s0016-0032",
+"content_sha1": "73a3c19e17931a0ee6b11a664037c4c839e23609",
+"score": 14,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 4
+},
+{
+"item_id": "tt1212428-s0033-0049",
+"content_sha1": "2593ee7fd0070d901a38c00e5d019fb686051761",
+"score": 21,
+"paren_only": 8,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 5
+},
+{
+"item_id": "tt1212428-s0065-0079",
+"content_sha1": "5290f2e600921c999f4ffb8faf14f51fa307325a",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt1212428-s0080-0094",
+"content_sha1": "a6e62591c580b4c8026a6b5a29b852d3ce65cf38",
+"score": 11,
+"paren_only": 4,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 3
+},
+{
+"item_id": "tt1212428-s0095-0111",
+"content_sha1": "5bf5deab4ed6476996ab602bd4348b8ef8541a97",
+"score": 15,
+"paren_only": 9,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 4
+},
+{
+"item_id": "tt1213641-s0101-0115",
+"content_sha1": "9af706e3099eb710b76c6d43bf7b86f4da37a7ba",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt1220628-s0074-0093",
+"content_sha1": "c3a32b78eddc674b2b4d12bcb42736370b515a2a",
+"score": 7,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 2
+},
+{
+"item_id": "tt1226229-s0000-0018",
+"content_sha1": "123ce380cea969a2cbae5ac220d4efcffd0bf92e",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt1226229-s0034-0048",
+"content_sha1": "6b277cdc1a8f750e905180b80504e0d9d200701d",
+"score": 10,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt1226229-s0049-0063",
+"content_sha1": "33b811c6a63235e9869c99bb89c15023bce111aa",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt1226229-s0064-0079",
+"content_sha1": "7cca021ed3a6514596164c027f668da3b6b89361",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt1226229-s0080-0094",
+"content_sha1": "1e75e4a57ed41bfa68d1eaaaf86bbd9be0747ce8",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt1226753-s0109-0125",
+"content_sha1": "166d54422dd0a1f0a1f1bc81eda1fab17ebd1bd9",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt1228987-s0046-0063",
+"content_sha1": "d5bacad5d1133872af3f5c5400178457c4331a32",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1231587-s0033-0047",
+"content_sha1": "5edf7c10ee19aff1eea61a544bc6b8f2fe523470",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 4
+},
+{
+"item_id": "tt1232200-s0000-0015",
+"content_sha1": "01c2184aac899a3183bdbf516a1df9ccf42ff996",
+"score": 18,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 18,
+"fused": 0
+},
+{
+"item_id": "tt1245526-s0021-0035",
+"content_sha1": "262c796d84de61a6fd5a513bd991281d1ca6aecb",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt1245526-s0052-0066",
+"content_sha1": "14ece14fb54cc43afbabade8eaa665675b0d9fec",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt1245526-s0067-0081",
+"content_sha1": "9b8e695fff2064ff895fc68f075e1199c13eeaac",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1245526-s0082-0096",
+"content_sha1": "226c4b293aae4babf8ae43223cd605617807072d",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1245526-s0097-0115",
+"content_sha1": "131ca0b4eb7ef41bce7cbdd5cb1c7f4f4e494d6a",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt1245526-s0131-0148",
+"content_sha1": "edc8dec1a2bdee29a1bc7f7cb094d77056b5fb1c",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt1251757-s0151-0170",
+"content_sha1": "72a5a8abbfca8537d0a1bc67fc1fef14fd250739",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt1266029-s0159-0170",
+"content_sha1": "ff4ce5a7d585cbc638b88c253d9e137168099dc3",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1320253-s0013-0024",
+"content_sha1": "6a7a92da74bfd0502388817bb4c15e9e533b6615",
+"score": 9,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt1320253-s0099-0113",
+"content_sha1": "0a29a80c565561864c0d095f169ce9d0866fc8aa",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1334260-s0001-0019",
+"content_sha1": "60185a9b60de4b1459f1bde65de50e030381a9cc",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1334260-s0041-0061",
+"content_sha1": "278b00483dd359a356f2ff64ea29d512f046ff0b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt13650600-s0081-0092",
+"content_sha1": "df7266cf794e725f8f5979b72282608f3ab41db7",
+"score": 12,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 11,
+"fused": 0
+},
+{
+"item_id": "tt13650600-s0093-0107",
+"content_sha1": "33254eede699a05d54f2b9abe948845875376e0f",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0015-0029",
+"content_sha1": "f16b912e6caaddf49183ce14b8ad163c67ede116",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 10,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0030-0044",
+"content_sha1": "e7650a6e14580ea2f8577671abfa87d87f343b8e",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 10,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0045-0059",
+"content_sha1": "32d0eba9fd50c272671f1ec523f0149888e87323",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 9,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0060-0075",
+"content_sha1": "9ac94fe09fdb989ad3f68947dfbe45af6dd5c998",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0076-0090",
+"content_sha1": "4494ff14f420a5ed31a17738bb30feb60b3e3ef5",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0091-0108",
+"content_sha1": "112b50179fd10359ca5ae21153c0c4f3622a481b",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0109-0123",
+"content_sha1": "78b3ddec3fc216b141254c56ed84bbb046b1aebc",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0124-0142",
+"content_sha1": "f76936f44d5c2007a8c916c857a2a94d1eb86ba3",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0143-0157",
+"content_sha1": "50659b4477f16d393590009d18f2ad0d77a11e48",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 10,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1371155-s0158-0170",
+"content_sha1": "36ab6b2dffe5c9ad82eef72f3b42e47246aa348b",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt1386588-s0065-0084",
+"content_sha1": "c9386cac0d532442d70b776a4dc686fb8323447e",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt1398426-s0001-0015",
+"content_sha1": "3e50a4bf75fcc02615861752f857cc461308f19b",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt14208870-s0032-0046",
+"content_sha1": "bf1b323f977602cdc3d5e857c7364300e2e1294d",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt14376344-s0000-0014",
+"content_sha1": "4cb5f7a8abe66399eabf770a46f33ffad8db53a3",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt14376344-s0015-0029",
+"content_sha1": "18ac99ef42c826da2c7d7b93c641f34449ee8a4d",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1453405-s0052-0063",
+"content_sha1": "cec593d7a00be50b2a51846fdcf91eddbb319735",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1454468-s0036-0050",
+"content_sha1": "db1906eaa35d06b685c18c1257b530a9025e9038",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt14735318-s0016-0030",
+"content_sha1": "92e0dc14820941085c1e0f10b8e2f4d94d20fc3b",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt14735318-s0031-0045",
+"content_sha1": "7c82386c5db5c10a4c85812975e621b5976b53b7",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt1473832-s0016-0031",
+"content_sha1": "f1913c469a8639067bb894ab505c653c620bb7da",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1478338-s0062-0077",
+"content_sha1": "7e5daf080a3db3be8816a9682fd977adf5b0ec38",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt1485796-s0001-0015",
+"content_sha1": "d7d52c672d22f23d948c0561b0b1f67594be1129",
+"score": 10,
+"paren_only": 1,
+"cue_as_dlg": 2,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt1485796-s0031-0046",
+"content_sha1": "a68b1407c865fdf2509d2951e2c1b16abd58497e",
+"score": 13,
+"paren_only": 1,
+"cue_as_dlg": 4,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt1485796-s0047-0063",
+"content_sha1": "9babf60c17956e99011d043d07fe4c317934a2d5",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 1
+},
+{
+"item_id": "tt1485796-s0112-0127",
+"content_sha1": "bc061abdcdaf3b502e4c8fbbcaf4eaf8e6b3bf9e",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt1502404-s0001-0016",
+"content_sha1": "2aa5c4a9e4ba7efdafb72c10e362af1ea43c54ec",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 2
+},
+{
+"item_id": "tt1517268-s0018-0032",
+"content_sha1": "ee9a35456425dc279792639d25fdaf0ad3d78d4b",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 3,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1517268-s0048-0059",
+"content_sha1": "7e0a0b8462b88caee2308a0905ecf806954ae376",
+"score": 14,
+"paren_only": 4,
+"cue_as_dlg": 2,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt1517451-s0089-0104",
+"content_sha1": "55c6d4e24db678594f8f5bf7f9caeee8ec11b25e",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1535109-s0054-0073",
+"content_sha1": "56b603b26d4766af321de9a813d8c6c6273f67c7",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt1535109-s0148-0166",
+"content_sha1": "02e13a1ceb86ca8d034a279e99d82f580543ae2f",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt15398776-s0114-0125",
+"content_sha1": "58f886b57c8f60c556fe304b92af06fdd37ae4f3",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt15428940-s0017-0035",
+"content_sha1": "bacacac970f881c83b6f67633391239bb03079ef",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt1560220-s0032-0046",
+"content_sha1": "cd48b8159ab3a86aeebe94bf8e9ec04ceec3c31b",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1570728-s0001-0017",
+"content_sha1": "3fdc5ff80bb67e3301d90bccac2f1695af146cf5",
+"score": 8,
+"paren_only": 5,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1570728-s0019-0030",
+"content_sha1": "14f1c1087c968e0971571285d952e307815db3cb",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1570728-s0036-0048",
+"content_sha1": "0fef904f5a3911059c9a71ac96c2afd3b4a136a7",
+"score": 12,
+"paren_only": 1,
+"cue_as_dlg": 9,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1570728-s0049-0063",
+"content_sha1": "974687e78890bcdcf87c296c7073708f79d027a1",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt1570728-s0064-0078",
+"content_sha1": "f65be9d1bb5016cb36219a0f676709600ef40c34",
+"score": 19,
+"paren_only": 4,
+"cue_as_dlg": 10,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt1596345-s0016-0030",
+"content_sha1": "e3fd722ea3afc9ea09f97dff854a02fd61520fb4",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt1632708-s0020-0034",
+"content_sha1": "242cfa1adca2f0f14cba515ccde5b6ddfef99c95",
+"score": 6,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt1632708-s0050-0064",
+"content_sha1": "22826f5fbd6f4100c7a73704b7da54919bea14db",
+"score": 8,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt1632708-s0065-0079",
+"content_sha1": "e16a13079a4f4d5a951b22a337bdcc864386c86d",
+"score": 7,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt16419074-s0079-0094",
+"content_sha1": "e03628792a9c7daf0a7aa4eba928a9168e3a7a46",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 3
+},
+{
+"item_id": "tt1655389-s0039-0053",
+"content_sha1": "052269dca90e93c4b76b84027564a3b5a21d487d",
+"score": 15,
+"paren_only": 13,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1655389-s0054-0072",
+"content_sha1": "09b0b7d19bf1c925715ee9e52086dfc7b1ccd6d1",
+"score": 7,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1655389-s0073-0087",
+"content_sha1": "5cc5666c58343365f1e48a789c3a842160594e56",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt1655389-s0123-0140",
+"content_sha1": "9ecdd9ae49a15391e460cb7e8a0784aeacac6233",
+"score": 7,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 1
+},
+{
+"item_id": "tt1672723-s0073-0087",
+"content_sha1": "be8d39acc675c8b82e7b753c8c58a45b3039d13a",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1672723-s0163-0180",
+"content_sha1": "8a90904ce57991a1da7530edbdecf5cc2e0ad536",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1700845-s0013-0027",
+"content_sha1": "6cd832848dc24a17407ead3246f2ca3fd7ebd479",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1700845-s0058-0072",
+"content_sha1": "30c59913e9585673950adf79c322820ab6697b55",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt1706620-s0001-0012",
+"content_sha1": "d7f4333339d131b78972f0196dfd0ec10d770c4a",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1706620-s0026-0037",
+"content_sha1": "669fd5101b206f4817fa68995f5a25d45e29ad20",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1742044-s0151-0165",
+"content_sha1": "9deaea9510e9ccdf155c408016d6e1a62331dafb",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1745960-s0147-0166",
+"content_sha1": "08b67ceda940631e12e1da9ced551300390435f7",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 1
+},
+{
+"item_id": "tt1745960-s0228-0246",
+"content_sha1": "98e5f8eb09acbfb4c455376a42c6fd491083738b",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt1772288-s0000-0014",
+"content_sha1": "29cb280f1840ff59fa3173238ecbbe7ba42a7963",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1790809-s0017-0028",
+"content_sha1": "04ef624852353a74101e743c484d0296d03e06d9",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1790864-s0031-0046",
+"content_sha1": "2c5a21b92cf273044cf72d59da59bc12b54e9dc2",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt1791528-s0001-0012",
+"content_sha1": "f2010178766104e6eacce2401756775ef8bc7a0c",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt1791528-s0030-0041",
+"content_sha1": "1f4c93138745af779bfbb0d036fa47fe3f6dd058",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt1791682-s0020-0034",
+"content_sha1": "3fedc324357de5b8763c672cd5d02fd7bfa82e6f",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1800241-s0075-0089",
+"content_sha1": "70ff0e1115351c942eeae87c18d103dfc402e1c9",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt1800302-s0103-0118",
+"content_sha1": "ea839a75b3a7152a9026221319b83dfc00cb8b12",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1817273-s0040-0059",
+"content_sha1": "ac90378cb4624d00dcf10aed48a5b8e887790bcb",
+"score": 7,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt1817273-s0167-0182",
+"content_sha1": "7673ebfa3c0713b18def9fbf24d8ae396a1a53a6",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt1876451-s0016-0030",
+"content_sha1": "52c6afeb3328367aefaa4349fb6edac369365fad",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt1876451-s0031-0045",
+"content_sha1": "c46e83e360a84113ef18d9fb39e032042f0eccfe",
+"score": 6,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt1920945-s0072-0091",
+"content_sha1": "6b3a5bc6b8125ccc6776317733eaf5191173f9eb",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt1959563-s0017-0032",
+"content_sha1": "b47b108e5e64653ca11060c99282d9236462421f",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt1967614-s0001-0012",
+"content_sha1": "1dee96c735f8fe93bc96d74acf6deb4790487bf9",
+"score": 18,
+"paren_only": 8,
+"cue_as_dlg": 3,
+"bad_cue": 5,
+"fused": 2
+},
+{
+"item_id": "tt1967614-s0013-0027",
+"content_sha1": "050d7121e6b34dc2fbb66558dc8707d506a7eecf",
+"score": 28,
+"paren_only": 19,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 3
+},
+{
+"item_id": "tt1967614-s0037-0048",
+"content_sha1": "12aaecb95057b95eedf1a0d209ed607d2925bbdb",
+"score": 8,
+"paren_only": 6,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt1967614-s0049-0061",
+"content_sha1": "c47cadcb8118eca87983fe2f24aad21ebdd80e08",
+"score": 34,
+"paren_only": 24,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 5
+},
+{
+"item_id": "tt1976009-s0069-0080",
+"content_sha1": "e6e37d4c8720e8c54607785fd7fe8df5d972d740",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 3
+},
+{
+"item_id": "tt1981677-s0001-0016",
+"content_sha1": "8926cd0fb611c4ce1617c9d6e4ace297300873a1",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt1981677-s0017-0028",
+"content_sha1": "ae11002ddcc51418b041911286b3f18807f77bdc",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 11,
+"fused": 0
+},
+{
+"item_id": "tt1981677-s0050-0061",
+"content_sha1": "7c7ca367fb8b8e1e86160a97b54a498f1989a256",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt20420628-s0049-0064",
+"content_sha1": "e6a6eae14cb56333d87ecbeb959572c6fb2694ac",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt2084989-s0040-0059",
+"content_sha1": "d5317cddd0b65089f913c74d03c22f104e43d853",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt2103281-s0046-0061",
+"content_sha1": "1e375b8855b94896042c65c017585fdf15edbfc5",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt2120120-s0101-0116",
+"content_sha1": "7f956fee4c8a2c5de68f9544e8eac310432506a9",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 3
+},
+{
+"item_id": "tt2120120-s0117-0131",
+"content_sha1": "d12028b229913e723429f3d15729f46e1da99152",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt2184339-s0032-0044",
+"content_sha1": "49ecd6b7de9d837b5ddf96718ff388d7eddecbb3",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt2294449-s0000-0014",
+"content_sha1": "4c99d95da762fa63b81c1103e232ff1065e9b3f6",
+"score": 9,
+"paren_only": 8,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt2294449-s0015-0029",
+"content_sha1": "17444535ca8aabc85d30e95c0848a280ce6d85cb",
+"score": 10,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt2294449-s0030-0044",
+"content_sha1": "3438e692c8bf06d7db2115b08f3976ac332b1ba6",
+"score": 9,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt2294449-s0060-0074",
+"content_sha1": "0e447dd63d42197d8ca64c934368cfd4854a3fa2",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt2294449-s0090-0104",
+"content_sha1": "71ce013186a802b5dcdbcac0f86bcc9ccc957d17",
+"score": 10,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt2294449-s0105-0116",
+"content_sha1": "e7df67e61005d81851b3ae98f5fb7bca40a5835e",
+"score": 6,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 3
+},
+{
+"item_id": "tt2334649-s0069-0083",
+"content_sha1": "50274d09d438ae2a735a4bb56a5c5147903b91b8",
+"score": 6,
+"paren_only": 3,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt2388715-s0018-0037",
+"content_sha1": "f70ce09801226329636fe47e11186cc3a1114088",
+"score": 6,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2388715-s0038-0054",
+"content_sha1": "b3f283259643ba4fb915e97cfa7bae3a91016aa3",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt2388715-s0092-0106",
+"content_sha1": "225996577840b74249ca2bfe3042895cc3e10891",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt2388715-s0123-0139",
+"content_sha1": "63eb5923514efd2c4f5392d26fffae8355e46683",
+"score": 7,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 1
+},
+{
+"item_id": "tt2404639-s0019-0033",
+"content_sha1": "f071fbbc657c9eb4e8444c618041a12b52dd51d2",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2404639-s0034-0053",
+"content_sha1": "38199f9c1ad5c2b54da2f2b3589cc635c0f7e593",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2404639-s0054-0073",
+"content_sha1": "2ac310a18ebb46963abaf671099edc53f6b72788",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2404639-s0074-0093",
+"content_sha1": "fdb01d803985441113670c149a14148168b1e199",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2404639-s0094-0108",
+"content_sha1": "b6b1786376132f68743ac1caf1d933f6e661a9f9",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2404639-s0109-0123",
+"content_sha1": "e2b8a9864422e4c2d557dd67bb905381b18d0da8",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 10,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2473602-s0085-0102",
+"content_sha1": "912e23a222ee796db369fb7b8ac55f86490021c9",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt2473602-s0121-0137",
+"content_sha1": "528e627a4d0d0ebc57b5fcb203cc6f4a1bc05f2a",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt2473602-s0155-0169",
+"content_sha1": "2e76daf1eee9b075c7f9ce21f39c5d2ea937bbeb",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt2486678-s0042-0056",
+"content_sha1": "26cca8543ef4263d18d6b6eaf2c13591ff82b6c5",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt2554274-s0046-0061",
+"content_sha1": "2cce1fa5b6d66399c7f8174deca0d208a55602a0",
+"score": 6,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt2554274-s0062-0080",
+"content_sha1": "c40bb49730a5854b2bc70ed38a8c4c0feb3d89da",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2582496-s0028-0042",
+"content_sha1": "89e8abd3d76e801ea7077e13f2c0cc85b3381cc5",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt2582496-s0043-0057",
+"content_sha1": "473bba8651d3e0e75c9982b924740e294d1f1848",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt2582782-s0044-0058",
+"content_sha1": "b6cc6d15816190dffa489e0ce9c0df6d25fe3307",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt2582782-s0059-0077",
+"content_sha1": "ff415547158e79ce2fc5389d1fe9b85cca676f71",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt2771200-s0016-0035",
+"content_sha1": "069390e62389afcb9b7ffc6b9d88b20d818529d5",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt2771200-s0036-0051",
+"content_sha1": "37cd7163991a19af9058f273098e7e0c13fdbad6",
+"score": 5,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt2771200-s0112-0129",
+"content_sha1": "fb95c98f3b5de31d3b4f8c1cbaecb9314d774fdb",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0001-0015",
+"content_sha1": "dc6dc58a3e80cf91eccfa0f598c9879b8b1c9e5f",
+"score": 14,
+"paren_only": 0,
+"cue_as_dlg": 14,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0016-0030",
+"content_sha1": "ed334a19bd0fed1a145fe05d5a992cec76046352",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0031-0045",
+"content_sha1": "8bcb3fd37945bf0ade7951199b01957e24df4f60",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 13,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0046-0060",
+"content_sha1": "3399a822a3037cce17e5fc48698972b1f371c030",
+"score": 15,
+"paren_only": 0,
+"cue_as_dlg": 14,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0061-0075",
+"content_sha1": "180b27011e2a6f6085f935cd1ac06794d77e8376",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 11,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0076-0093",
+"content_sha1": "f09bd4af0d2af2abf792e9b37363a16e380b2105",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0094-0113",
+"content_sha1": "8ddff1389dc17b684ffe340697c08276e6886007",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt2788710-s0114-0130",
+"content_sha1": "8529de27585422d048ef0c252809af8fea7f8e5d",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 8,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt2837574-s0036-0055",
+"content_sha1": "3fbd622cf8a35bffacae97dab728c1503e46d31f",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 0,
+"fused": 6
+},
+{
+"item_id": "tt2837574-s0056-0075",
+"content_sha1": "340a4f02b0062e64c1e35e59edfe373dc5f373d4",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt2837574-s0076-0095",
+"content_sha1": "ecaca6339bbbd787b83913a24f7ab4ff35e99eca",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt2848292-s0001-0017",
+"content_sha1": "f44fa7629ab5fba23fba46f2aec7cb56ff82c2bb",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt2848292-s0076-0090",
+"content_sha1": "24d0c32cfde00dfba0eb684d7d7daf1d15734d05",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt2848292-s0091-0109",
+"content_sha1": "089e3f38b267aeedf2a1606304dbeeaf62d08629",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt2935510-s0103-0119",
+"content_sha1": "fe6d79213232fe06d9b3f6c4e0e15bbe726c3fcc",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt2948356-s0001-0012",
+"content_sha1": "2486922e60537e58a3b02a50bba1a8d911119c18",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt2948356-s0028-0042",
+"content_sha1": "bd3cd9edd1981467e5d642fe34cc1ab871f5798f",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 10,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt3104988-s0016-0031",
+"content_sha1": "9027278ce0b7b02b68b378dfccefe737bd0f1088",
+"score": 6,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt3224458-s0028-0039",
+"content_sha1": "cbff73c5556aec919a2e6b7986ab3e093f7d7b93",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 10,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt3224458-s0040-0056",
+"content_sha1": "eda88d344f4a536bcfcc9a408647ba7a0e3c7685",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt3224458-s0057-0075",
+"content_sha1": "de1dd57b7a96ee7e8d7a3fdcfb12894fb0cd6262",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 7,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt3263904-s0021-0032",
+"content_sha1": "9fb52ecfab62497ec40f7327d6f8a4db1e8650b7",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt3263904-s0105-0122",
+"content_sha1": "bd416d0cce54045a6a8de486be344fe537b6e167",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt3281548-s0001-0015",
+"content_sha1": "76641917509150d6300617a79b7405b8922844c5",
+"score": 11,
+"paren_only": 8,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt3281548-s0016-0030",
+"content_sha1": "cfc425cfd10bbd881c1db9c306f33d8fd1eb843a",
+"score": 12,
+"paren_only": 11,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt3281548-s0031-0045",
+"content_sha1": "329ae213251bb276f6c0c5beb9fec47142ff75e3",
+"score": 11,
+"paren_only": 11,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt3281548-s0046-0060",
+"content_sha1": "410570c927ee417202dbade9d2024dfc638e8500",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt3316948-s0025-0039",
+"content_sha1": "c68795ed8b035c5261349c8379af355ed85ea456",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt3316948-s0055-0069",
+"content_sha1": "a337cb57a9f9cdd89f66449d1e7ca0774753774c",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt3322364-s0030-0044",
+"content_sha1": "6f7b7275cfcc92d869d02857dfa4590882d1bbf2",
+"score": 6,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt3385524-s0061-0075",
+"content_sha1": "8bf8acc4912cf28c8284025fe8147e6519996147",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt3416744-s0001-0020",
+"content_sha1": "6bc1614e82c707c563bd900cb00528955fe89585",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt3470600-s0064-0078",
+"content_sha1": "a63221aabd10e5cfc1ac65afe1deda2afb53cc9e",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt3470600-s0079-0096",
+"content_sha1": "4331d39ff145a85372a1c17e09f6c03cd886b46a",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 1
+},
+{
+"item_id": "tt3501632-s0067-0086",
+"content_sha1": "94d7a379c1ebc3bd69b0880ba1b30a2b58ec7b7a",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt3531824-s0035-0046",
+"content_sha1": "b23ac9f81448b8ef7369bb136b66cd0155f770fc",
+"score": 6,
+"paren_only": 2,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt3581652-s0046-0065",
+"content_sha1": "cdfb84193362683914ea82fcc3c7003757cd58e3",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt3846674-s0001-0015",
+"content_sha1": "cc74382194882175c3d3d3f0f48275e2c2c3a3ec",
+"score": 16,
+"paren_only": 14,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt3846674-s0016-0030",
+"content_sha1": "207bf28e005f5aaf8f164d481fa64980e33c1eca",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt3846674-s0031-0046",
+"content_sha1": "e17651ffa4fefd630f257e44eb0ec7280ae175f7",
+"score": 10,
+"paren_only": 8,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt3846674-s0047-0061",
+"content_sha1": "384b0503d6f8cbc2144ddb810a9d740e224c1741",
+"score": 9,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt3846674-s0078-0092",
+"content_sha1": "6e9906472a738f69e092e74bb3f5f13a9ac6de54",
+"score": 7,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt3850214-s0065-0079",
+"content_sha1": "f33e6d6543a6dfd084261b914b585b045558e0bf",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt4062536-s0001-0017",
+"content_sha1": "195f7defdf3c81176e763bad5615600c5fc39f57",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt4062536-s0034-0049",
+"content_sha1": "fd85e3fb6b37e8a18e984ed21f0b3c531f96b45e",
+"score": 15,
+"paren_only": 0,
+"cue_as_dlg": 5,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt4062536-s0062-0073",
+"content_sha1": "1b1dd9015aa7da904c5e897545605e5ba64a18b2",
+"score": 13,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 9,
+"fused": 0
+},
+{
+"item_id": "tt4158096-s0068-0089",
+"content_sha1": "e8656774827d1b1ee5b4ae5ee3b436c80e045c95",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt4191702-s0032-0046",
+"content_sha1": "2fb47183aa2a74a206c612e3ba36c55d8ec0802d",
+"score": 9,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt4196450-s0001-0017",
+"content_sha1": "62ffce580961f7aa93448ebb9f1542776ee68b59",
+"score": 5,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt4196450-s0063-0082",
+"content_sha1": "1dc21b19d454259e6434458e3c8a05a4e51eb721",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 5
+},
+{
+"item_id": "tt4196450-s0083-0100",
+"content_sha1": "d77dabed1e5c33be5a7b83216af885e972687da8",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt4209788-s0067-0084",
+"content_sha1": "a88179d1add2bff39b13796453212e562e35a73c",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt4209788-s0089-0105",
+"content_sha1": "b5a8a1205ea767f48c9191fd5156e077f2d1ecf0",
+"score": 7,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt4209788-s0144-0159",
+"content_sha1": "fd1457e7c19f1d100b0878170f9494bba57fd20f",
+"score": 15,
+"paren_only": 11,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt4326444-s0000-0014",
+"content_sha1": "ed295e7557a6ab91eab9d0d3ee716238518e4dc3",
+"score": 14,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 14,
+"fused": 0
+},
+{
+"item_id": "tt4326444-s0015-0031",
+"content_sha1": "c06c012d932d1d379cd291da4952678a79ccdfc1",
+"score": 25,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 23,
+"fused": 1
+},
+{
+"item_id": "tt4326444-s0032-0046",
+"content_sha1": "c9af14366e9f3f4e9ebb04a1c383b5bc2cc7c60c",
+"score": 17,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 16,
+"fused": 0
+},
+{
+"item_id": "tt4326444-s0047-0061",
+"content_sha1": "5c0f7af47d7a31750f80420c4183b1a780f5bce6",
+"score": 22,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 22,
+"fused": 0
+},
+{
+"item_id": "tt4326444-s0062-0081",
+"content_sha1": "1aaea8b59b15a733b1e7e2f8251087ee91d806b9",
+"score": 27,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 27,
+"fused": 0
+},
+{
+"item_id": "tt4326444-s0082-0096",
+"content_sha1": "7b4a685e05367b86b34e8afb7a35a80e734f6003",
+"score": 22,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 21,
+"fused": 0
+},
+{
+"item_id": "tt4326444-s0097-0115",
+"content_sha1": "66f1c02f70a6ef644327544e73841d3a2cce8d40",
+"score": 16,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 13,
+"fused": 1
+},
+{
+"item_id": "tt4513316-s0111-0125",
+"content_sha1": "4955453c0bde865817f50808ae1efaac66a05d41",
+"score": 6,
+"paren_only": 6,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt4550098-s0050-0064",
+"content_sha1": "ae2ae8402b8016e090df91dbc1c4017ad6d1c481",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt4669986-s0061-0080",
+"content_sha1": "d17c63d08021ab47378409f86c26e9b5e908f07b",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt4925292-s0001-0015",
+"content_sha1": "d36d3cf4433240d440c3829cf728d1e0b2b612c2",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt4925292-s0031-0050",
+"content_sha1": "2721c751a7b3e7157dcfc9f63066799ff082af78",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt4960748-s0001-0020",
+"content_sha1": "b78aa85233b86387197066548893a40821d5b001",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 1
+},
+{
+"item_id": "tt4998632-s0095-0115",
+"content_sha1": "a1a7a4b40fb94716e41043621899c82f26c57e77",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt5112578-s0001-0015",
+"content_sha1": "46e9dc5629661895f8356f9dbb90959b7b6747cf",
+"score": 4,
+"paren_only": 3,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt5175450-s0015-0031",
+"content_sha1": "a0fdae20341b92209443afbb28f8265da4f3cf9e",
+"score": 4,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt5175450-s0048-0062",
+"content_sha1": "294b2aee2a4e710cbd374c62bdf149e22e5e6471",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 2
+},
+{
+"item_id": "tt5304992-s0031-0045",
+"content_sha1": "8544a549cd867260ad09d947f8c91d95ccaf8c93",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt5311542-s0034-0048",
+"content_sha1": "0f56c617fcd672cfd1a804c77f710c679c6597d2",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt5535276-s0000-0014",
+"content_sha1": "da3b3a3ab3c8ae11068a68a0ba35b61f0341ff3c",
+"score": 6,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt5535276-s0027-0041",
+"content_sha1": "ad90bdb50b166244ad990f04a54b295a6dd1544e",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt5535276-s0042-0053",
+"content_sha1": "e7c5019a15a93f06c8e22328f95274d2158fd020",
+"score": 9,
+"paren_only": 9,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt5536736-s0002-0016",
+"content_sha1": "1aeaf6c2b5057fe46e6ba72b5bf611c703dc9012",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt5536736-s0037-0048",
+"content_sha1": "800dfd368d922defa09905ce3ad6d41b34b3bb7f",
+"score": 5,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt5536736-s0076-0087",
+"content_sha1": "3477c74ca05b13a9f13013dccd763070d42f7e37",
+"score": 7,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt5537002-s0001-0015",
+"content_sha1": "e7a867a5677bf1e5159c6e5e89e0f577878992f8",
+"score": 4,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt5537002-s0061-0075",
+"content_sha1": "1102ca8b790af2595c3249334510419854254628",
+"score": 5,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt5537002-s0076-0092",
+"content_sha1": "212e500711f30a25d72a5ecff9583da9d28cd115",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt5537002-s0093-0108",
+"content_sha1": "56da8e606e67fa344ede9759f57be7e1d88af522",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt5537002-s0125-0144",
+"content_sha1": "83018e107acba7a0b2523d8bdcc148e85f760fd1",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt5711148-s0001-0015",
+"content_sha1": "acdf2ebdb3bd2e1ba3f00f131b0475a75c57a8b4",
+"score": 6,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt5711148-s0016-0031",
+"content_sha1": "fa9709cd4a9063db70d5da2ffacd5544947a500f",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt5711148-s0047-0061",
+"content_sha1": "5fc0067e2791f5bc9cdfb98b2fc4b12b14cbd845",
+"score": 6,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt5711148-s0062-0076",
+"content_sha1": "01665fb8da559f2934a700ed0eaecf90fb5792c8",
+"score": 15,
+"paren_only": 8,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 4
+},
+{
+"item_id": "tt5711148-s0077-0091",
+"content_sha1": "050adfc79acd9a3f158aeebdf685e8d5f194c79a",
+"score": 19,
+"paren_only": 15,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt5711148-s0092-0107",
+"content_sha1": "52ee759c4e5f641cc99be5e38fc9c704285d301d",
+"score": 10,
+"paren_only": 4,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 4
+},
+{
+"item_id": "tt5711148-s0108-0122",
+"content_sha1": "ac20d0c2d0e094f554fee1da55dbb82f5855d6ec",
+"score": 11,
+"paren_only": 4,
+"cue_as_dlg": 1,
+"bad_cue": 2,
+"fused": 4
+},
+{
+"item_id": "tt5776858-s0057-0071",
+"content_sha1": "1c3307851a21c585b35b442ab07a823d3ac98ce5",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt6205872-s0001-0020",
+"content_sha1": "f050bbcedf96f1f6c05b787b0782c65da67d6dd5",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt6205872-s0069-0084",
+"content_sha1": "53578465b0c28e662c0816abdefe33c65952c347",
+"score": 8,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt6217926-s0001-0019",
+"content_sha1": "d4f6f73af795323f060fc35ab18229d31f4bf785",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt6217926-s0020-0039",
+"content_sha1": "cb1817c27f277654155f69e59f3dafb71ab0de89",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt6217926-s0040-0059",
+"content_sha1": "6eb1ef524ca27426d4f0544d5741ed19119ba7a1",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt6217926-s0075-0091",
+"content_sha1": "9500964e6d06fa5fa24d10fc6e94eb4978a69288",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 6,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt6217926-s0092-0109",
+"content_sha1": "31ae8837b464ea04e9ace2463b915cdf6a4eddd6",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt6751668-s0017-0031",
+"content_sha1": "330d0387b9d9e6ccc5e2b7ab9f35c5011dd08a85",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt6751668-s0052-0063",
+"content_sha1": "32a82a0c7c84de5764a2f78f48d3332b1a9d73fe",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt6802400-s0012-0023",
+"content_sha1": "cb3cb24456db57ea2cc3b00158c9399453c9f7e6",
+"score": 4,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt6802400-s0036-0050",
+"content_sha1": "9aa809efd33f4f74330682cb2f5b043dbabd3f43",
+"score": 6,
+"paren_only": 4,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 2
+},
+{
+"item_id": "tt6802400-s0063-0074",
+"content_sha1": "05216d7b09e819e0cbdd35a409d6fb6a34075933",
+"score": 6,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt6857112-s0037-0052",
+"content_sha1": "e842551149d9e785cdf0ee085659f40273fba2d8",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt6866224-s0000-0011",
+"content_sha1": "da7b1b4bdd46c325003f4fb0727d1d4a0cbf1f16",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt6866224-s0024-0035",
+"content_sha1": "ccfcafa840aacb3b094cba3d8d3e2f6d190d5412",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt6866224-s0036-0047",
+"content_sha1": "00be04a14a1f644ad3ea517155c7f834f89c4415",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt6866224-s0048-0060",
+"content_sha1": "e255f30f6b781d6568b5b4cbd4093016266aae7c",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt6933454-s0021-0040",
+"content_sha1": "2825f0e8a459bcd9036a71101e9ec37b1ac1596f",
+"score": 8,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt7014006-s0025-0036",
+"content_sha1": "a7acea61e8d82ca9592781d6eafe185591ce0413",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt7074886-s0001-0015",
+"content_sha1": "7a27819e74e702b7562568d62653addfd87e75c0",
+"score": 9,
+"paren_only": 9,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt7242142-s0078-0092",
+"content_sha1": "62d23ce030351f820dd2c5e6a9af09d4cbed4100",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt7242142-s0093-0110",
+"content_sha1": "15b759b68db8fa2f93830d06c63c30d5a879e212",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt7322224-s0001-0015",
+"content_sha1": "602fd5b7893d9008fcb5d284b78de144a0652574",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt7322224-s0016-0030",
+"content_sha1": "4d2b002872a47cb0e34f0ea786735834f77717f7",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt7322224-s0064-0078",
+"content_sha1": "d0ca95efffc42c30e836979bd6a66fdd40213fa6",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt7349662-s0001-0018",
+"content_sha1": "b2ecb9b85056b4946b9db08ddc7bb9ed322e2460",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt7349662-s0072-0086",
+"content_sha1": "9eaee2fef664e074158a4155b4fac408a5048c71",
+"score": 8,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt7349662-s0121-0140",
+"content_sha1": "4d1e320ffc7a16c5425144ce7a984dd49593e691",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 8,
+"fused": 0
+},
+{
+"item_id": "tt7349662-s0141-0155",
+"content_sha1": "96246a709c755a2b35bc3ace86489147ea3799f2",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 0
+},
+{
+"item_id": "tt7653254-s0020-0034",
+"content_sha1": "8846ebb2f9bfe0e4b755b83b74eb3bdb93723cc4",
+"score": 8,
+"paren_only": 7,
+"cue_as_dlg": 1,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt7653254-s0042-0053",
+"content_sha1": "8359fe13813b28776fce3b176c8ca1d98bdb8651",
+"score": 5,
+"paren_only": 5,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt7668870-s0001-0020",
+"content_sha1": "8e3645cc71995710e0297c32e5ba6c1a7eb9c12f",
+"score": 16,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 16,
+"fused": 0
+},
+{
+"item_id": "tt7668870-s0036-0050",
+"content_sha1": "a3f0c418c91c11c83ce66dc3830e5ab82e02e548",
+"score": 26,
+"paren_only": 1,
+"cue_as_dlg": 0,
+"bad_cue": 25,
+"fused": 0
+},
+{
+"item_id": "tt7668870-s0051-0066",
+"content_sha1": "795a855d9ee498517b6038c5c8f47d5677ac52d0",
+"score": 12,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 12,
+"fused": 0
+},
+{
+"item_id": "tt7668870-s0067-0086",
+"content_sha1": "d29da9a1574cb5eb6e8266feda7c69d83d017d8c",
+"score": 11,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 9,
+"fused": 1
+},
+{
+"item_id": "tt7668870-s0087-0106",
+"content_sha1": "181b13d6eea52110c10d07e6873905984281789c",
+"score": 10,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 10,
+"fused": 0
+},
+{
+"item_id": "tt7668870-s0107-0121",
+"content_sha1": "68d973f83de2e4897b5cc72614dd16ac6b825d8e",
+"score": 28,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 27,
+"fused": 0
+},
+{
+"item_id": "tt7772582-s0115-0133",
+"content_sha1": "f21360041af316f5ef97e0b312422f187505c077",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 4,
+"bad_cue": 0,
+"fused": 0
+},
+{
+"item_id": "tt7784604-s0102-0113",
+"content_sha1": "4b7b9957fbc592407cf694663580c47ff70aab57",
+"score": 10,
+"paren_only": 9,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt7888964-s0098-0117",
+"content_sha1": "0b1e58f656553ba191d45c61adca0d92c4c71e6c",
+"score": 21,
+"paren_only": 17,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 4
+},
+{
+"item_id": "tt7888964-s0118-0138",
+"content_sha1": "fd045b509be28e775c6a022c9660ea15e19130d2",
+"score": 8,
+"paren_only": 7,
+"cue_as_dlg": 0,
+"bad_cue": 0,
+"fused": 1
+},
+{
+"item_id": "tt8105234-s0030-0044",
+"content_sha1": "78b2041bf06d46a4ae7e186363c3b63953673c59",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt8105234-s0077-0091",
+"content_sha1": "99959da55650573b6002234d702b40aef25584c8",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt8589698-s0047-0058",
+"content_sha1": "46323ceedd091534e4a4e77eb1b8521a871ca1c9",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 1,
+"fused": 2
+},
+{
+"item_id": "tt8772262-s0018-0029",
+"content_sha1": "2136470d69a9f29fe029d632cd7bc3d5af7b37a3",
+"score": 13,
+"paren_only": 11,
+"cue_as_dlg": 0,
+"bad_cue": 2,
+"fused": 0
+},
+{
+"item_id": "tt8772262-s0058-0072",
+"content_sha1": "0039a20b273582b382a553ea21ae16adca5f6e5a",
+"score": 9,
+"paren_only": 8,
+"cue_as_dlg": 0,
+"bad_cue": 1,
+"fused": 0
+},
+{
+"item_id": "tt9130508-s0025-0039",
+"content_sha1": "1b2b60773d405ae9c9f79203feba37783d10019b",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt9683478-s0020-0039",
+"content_sha1": "8bd995e09f3c5390c70fccc9c75b07c2f1b153f7",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt9683478-s0080-0099",
+"content_sha1": "52da9413da878ae75b6cfce1e4fe02f0b1514d31",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt9683478-s0100-0119",
+"content_sha1": "5c5bfca8761cd90a5a142f69453da1d4dd27f301",
+"score": 4,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt9683478-s0135-0154",
+"content_sha1": "104bdf12146eb4be54c4e50593503c22ec6b2443",
+"score": 7,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt9731598-s0090-0101",
+"content_sha1": "1a74b1b07fd019b98dc1486bfc74e59b61895d8a",
+"score": 8,
+"paren_only": 2,
+"cue_as_dlg": 2,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt9777644-s0001-0012",
+"content_sha1": "5d495266f261b12dbe342a7ecebfe621bf29f743",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 0,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt9777644-s0013-0027",
+"content_sha1": "4e385c74e1e3a7565f4abbf3b0790885b8d568cc",
+"score": 9,
+"paren_only": 0,
+"cue_as_dlg": 3,
+"bad_cue": 6,
+"fused": 0
+},
+{
+"item_id": "tt9777644-s0071-0086",
+"content_sha1": "e72f0f763ed56e16f37f9e3eadc9391b69e9f10b",
+"score": 6,
+"paren_only": 0,
+"cue_as_dlg": 2,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt9777644-s0087-0104",
+"content_sha1": "76ed698969d8e13ea04ddbd3557263de5d0bf124",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt9784798-s0001-0015",
+"content_sha1": "217045f0348176bd251d5ac21fc0720f0e82267a",
+"score": 14,
+"paren_only": 5,
+"cue_as_dlg": 1,
+"bad_cue": 7,
+"fused": 1
+},
+{
+"item_id": "tt9784798-s0016-0032",
+"content_sha1": "6abf1640608c39cd4acdbd4472bfa07fe5c4b09c",
+"score": 7,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 1
+},
+{
+"item_id": "tt9784798-s0033-0048",
+"content_sha1": "aefb0e95cff3e94c567a9e3c042f86fad1840e24",
+"score": 8,
+"paren_only": 1,
+"cue_as_dlg": 2,
+"bad_cue": 5,
+"fused": 0
+},
+{
+"item_id": "tt9784798-s0049-0067",
+"content_sha1": "014a4ed3b987d4a4470e3d137eacf0fd7d690e4f",
+"score": 7,
+"paren_only": 2,
+"cue_as_dlg": 1,
+"bad_cue": 4,
+"fused": 0
+},
+{
+"item_id": "tt9784798-s0068-0082",
+"content_sha1": "dca0867699871da6a4b3a995dda1d02206ef92ac",
+"score": 9,
+"paren_only": 2,
+"cue_as_dlg": 0,
+"bad_cue": 7,
+"fused": 0
+},
+{
+"item_id": "tt9784798-s0083-0097",
+"content_sha1": "43cb213a2e8bc1469de984e83dd99a82ef8d1a0b",
+"score": 6,
+"paren_only": 1,
+"cue_as_dlg": 1,
+"bad_cue": 1,
+"fused": 3
+},
+{
+"item_id": "tt9827834-s0129-0141",
+"content_sha1": "4dff11ca9dd169dbf52d35d451394db6bf52b844",
+"score": 5,
+"paren_only": 0,
+"cue_as_dlg": 1,
+"bad_cue": 3,
+"fused": 1
+}
+]
+}
