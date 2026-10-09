@@ -13,7 +13,8 @@ import json
 import os
 import re
 
-SCHEMA_VERSION = "1.0"
+SCHEMA_VERSION = "1.1"
+IDENTITY_DECISIONS = ("relabel", "accept_as_draft", "accept", "unverifiable_ok", "hold")
 
 TAG_KEYS = ("<scene>", "<stage_direction>", "<scene_description>", "<parenthetical>", "<character>", "<dialogue>")
 QUALITY_KEYS = ("dialogue_turns", "num_speakers", "top_speakers", "dialogue_char_ratio", "max_element_chars",
@@ -58,6 +59,12 @@ FIELDS = [
     ("abstract_prompt_version", "string", True, "prompt that produced summary; null until merged"),
     ("abstract_author", "string", True, "model/agent that wrote summary; null until merged"),
     ("quality", "object", False, "content QC metrics: " + ", ".join(QUALITY_KEYS)),
+    # 1.1 (contract C33, film identity)
+    ("source_label", "object", True, "null, or the source's own label {imdb_id, movie_name, split} when identity_table.json "
+                                     "relabelled the screenplay to the film it really is"),
+    ("script_version", "string", True, "null, or 'draft' when the text is an early draft of the film (renamed characters)"),
+    ("identity_decision", "string", True, "null when the speakers match the IMDb cast (C33 ok); else the identity_table.json "
+                                          "decision: relabel | accept_as_draft | accept | unverifiable_ok | hold"),
 ]
 FIELD_NAMES = [f[0] for f in FIELDS]
 _JSON_TYPES = {"string": str, "integer": int, "number": (int, float), "boolean": bool, "array": list, "object": dict}
@@ -126,6 +133,9 @@ def make_record(item: dict, *, batch_id: str, build: str, abstract: dict | None 
         "abstract_prompt_version": abstract.get("prompt_version") if abstract else None,
         "abstract_author": abstract.get("author") if abstract else None,
         "quality": {k: item.get(k) for k in QUALITY_KEYS},
+        "source_label": item.get("source_label"),
+        "script_version": item.get("script_version"),
+        "identity_decision": item.get("identity_decision"),
     }
     return rec
 
@@ -171,6 +181,13 @@ def validate_record(rec: dict) -> list[str]:
         if set(d) != {"scene", "reason"} or not rec["scene_start"] < d["scene"] < rec["scene_end"]:
             problems.append("dropped_scenes_shape")
             break
+    if rec["source_label"] is not None and (set(rec["source_label"]) != {"imdb_id", "movie_name", "split"}
+                                            or rec["identity_decision"] != "relabel"):
+        problems.append("source_label_shape")
+    if rec["identity_decision"] is not None and rec["identity_decision"] not in IDENTITY_DECISIONS:
+        problems.append("identity_decision_value")
+    if rec["script_version"] not in (None, "draft") or (rec["script_version"] == "draft") != (rec["identity_decision"] == "accept_as_draft"):
+        problems.append("script_version_value")
     has_summary = bool(rec["summary"])
     if has_summary != (rec["abstract_prompt_version"] is not None) or has_summary != (rec["summary_words"] is not None):
         problems.append("summary_fields_inconsistent")
@@ -184,4 +201,11 @@ def schema_json() -> dict:
         "tag_keys": list(TAG_KEYS),
         "quality_keys": list(QUALITY_KEYS),
         "gt_related_types": list(GT_RELATED_TYPES),
+        "identity_decisions": list(IDENTITY_DECISIONS),
     }
+
+
+def load_identity_table(path: str | None = None) -> dict[str, dict]:
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "identity_table.json")
+    with open(path, encoding="utf-8") as f:
+        return {e["imdb_id"]: e for e in json.load(f)["films"]}

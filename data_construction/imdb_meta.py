@@ -48,6 +48,9 @@ def main() -> None:
         with open(os.path.join(args.moviesum_dir, f"{split}.jsonl"), encoding="utf-8") as f:
             for line in f:
                 ids.add(json.loads(line)["imdb_id"])
+    # Films a MovieSum screenplay is relabelled to (identity_table.json) need their own metadata.
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "identity_table.json"), encoding="utf-8") as f:
+        ids |= {e["target_imdb_id"] for e in json.load(f)["films"] if e.get("target_imdb_id")}
 
     meta = {i: {} for i in ids}
     for row in read_tsv(fetch("title.basics.tsv.gz", args.imdb_dir), ids):

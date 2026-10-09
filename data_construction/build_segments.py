@@ -38,13 +38,13 @@ from cml_format import (  # noqa: E402
     segment_stats,
     validate_cml,
 )
-from dataset_schema import gt_relation, load_gt_related  # noqa: E402
+from dataset_schema import gt_relation, load_gt_related, load_identity_table  # noqa: E402
 
 MOVIESUM_URL = "https://huggingface.co/datasets/rohitsaxena/MovieSum/resolve/main/{split}.jsonl"
 MOVIESUM_PAGE = "https://huggingface.co/datasets/rohitsaxena/MovieSum"
 GT_URL = "https://huggingface.co/datasets/songdj/CML-Bench/resolve/main/ground_truth/gt_100.json"
 SPLITS = ("train", "val", "test")
-NORMALIZATION_VERSION = "moviesum_clean_detok_v3"
+NORMALIZATION_VERSION = "moviesum_clean_detok_v3_1"
 
 CONFIG = {
     "scenes_preferred": [15, 20],
@@ -200,6 +200,7 @@ def main() -> None:
     ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
     ap.add_argument("--imdb_meta", default="data_construction/work/sources/imdb_meta.json")
     ap.add_argument("--gt_related", default=None, help="GT relation table (default: data_construction/gt_related.json)")
+    ap.add_argument("--identity_table", default=None, help="C33 decisions (default: data_construction/identity_table.json)")
     ap.add_argument("--out", default="data_construction/work/build")
     ap.add_argument("--limit_movies", type=int, default=0, help="debug: only process the first N candidate movies")
     ap.add_argument("--no_detok", action="store_true", help="keep MovieSum's PTB tokenization (\"do n't\", \" ,\") verbatim")
@@ -213,6 +214,7 @@ def main() -> None:
     gt = load_gt(args.gt_path)
     imdb_meta = load_imdb_meta(args.imdb_meta)
     gt_table = load_gt_related(args.gt_related)
+    identity = load_identity_table(args.identity_table)
     gt_ids = {r["imdb_id"] for r in gt}
     gt_titles = {norm_title(r["movie_name"]) for r in gt}
 
@@ -245,6 +247,14 @@ def main() -> None:
         if imdb_id in by_id:
             gt_movie_shingles |= shingles(words_of(clean_text(by_id[imdb_id]["script"])), cfg["ngram"], cfg["shingle_sample_mod"])
 
+    for e in identity.values():
+        if e["decision"] == "relabel":
+            t = e["target_imdb_id"]
+            if t in gt_ids or t in by_id or gt_relation(t, gt_table) or norm_title(e["target_movie_name"]) in gt_titles:
+                sys.exit(f"identity_table: relabel target {t} is a GT movie, GT-related or already a MovieSum row")
+        if e["decision"] == "duplicate_keep_other" and e["keep_imdb_id"] not in by_id:
+            sys.exit(f"identity_table: {e['imdb_id']} keeps {e['keep_imdb_id']}, which is not a MovieSum row")
+
     candidates = sorted(by_id.values(), key=lambda r: (split_rank[r["split"]], r["imdb_id"]))
     if args.limit_movies:
         candidates = candidates[: args.limit_movies]
@@ -262,6 +272,20 @@ def main() -> None:
         if relation and relation["type"] == "remake":
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "gt_remake", "gt_movie": relation["gt_movie"]})
             continue
+        # C33: a screenplay MovieSum files under the wrong film is relabelled, dropped, or (duplicates) the row whose
+        # cast matches is kept instead; this happens before the duplicate-text check so the right row survives.
+        ident = identity.get(imdb_id, {})
+        decision = ident.get("decision")
+        if decision in ("exclude", "duplicate_keep_other"):
+            excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": f"identity_{decision}",
+                             **({"keep_imdb_id": ident["keep_imdb_id"]} if decision == "duplicate_keep_other" else {})})
+            continue
+        out_id, out_name = imdb_id, name
+        source_label = None
+        if decision == "relabel":
+            out_id, out_name = ident["target_imdb_id"], ident["target_movie_name"]
+            source_label = {"imdb_id": imdb_id, "movie_name": name, "split": row["split"]}
+            relation = gt_relation(out_id, gt_table)
         dropped: dict[int, str] = {}
         scenes = parse_script(row["script"], detok=not args.no_detok, dropped=dropped)
         scenes = drop_duplicate_scenes(drop_front_matter(scenes), dropped=dropped)
@@ -287,12 +311,12 @@ def main() -> None:
             prefix.append(prefix[-1] + t)
         windows = choose_windows(scenes, prefix, cfg)
         stats["movies_windowed"] += 1
-        meta = imdb_meta.get(imdb_id, {})
+        meta = imdb_meta.get(out_id, {})
         kept = 0
         for wi, (a, b) in enumerate(windows):
             seg_scenes = scenes[a:b]
             content = render(seg_scenes)
-            item_id = f"{imdb_id}-s{seg_scenes[0].index:04d}-{seg_scenes[-1].index:04d}"
+            item_id = f"{out_id}-s{seg_scenes[0].index:04d}-{seg_scenes[-1].index:04d}"
             kept_idx = {s.index for s in seg_scenes}
             gaps = [i for i in range(seg_scenes[0].index, seg_scenes[-1].index + 1) if i not in kept_idx]
             assert all(i in dropped for i in gaps), (item_id, [i for i in gaps if i not in dropped])
@@ -304,14 +328,14 @@ def main() -> None:
                 reasons.append("gt_segment_overlap")
             stats["windows_total"] += 1
             if reasons:
-                rejected.append({"item_id": item_id, "movie_name": name, "reasons": reasons, "content_tokens": st["content_tokens"]})
+                rejected.append({"item_id": item_id, "movie_name": out_name, "reasons": reasons, "content_tokens": st["content_tokens"]})
                 stats.update(f"reject:{r.split(':')[0]}" for r in reasons)
                 continue
             accepted.append(
                 {
                     "item_id": item_id,
-                    "movie_name": name,
-                    "imdb_id": imdb_id,
+                    "movie_name": out_name,
+                    "imdb_id": out_id,
                     "script_segment": content,
                     "summary": "",
                     "segment_index": kept,
@@ -323,7 +347,7 @@ def main() -> None:
                     "source_split": row["split"],
                     "source_url": MOVIESUM_PAGE,
                     "source_file": f"{row['split']}.jsonl",
-                    "imdb_url": f"https://www.imdb.com/title/{imdb_id}/",
+                    "imdb_url": f"https://www.imdb.com/title/{out_id}/",
                     "imdb_rating": meta.get("rating"),
                     "imdb_votes": meta.get("votes"),
                     "genres": meta.get("genres", []),
@@ -331,6 +355,9 @@ def main() -> None:
                     "content_normalization": normalization,
                     "content_sha1": hashlib.sha1(content.encode()).hexdigest(),
                     "gt_related": relation,
+                    "source_label": source_label,
+                    "script_version": "draft" if decision == "accept_as_draft" else None,
+                    "identity_decision": decision,
                     "gt_ngram_overlap": round(gt_ov, 5),
                     **{k: st[k] for k in st},
                 }
@@ -377,6 +404,8 @@ def main() -> None:
         "split_counts": dict(Counter(s["source_split"] for s in accepted)),
         "gt_related_segments": dict(Counter(s["gt_related"]["type"] for s in accepted if s["gt_related"])),
         "eval_safe_segments": sum(s["gt_related"] is None for s in accepted),
+        "identity_decisions": dict(Counter(s["identity_decision"] for s in accepted if s["identity_decision"])),
+        "identity_table": "identity_v1",
         "gt_related_table": gt_table["version"],
         "total_content_tokens": sum(s["content_tokens"] for s in accepted),
         "seconds": round(time.time() - t0, 1),
