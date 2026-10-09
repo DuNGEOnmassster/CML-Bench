@@ -70,6 +70,8 @@ def main() -> None:
     ap.add_argument("--batch_prefix", default=None, help="batch id prefix (default: '<source slug>-b')")
     ap.add_argument("--prompt", default=DEFAULT_PROMPT)
     ap.add_argument("--prompt_version", default="abstract_v1.5")
+    ap.add_argument("--allowed_authors", default="claude-opus-5.5", help="comma-separated author values merge gate G1 accepts")
+    ap.add_argument("--orchestrators", type=int, default=4, help="fan-out partitions written to fanout.json (main batches only)")
     args = ap.parse_args()
 
     run_dir = os.path.abspath(args.run_dir)
@@ -92,16 +94,24 @@ def main() -> None:
     else:
         items = select(segments, args.sample, args.one_per_movie, args.seed)
     prefix = args.batch_prefix if args.batch_prefix is not None else f"{slug}-b"
+    # Films whose identity is on hold (C33) get their own batches after the main range; they are not issued in the
+    # fan-out until a human read decides.
+    held = [it for it in items if it.get("identity_decision") == "hold"]
+    main_items = [it for it in items if it.get("identity_decision") != "hold"]
+    items = main_items + held
+    bs = args.batch_size
+    index = [(f"{prefix}{n:04d}", main_items[b : b + bs]) for n, b in enumerate(range(0, len(main_items), bs), start=1)]
+    n_main = len(index)
+    index += [(f"{slug}-hold-b{n:04d}", held[b : b + bs]) for n, b in enumerate(range(0, len(held), bs), start=1)]
 
     os.makedirs(os.path.join(run_dir, "abstracts"), exist_ok=True)
-    index = []
-    for n, b in enumerate(range(0, len(items), args.batch_size), start=1):
-        batch_id = f"{prefix}{n:04d}"
+    rows = []
+    for batch_id, batch_items in index:
         bdir = os.path.join(run_dir, "batches", batch_id)
         os.makedirs(os.path.join(bdir, "items"), exist_ok=True)
         os.makedirs(os.path.join(bdir, "scratch"), exist_ok=True)
         entries = []
-        for it in items[b : b + args.batch_size]:
+        for it in batch_items:
             it["batch_id"] = batch_id
             it["build_id"] = build
             content_path = os.path.join(bdir, "items", f"{it['item_id']}.xml")
@@ -127,25 +137,36 @@ def main() -> None:
             "prompt_path": os.path.abspath(args.prompt),
             "prompt_version": args.prompt_version,
             "scratch_dir": os.path.join(bdir, "scratch"),
+            "writer_report_path": os.path.join(bdir, "writer_report.json"),
+            "allowed_authors": args.allowed_authors.split(","),
             "num_items": len(entries),
             "total_content_tokens": sum(e["content_tokens"] for e in entries),
             "items": entries,
         }
         with open(os.path.join(bdir, "manifest.json"), "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2, ensure_ascii=False)
-        index.append({"batch_id": batch_id, "item_ids": [e["item_id"] for e in entries],
-                      "content_sha1s": [e["content_sha1"] for e in entries]})
+        rows.append({"batch_id": batch_id, "item_ids": [e["item_id"] for e in entries],
+                     "content_sha1s": [e["content_sha1"] for e in entries]})
 
     with open(os.path.join(run_dir, "items.jsonl"), "w", encoding="utf-8") as f:
         for it in items:
             f.write(json.dumps(it, ensure_ascii=False) + "\n")
     with open(os.path.join(run_dir, "batches.jsonl"), "w", encoding="utf-8") as f:
-        for row in index:
+        for row in rows:
             f.write(json.dumps(row) + "\n")
+    # Contiguous partitions of the main batches, cut at multiples of 10 so each C31 sampling block has one owner.
+    per = -(-n_main // (args.orchestrators * 10)) * 10
+    ranges = [{"name": f"O{i + 1}", "first": i * per + 1, "last": min(n_main, (i + 1) * per)}
+              for i in range(args.orchestrators) if i * per < n_main]
+    with open(os.path.join(run_dir, "fanout.json"), "w", encoding="utf-8") as f:
+        json.dump({"build_id": build, "batch_prefix": prefix, "main_batches": n_main, "hold_batches": len(rows) - n_main,
+                   "orchestrators": ranges}, f, indent=2)
     with open(os.path.join(run_dir, "run.json"), "w", encoding="utf-8") as f:
         json.dump({"build_id": build, "source_slug": slug, "seed": args.seed, "batch_size": args.batch_size,
-                   "prompt_version": args.prompt_version, "items": len(items), "batches": len(index)}, f, indent=2)
-    print(f"{len(items)} items -> {len(index)} batches of <= {args.batch_size} in {run_dir} (build {build})")
+                   "prompt_version": args.prompt_version, "items": len(items), "batches": len(rows),
+                   "main_batches": n_main, "held_items": len(held)}, f, indent=2)
+    print(f"{len(items)} items -> {len(rows)} batches of <= {args.batch_size} ({n_main} main, {len(rows) - n_main} hold) "
+          f"in {run_dir} (build {build})")
 
 
 if __name__ == "__main__":

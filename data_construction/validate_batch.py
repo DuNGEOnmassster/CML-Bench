@@ -3,15 +3,18 @@
   python data_construction/validate_batch.py --run_dir RUN --batch RUN/batches/moviesum-b0001
 
 Blocking gates (all must pass; contract IDs in brackets):
-  G1 complete     every manifest item has a valid abstract JSON (item_id, abstract, prompt_version == manifest, author)
-  G2 integrity    sha1(content file) == manifest content_sha1 == run items.jsonl content_sha1 (== abstract's, if given)
+  G1 complete     every manifest item has a valid abstract JSON (item_id, abstract, prompt_version == manifest) and its
+                  author is on the manifest's allowed_authors list
+  G2 integrity    the abstract's content_sha1 (required) == sha1(content file) == manifest == run items.jsonl
   G3 hard checks  check_abstracts hard-pass for every item [C19]
   G4 grounding    lexical grounding >= 0.35 for every item [C23]
   G5 length       >= 70% of items inside target_words [C20; release level is >= 85%]
   G6 boilerplate  first 8 words unique within the batch and against every already merged abstract [C24]
   G7 schema       the merged record passes dataset_schema.validate_record
-Soft signals (reported, never blocking): top speaker named, thirds covered, paragraphs, words vs target_center.
-Faithfulness/coverage (C25-C28) are judged by the evaluator's sample audit; a failed audit revokes the batch (C31).
+Non-blocking G8 (audit routing, C31): an item goes to the targeted audit pool, outside the 2% random sample, when its
+abstract names the film's title (not as words of the excerpt), has 1-2 ungrounded proper nouns, misses the top speaker
+or the last third, or the writer reported a source problem for it (batches/<id>/writer_report.json).
+Faithfulness/coverage (C25'-C28') are judged by the audit; a major or outside error revokes the batch (C31).
 """
 from __future__ import annotations
 
@@ -19,6 +22,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +31,29 @@ from dataset_schema import make_record, validate_record  # noqa: E402
 
 MIN_IN_TARGET = 0.7
 MIN_GROUNDING = 0.35
+DEFAULT_AUTHORS = ["claude-opus-5.5"]
+G8_SOFT = {"some_ungrounded_proper_nouns": "ungrounded_names", "top_speaker_missing": "top_speaker_missing",
+           "last_third_not_covered": "last_third_not_covered"}
+
+
+def title_mention(abstract: str, movie_name: str, content: str) -> bool:
+    """The abstract uses the film's title (>= 2 words, or one word of >= 5 letters) and the excerpt never does."""
+    title = re.sub(r"_\d{4}$", "", movie_name)
+    title = re.sub(r"^(the|a|an)\s+", "", title, flags=re.I).split(":")[0].strip()
+    words = re.findall(r"[A-Za-z']+", title)
+    if not words or (len(words) == 1 and len(words[0]) < 5):
+        return False
+    pat = r"\b" + r"\W+".join(map(re.escape, words)) + r"\b"
+    return bool(re.search(pat, abstract, re.I)) and not re.search(pat, content, re.I)
+
+
+def writer_issues(batch_dir: str) -> set[str]:
+    path = os.path.join(batch_dir, "writer_report.json")
+    if not os.path.exists(path):
+        return set()
+    with open(path, encoding="utf-8") as f:
+        rep = json.load(f)
+    return {x["item_id"] for x in rep.get("source_issues", []) if x.get("item_id")}
 
 
 def first8(text: str) -> str:
@@ -48,10 +75,12 @@ def abstract_set_hash(manifest: dict) -> str:
 def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_tokens=None) -> dict:
     from make_abstract_batches import target_center  # noqa: PLC0415
 
-    failures, soft, records, per_item = [], [], [], []
+    failures, soft, records, per_item, targets = [], [], [], [], []
     present = [os.path.exists(e["abstract_path"]) for e in manifest["items"]]
     if not any(present):
-        return {"state": "pending", "failures": [], "soft": [], "records": [], "items": []}
+        return {"state": "pending", "failures": [], "soft": [], "records": [], "items": [], "audit_targets": []}
+    allowed = set(manifest.get("allowed_authors") or DEFAULT_AUTHORS)
+    issues = writer_issues(os.path.dirname(manifest["scratch_dir"]))
     seen8 = set()
     for e, ok in zip(manifest["items"], present):
         iid = e["item_id"]
@@ -69,11 +98,16 @@ def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_t
             continue
         if ab.get("prompt_version") != manifest["prompt_version"]:
             failures.append(f"G1:{iid}:prompt_version={ab.get('prompt_version')}")
+        if ab.get("author") not in allowed:
+            failures.append(f"G1:{iid}:author_not_allowed={ab.get('author')}")
         with open(e["content_path"], encoding="utf-8") as f:
             content = f.read()
         item = items_by_id.get(iid)
         sha = hashlib.sha1(content.encode()).hexdigest()
-        if item is None or not (sha == e["content_sha1"] == item["content_sha1"]) or ab.get("content_sha1", sha) != sha:
+        if not ab.get("content_sha1"):
+            failures.append(f"G2:{iid}:content_sha1_missing")
+            continue
+        if item is None or not (sha == e["content_sha1"] == item["content_sha1"] == ab["content_sha1"]):
             failures.append(f"G2:{iid}:content_changed")
             continue
         chk = check_one(ab["abstract"], content, e["target_words"])
@@ -90,6 +124,13 @@ def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_t
         if problems:
             failures.append(f"G7:{iid}:{','.join(problems)}")
         soft.extend(f"{iid}:{s}" for s in chk["soft"])
+        reasons = [G8_SOFT[x] for x in chk["soft"] if x in G8_SOFT]
+        if title_mention(ab["abstract"], item["movie_name"], content):
+            reasons.append("title_mention")
+        if iid in issues:
+            reasons.append("writer_source_issue")
+        if reasons:
+            targets.append({"item_id": iid, "batch_id": manifest["batch_id"], "reasons": reasons})
         per_item.append({"item_id": iid, "words": chk["words"], "target_center": target_center(item["content_tokens"]),
                          "paragraphs": chk.get("paragraphs"), "hard": chk["hard"], "soft": chk["soft"],
                          "grounding": chk.get("lexical_grounding")})
@@ -100,7 +141,7 @@ def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_t
             failures.append(f"G5:in_target={in_target:.2f}")
     state = "passed" if all(present) and not failures else ("incomplete" if not all(present) else "rejected")
     return {"state": state, "failures": failures, "soft": soft, "records": records if state == "passed" else [],
-            "items": per_item}
+            "items": per_item, "audit_targets": targets}
 
 
 def main() -> None:
@@ -113,7 +154,7 @@ def main() -> None:
     with open(os.path.join(args.batch, "manifest.json"), encoding="utf-8") as f:
         manifest = json.load(f)
     res = validate(manifest, items, set())
-    print(json.dumps({k: res[k] for k in ("state", "failures", "soft")}, indent=2))
+    print(json.dumps({k: res[k] for k in ("state", "failures", "soft", "audit_targets")}, indent=2))
     sys.exit(0 if res["state"] == "passed" else 1)
 
 

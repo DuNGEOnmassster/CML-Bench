@@ -26,6 +26,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -35,6 +36,7 @@ sys.path.insert(0, HERE)
 from dataset_schema import SCHEMA_VERSION, make_record, schema_json, source_slug, validate_record  # noqa: E402
 
 STORE_STATUS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/build_status.json"
+DEFAULT_VERDICTS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/audit"
 SHARD_BATCHES = 100
 DEFAULT_REPO = f"{os.environ.get('HF_ACCOUNT', '')}/CML-Dataset-Expanded"
 
@@ -239,8 +241,12 @@ Windows with `relative_position == 0` may open with title-page text.
 
 Source screenplays: [MovieSum](https://huggingface.co/datasets/rohitsaxena/MovieSum) (CC BY-NC 4.0 curation); each item
 records `source_url`, `source_file`, `scene_start`/`scene_end`, `dropped_scenes` and `imdb_url`. The CML-Bench GT movies
-are excluded (IMDb id, title, 13-gram text overlap, curated remake table). The screenplays remain the property of their
-rights holders: this dataset is private and for non-commercial research only. Do not make it public or redistribute it.
+are excluded (IMDb id, title, 13-gram text overlap, curated remake table). Film identity is checked against IMDb cast
+names: screenplays MovieSum files under the wrong film are relabelled (`source_label` keeps MovieSum's label), early
+drafts carry `script_version: draft`, and films awaiting a human identity read are in `*-hold-*` batches that are not
+written. Abstracts were written to land within a few words of a per-item target length, so their length spread is
+narrower than GT's. Audit pools and verdicts: `audit/<source>/`. The screenplays remain the property of their rights
+holders: this dataset is private and for non-commercial research only. Do not make it public or redistribute it.
 """
     return text.encode()
 
@@ -252,8 +258,9 @@ def write_store_status(status: dict, path: str) -> None:
             f.write("\n")
 
 
-def source_state(run_dir: str):
-    """Desired repo files for one source + its status, computed only from the local run dir."""
+def source_state(run_dir: str, verdicts_path: str | None = None):
+    """Desired repo files for one source + its status, computed from the local run dir (+ the audit verdicts file)."""
+    from audit_rules import paused_orchestrators, sample_batches, sample_item, stop_rule
     from cml_format import count_tokens
     from validate_batch import abstract_set_hash, first8, validate
 
@@ -270,6 +277,21 @@ def source_state(run_dir: str):
     revoked = json.load(open(revoked_path, encoding="utf-8")) if os.path.exists(revoked_path) else {}
     cache_path = os.path.join(run_dir, "merge_cache.json")
     cache = json.load(open(cache_path, encoding="utf-8")) if os.path.exists(cache_path) else {}
+    fanout_path = os.path.join(run_dir, "fanout.json")
+    ranges = json.load(open(fanout_path, encoding="utf-8"))["orchestrators"] if os.path.exists(fanout_path) else []
+    verdicts = []
+    paths = []
+    if verdicts_path and os.path.isdir(verdicts_path):
+        paths = sorted(os.path.join(verdicts_path, fn) for fn in os.listdir(verdicts_path) if re.match(r"verdicts.*\.jsonl$", fn))
+    elif verdicts_path and os.path.exists(verdicts_path):
+        paths = [verdicts_path]
+    for path in paths:  # one file per auditor, so reviewers never write the same file
+        with open(path, encoding="utf-8") as f:
+            verdicts += [v for v in map(json.loads, filter(str.strip, f)) if v.get("item_id") in items_by_id]
+    verdicts.sort(key=lambda v: v.get("audited_at", ""))
+    bad_verdict = {(v["item_id"], v.get("summary_sha1")) for v in verdicts if v.get("major", 0) or v.get("outside", 0)}
+    sampled = sample_batches([b["batch_id"] for b in batches])
+    targeted, sample = [], []
 
     files: dict[str, bytes] = {}
     content_records = []
@@ -301,13 +323,16 @@ def source_state(run_dir: str):
             res, rec_list = hit["res"], []
         else:
             full = validate(manifest, items_by_id, merged_first8, count_tokens=count_tokens)
-            res = {k: full[k] for k in ("state", "failures", "items")}
+            res = {k: full[k] for k in ("state", "failures", "items", "audit_targets")}
             rec_list = full["records"]
         first8s = [first8(r["summary"]) for r in rec_list]
         new_cache[b["batch_id"]] = {"key": key, "res": res, "first8": first8s}
         state = res["state"]
         if state == "passed" and revoked.get(b["batch_id"], {}).get("key") == key:
             state = "revoked"
+        sha = {r["item_id"]: hashlib.sha1(r["summary"].encode()).hexdigest() for r in rec_list}
+        if state == "passed" and any((i, h) in bad_verdict for i, h in sha.items()):
+            state = "revoked"  # C31: a major/outside verdict on these exact abstracts
         if state != "pending":
             states[b["batch_id"]] = state
         failed_items = {f.split(":")[1] for f in res["failures"] if f.count(":") >= 2}
@@ -316,6 +341,10 @@ def source_state(run_dir: str):
         if state == "passed":
             merged_first8.update(first8s)
             merged_items += len(rec_list)
+            targeted += [{**t, "summary_sha1": sha[t["item_id"]]} for t in res.get("audit_targets", [])]
+            if b["batch_id"] in sampled:
+                pick = sample_item([r["item_id"] for r in rec_list])
+                sample.append({"item_id": pick, "batch_id": b["batch_id"], "summary_sha1": sha[pick], "reason": "stratified_2pct"})
             for r in rec_list:
                 prompt_versions[r["abstract_prompt_version"]] = prompt_versions.get(r["abstract_prompt_version"], 0) + 1
             safe = [r for r in rec_list if r["eval_safe"]]
@@ -326,6 +355,21 @@ def source_state(run_dir: str):
                 files[f"data/{slug}/{b['batch_id']}.related.jsonl"] = jsonl_bytes(related)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(new_cache, f)
+    if targeted:
+        files[f"audit/{slug}/targeted.jsonl"] = jsonl_bytes(targeted)
+    if sample:
+        files[f"audit/{slug}/sample.jsonl"] = jsonl_bytes(sample)
+    if verdicts:
+        files[f"audit/{slug}/verdicts.jsonl"] = jsonl_bytes(verdicts)
+    rule = stop_rule(verdicts)
+    audited_batches, seen_b = [], set()
+    for v in verdicts:
+        if v["batch_id"] not in seen_b:
+            seen_b.add(v["batch_id"])
+            audited_batches.append((v["batch_id"], any(x["batch_id"] == v["batch_id"] and (x.get("major", 0) or x.get("outside", 0))
+                                                        for x in verdicts)))
+    audit = {"targeted_items": len(targeted), "sample_items": len(sample), **rule,
+             "paused_orchestrators": paused_orchestrators(audited_batches, ranges), "orchestrators": ranges}
 
     checks_path = os.path.join(run_dir, "content_checks.json")
     content_checks = None
@@ -358,6 +402,10 @@ def source_state(run_dir: str):
         "batch_size": run["batch_size"],
         "merged_prompt_versions": prompt_versions,
         "content_checks": content_checks,
+        "items_held": sum(it.get("identity_decision") == "hold" for it in items),
+        "identity_decisions": dict(sorted({d: sum(it.get("identity_decision") == d for it in items)
+                                           for d in {it.get("identity_decision") for it in items} if d}.items())),
+        "audit": audit,
         "updated_at": now(),
         "batch_states": states,
     }
@@ -365,8 +413,8 @@ def source_state(run_dir: str):
 
 
 def cmd_sync(repo: Repo, args) -> dict:
-    slug, files, status = source_state(args.run_dir)
-    owned = (f"content/{slug}/", f"manifests/{slug}/", f"data/{slug}/")
+    slug, files, status = source_state(args.run_dir, args.verdicts)
+    owned = (f"content/{slug}/", f"manifests/{slug}/", f"data/{slug}/", f"audit/{slug}/")
     result = {}
 
     def plan(head, tree):
@@ -458,6 +506,7 @@ def main() -> None:
     sub = ap.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("sync")
     s.add_argument("--run_dir", required=True)
+    s.add_argument("--verdicts", default=DEFAULT_VERDICTS, help="audit verdicts: a jsonl file, or a dir of verdicts*.jsonl (C31); missing = none yet")
     p = sub.add_parser("pilot")
     p.add_argument("--folder", required=True)
     p.add_argument("--name", required=True)
