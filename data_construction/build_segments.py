@@ -38,6 +38,7 @@ from cml_format import (  # noqa: E402
     segment_stats,
     validate_cml,
 )
+from dataset_schema import gt_relation, load_gt_related  # noqa: E402
 
 MOVIESUM_URL = "https://huggingface.co/datasets/rohitsaxena/MovieSum/resolve/main/{split}.jsonl"
 MOVIESUM_PAGE = "https://huggingface.co/datasets/rohitsaxena/MovieSum"
@@ -198,6 +199,7 @@ def main() -> None:
     ap.add_argument("--moviesum_dir", default="data_construction/work/sources/moviesum")
     ap.add_argument("--gt_path", default="data_construction/work/sources/cml_bench/gt_100.json")
     ap.add_argument("--imdb_meta", default="data_construction/work/sources/imdb_meta.json")
+    ap.add_argument("--gt_related", default=None, help="GT relation table (default: data_construction/gt_related.json)")
     ap.add_argument("--out", default="data_construction/work/build")
     ap.add_argument("--limit_movies", type=int, default=0, help="debug: only process the first N candidate movies")
     ap.add_argument("--no_detok", action="store_true", help="keep MovieSum's PTB tokenization (\"do n't\", \" ,\") verbatim")
@@ -210,6 +212,7 @@ def main() -> None:
     rows = load_moviesum(args.moviesum_dir)
     gt = load_gt(args.gt_path)
     imdb_meta = load_imdb_meta(args.imdb_meta)
+    gt_table = load_gt_related(args.gt_related)
     gt_ids = {r["imdb_id"] for r in gt}
     gt_titles = {norm_title(r["movie_name"]) for r in gt}
 
@@ -255,7 +258,13 @@ def main() -> None:
         if norm_title(name) in gt_titles:
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "gt_title_match"})
             continue
-        scenes = drop_duplicate_scenes(drop_front_matter(parse_script(row["script"], detok=not args.no_detok)))
+        relation = gt_relation(imdb_id, gt_table)
+        if relation and relation["type"] == "remake":
+            excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "gt_remake", "gt_movie": relation["gt_movie"]})
+            continue
+        dropped: dict[int, str] = {}
+        scenes = parse_script(row["script"], detok=not args.no_detok, dropped=dropped)
+        scenes = drop_duplicate_scenes(drop_front_matter(scenes), dropped=dropped)
         if len(scenes) < cfg["min_movie_scenes"]:
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "too_few_scenes", "num_scenes": len(scenes)})
             continue
@@ -284,6 +293,10 @@ def main() -> None:
             seg_scenes = scenes[a:b]
             content = render(seg_scenes)
             item_id = f"{imdb_id}-s{seg_scenes[0].index:04d}-{seg_scenes[-1].index:04d}"
+            kept_idx = {s.index for s in seg_scenes}
+            gaps = [i for i in range(seg_scenes[0].index, seg_scenes[-1].index + 1) if i not in kept_idx]
+            assert all(i in dropped for i in gaps), (item_id, [i for i in gaps if i not in dropped])
+            dropped_scenes = [{"scene": i, "reason": dropped[i]} for i in gaps]
             st = segment_stats(seg_scenes, content, vocab)
             reasons = segment_rejections(st, validate_cml(content), cfg)
             gt_ov = overlap(shingles(words_of(content), cfg["ngram"]), gt_seg_shingles)
@@ -304,6 +317,7 @@ def main() -> None:
                     "segment_index": kept,
                     "scene_start": seg_scenes[0].index,
                     "scene_end": seg_scenes[-1].index,
+                    "dropped_scenes": dropped_scenes,
                     "relative_position": round(a / len(scenes), 4),
                     "source_dataset": "MovieSum",
                     "source_split": row["split"],
@@ -316,6 +330,7 @@ def main() -> None:
                     "year": meta.get("year"),
                     "content_normalization": normalization,
                     "content_sha1": hashlib.sha1(content.encode()).hexdigest(),
+                    "gt_related": relation,
                     "gt_ngram_overlap": round(gt_ov, 5),
                     **{k: st[k] for k in st},
                 }
@@ -360,6 +375,9 @@ def main() -> None:
         "num_scenes": dist([s["num_scenes"] for s in accepted]),
         "dialogue_turns": dist([s["dialogue_turns"] for s in accepted]),
         "split_counts": dict(Counter(s["source_split"] for s in accepted)),
+        "gt_related_segments": dict(Counter(s["gt_related"]["type"] for s in accepted if s["gt_related"])),
+        "eval_safe_segments": sum(s["gt_related"] is None for s in accepted),
+        "gt_related_table": gt_table["version"],
         "total_content_tokens": sum(s["content_tokens"] for s in accepted),
         "seconds": round(time.time() - t0, 1),
     }

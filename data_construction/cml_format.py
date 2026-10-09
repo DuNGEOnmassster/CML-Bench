@@ -161,8 +161,9 @@ def retag_orphan_characters(elements: list[tuple[str, str]]) -> list[tuple[str, 
     return out
 
 
-def parse_script(script: str, detok: bool = True) -> list[Scene]:
-    """Parse a MovieSum script into cleaned scenes. Scene.index is the 0-based index in the raw script."""
+def parse_script(script: str, detok: bool = True, dropped: dict | None = None) -> list[Scene]:
+    """Parse a MovieSum script into cleaned scenes. Scene.index is the 0-based index in the raw script.
+    Scenes left without a body (heading only, or empty) are skipped and recorded in `dropped` as "no_body"."""
     scenes = []
     for idx, raw in enumerate(SCENE_RE.findall(script)):
         elements = []
@@ -174,15 +175,19 @@ def parse_script(script: str, detok: bool = True) -> list[Scene]:
         scene = Scene(idx, retag_orphan_characters(elements))
         if scene.has_body():
             scenes.append(scene)
+        elif dropped is not None:
+            dropped[idx] = "no_body"
     return scenes
 
 
-def drop_duplicate_scenes(scenes: list[Scene], min_chars: int = 200) -> list[Scene]:
+def drop_duplicate_scenes(scenes: list[Scene], min_chars: int = 200, dropped: dict | None = None) -> list[Scene]:
     """Drop a scene whose body repeats an earlier scene verbatim (draft paste-overs)."""
     seen, out = set(), []
     for scene in scenes:
         body = "\n".join(t for tag, t in scene.elements if tag != "stage_direction")
         if len(body) >= min_chars and body in seen:
+            if dropped is not None:
+                dropped[scene.index] = "duplicate"
             continue
         seen.add(body)
         out.append(scene)
