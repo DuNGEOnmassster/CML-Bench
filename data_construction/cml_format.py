@@ -38,6 +38,12 @@ TRANSITION_RE = re.compile(
     r"WIPE( TO)?|IRIS (IN|OUT)|INTERCUT|BACK TO( SCENE)?|THE END|END CREDITS|TITLE CARD|SUPER(IMPOSE)?)\W*$",
     re.I,
 )
+CAMERA_RE = re.compile(
+    r"^(NEW ANGLE|REVERSE ANGLE|WIDE ANGLE|HIGH ANGLE|LOW ANGLE|ANGLE|CLOSE ON|CLOSE UP|CLOSEUP|CLOSE SHOT|WIDE SHOT|"
+    r"EXTREME CLOSE|INSERT|POV|SERIES OF SHOTS|MONTAGE|BACK TO|BACK ON|MOMENTS LATER|SECONDS LATER|MINUTES LATER|"
+    r"LATER|CONTINUOUS|SUPER|TITLE)\b",
+    re.I,
+)
 CREDITS_RE = re.compile(
     r"\b(written by|screenplay by|story by|based on (the|a) (novel|book|play)|shooting script|revised draft|"
     r"first draft|final draft|copyright|all rights reserved)\b|\u00a9",
@@ -47,6 +53,11 @@ CREDITS_RE = re.compile(
 _CTRL_RE = re.compile(r"[\u0000-\u0008\u000b-\u001f\u007f-\u009f\ufffd]")
 _NOISE_CHARS_RE = re.compile(r"[\u2022\u25a0\u25aa\u00b7\u25cf\u25a1\u2023\u2043]+")
 _INLINE_JUNK_RE = re.compile(r"\(?\b(CONTINUED|CONT'D|OMITTED|OMIT)\b\)?:?")
+_ASTERISK_RE = re.compile(r"\*+")
+# Shooting-script scene numbers printed on both margins ("128A 128A", "132pt 132pt", "64 ... 64").
+_DUP_SCENE_NO_RE = re.compile(r"\b(\d{1,3}[A-Z]{1,3}|\d{1,3}pt)\s+\1\b")
+_MARGIN_SCENE_NO_RE = re.compile(r"^(\d{1,3}[A-Z]{0,3})\s+(.+?)\s+\1$")
+_LEADING_DOT_RE = re.compile(r"^\.\s+(?=\w)")
 _JUNK_ELEMENT_RE = re.compile(r"^(\(?(MORE|CONTINUED|CONT'?D|OMITTED)\)?[:.]?|[\W\d_]*)$", re.I)
 _WS_RE = re.compile(r"\s+")
 
@@ -54,6 +65,14 @@ _WS_RE = re.compile(r"\s+")
 # These rules undo only the unambiguous cases; " - " is left alone because it is
 # indistinguishable from a dash.
 _DETOK_RULES = (
+    (re.compile(r"-LRB-"), "("),
+    (re.compile(r"-RRB-"), ")"),
+    (re.compile(r"-LSB-"), "["),
+    (re.compile(r"-RSB-"), "]"),
+    (re.compile(r"-LCB-"), "{"),
+    (re.compile(r"-RCB-"), "}"),
+    (re.compile(r"\b(gon|wan|got) (na|ta)\b", re.I), r"\1\2"),
+    (re.compile(r"\b(lem|gim) (me)\b", re.I), r"\1\2"),
     (re.compile(r"``|''"), '"'),
     (re.compile(r"`"), "'"),
     (re.compile(r"(\w) (n't)\b", re.I), r"\1\2"),
@@ -64,7 +83,9 @@ _DETOK_RULES = (
     (re.compile(r" ([,.;:!?%])(?=\s|$|[\"')\]])"), r"\1"),
     (re.compile(r"\$ (\d)"), r"$\1"),
 )
-_TOKENIZATION_ARTEFACT_RE = re.compile(r"\w (n't|'s|'re|'ll|'ve)\b| [,.;:!?](?=\s|$)|\( | \)")
+_TOKENIZATION_ARTEFACT_RE = re.compile(
+    r"\w (n't|'s|'re|'ll|'ve)\b| [,.;:!?](?=\s|$)|\( | \)|-[LR][RSC]B-|\b(gon|wan|got) (na|ta)\b", re.I
+)
 
 _GARBLE_RE = re.compile(r"^(?=[^\d]*\d)(?=.*[A-Za-z])[A-Za-z\d']+$")
 _GARBLE_OK_RE = re.compile(
@@ -102,10 +123,16 @@ def clean_text(text: str, detok: bool = True) -> str:
     text = unicodedata.normalize("NFKC", text)
     text = _CTRL_RE.sub("", text)
     text = _NOISE_CHARS_RE.sub(" ", text)
+    text = _ASTERISK_RE.sub(" ", text)
     text = _INLINE_JUNK_RE.sub(" ", text)
     text = _WS_RE.sub(" ", text).strip()
+    text = _DUP_SCENE_NO_RE.sub(" ", text)
+    text = _WS_RE.sub(" ", text).strip()
+    text = _MARGIN_SCENE_NO_RE.sub(r"\2", text)
     if detok:
         text = detokenize(text)
+        # MovieSum turned a leading ellipsis into ". " ("<dialogue>. just some girl")
+        text = _LEADING_DOT_RE.sub("...", text)
     return text
 
 
@@ -121,7 +148,7 @@ def retag_orphan_characters(elements: list[tuple[str, str]]) -> list[tuple[str, 
         tag, text = elements[i]
         if tag == "character":
             nxt_tag, nxt_text = elements[i + 1] if i + 1 < len(elements) else (None, "")
-            if TRANSITION_RE.match(text):
+            if TRANSITION_RE.match(text) or CAMERA_RE.match(text):
                 if nxt_tag == "dialogue":
                     out.append(("scene_description", f"{text.rstrip(': ')}: {nxt_text}"))
                     i += 2
@@ -148,6 +175,18 @@ def parse_script(script: str, detok: bool = True) -> list[Scene]:
         if scene.has_body():
             scenes.append(scene)
     return scenes
+
+
+def drop_duplicate_scenes(scenes: list[Scene], min_chars: int = 200) -> list[Scene]:
+    """Drop a scene whose body repeats an earlier scene verbatim (draft paste-overs)."""
+    seen, out = set(), []
+    for scene in scenes:
+        body = "\n".join(t for tag, t in scene.elements if tag != "stage_direction")
+        if len(body) >= min_chars and body in seen:
+            continue
+        seen.add(body)
+        out.append(scene)
+    return out
 
 
 def drop_front_matter(scenes: list[Scene], max_scan: int = 5) -> list[Scene]:
@@ -218,8 +257,32 @@ def speaker_name(character_tag_text: str) -> str:
     return _SPEAKER_SUFFIX_RE.sub(" ", character_tag_text).strip().upper()
 
 
+_BAD_SPEAKER_RE = re.compile(r"[!?:~|\\^{}<>=+_]|^[(\-]|-$|^\d+[A-Z]{0,2}(\s+\d+[A-Z]{0,2})*$")
+
+
 def is_bad_character_tag(text: str) -> bool:
-    return bool(HEADING_RE.match(text)) or "CUT TO" in text.upper() or len(text) > 40 or len(text.split()) > 6
+    """Speaker tags that are really headings, camera directions, exclamations, scene numbers or OCR debris."""
+    return (
+        bool(HEADING_RE.match(text) or CAMERA_RE.match(text) or _BAD_SPEAKER_RE.search(text))
+        or "CUT TO" in text.upper()
+        or len(text) > 40
+        or len(text.split()) > 6
+        or len(re.sub(r"[^A-Za-z]", "", text)) < 2
+    )
+
+
+def rare_word_rate(text: str, vocab, max_count: int = 3) -> float:
+    """OCR-noise proxy: share of words (>= 3 letters) seen <= max_count times in the whole corpus,
+    ignoring words repeated >= 3 times in this text (invented names, places)."""
+    words = re.findall(r"[A-Za-z]{3,}", text)
+    if not words or not vocab:
+        return 0.0
+    local = {}
+    for w in words:
+        lw = w.lower()
+        local[lw] = local.get(lw, 0) + 1
+    rare = sum(1 for w in words if vocab.get(w.lower(), 0) <= max_count and local[w.lower()] < 3)
+    return rare / len(words)
 
 
 def garble_rate(text: str) -> float:
@@ -237,7 +300,7 @@ def tokenization_artefact_rate(text: str) -> float:
     return 1000 * len(_TOKENIZATION_ARTEFACT_RE.findall(text)) / words
 
 
-def segment_stats(scenes: list[Scene], content: str | None = None) -> dict:
+def segment_stats(scenes: list[Scene], content: str | None = None, vocab=None) -> dict:
     content = content if content is not None else render(scenes)
     elements = [(tag, text) for s in scenes for tag, text in s.elements]
     tag_counts = {f"<{t}>": 0 for t in ("scene",) + ELEMENT_TAGS}
@@ -266,5 +329,6 @@ def segment_stats(scenes: list[Scene], content: str | None = None) -> dict:
         "heading_ratio": round(sum(1 for s in scenes if s.heading) / max(1, len(scenes)), 4),
         "bad_character_tag_ratio": round(sum(map(is_bad_character_tag, char_tags)) / max(1, len(char_tags)), 4),
         "garble_rate": round(garble_rate(body_text), 5),
+        "rare_word_rate": round(rare_word_rate(body_text, vocab), 5),
         "tokenization_artefacts_per_1k_words": round(tokenization_artefact_rate(body_text), 3),
     }

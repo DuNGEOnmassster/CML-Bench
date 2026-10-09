@@ -31,6 +31,7 @@ from cml_format import (  # noqa: E402
     TRANSITION_END_RE,
     clean_text,
     count_tokens,
+    drop_duplicate_scenes,
     drop_front_matter,
     parse_script,
     render,
@@ -42,7 +43,7 @@ MOVIESUM_URL = "https://huggingface.co/datasets/rohitsaxena/MovieSum/resolve/mai
 MOVIESUM_PAGE = "https://huggingface.co/datasets/rohitsaxena/MovieSum"
 GT_URL = "https://huggingface.co/datasets/songdj/CML-Bench/resolve/main/ground_truth/gt_100.json"
 SPLITS = ("train", "val", "test")
-NORMALIZATION_VERSION = "moviesum_clean_detok_v1"
+NORMALIZATION_VERSION = "moviesum_clean_detok_v2"
 
 CONFIG = {
     "scenes_preferred": [15, 20],
@@ -58,6 +59,7 @@ CONFIG = {
     "min_heading_ratio": 0.7,
     "max_bad_character_tag_ratio": 0.05,
     "max_garble_rate": 0.005,
+    "max_rare_word_rate": 0.01,
     "ngram": 13,
     "shingle_sample_mod": 16,
     "max_gt_segment_overlap": 0.02,
@@ -179,6 +181,8 @@ def segment_rejections(stats: dict, problems: list[str], cfg) -> list[str]:
         reasons.append("bad_character_tags")
     if stats["garble_rate"] > cfg["max_garble_rate"]:
         reasons.append("ocr_garble")
+    if stats["rare_word_rate"] > cfg["max_rare_word_rate"]:
+        reasons.append("ocr_rare_words")
     return reasons
 
 
@@ -208,6 +212,10 @@ def main() -> None:
     imdb_meta = load_imdb_meta(args.imdb_meta)
     gt_ids = {r["imdb_id"] for r in gt}
     gt_titles = {norm_title(r["movie_name"]) for r in gt}
+
+    vocab = Counter()
+    for row in rows:
+        vocab.update(re.findall(r"[a-z]{3,}", row["script"].lower()))
 
     gt_seg_shingles = set()
     for r in gt:
@@ -247,7 +255,7 @@ def main() -> None:
         if norm_title(name) in gt_titles:
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "gt_title_match"})
             continue
-        scenes = drop_front_matter(parse_script(row["script"], detok=not args.no_detok))
+        scenes = drop_duplicate_scenes(drop_front_matter(parse_script(row["script"], detok=not args.no_detok)))
         if len(scenes) < cfg["min_movie_scenes"]:
             excluded.append({"imdb_id": imdb_id, "movie_name": name, "reason": "too_few_scenes", "num_scenes": len(scenes)})
             continue
@@ -276,7 +284,7 @@ def main() -> None:
             seg_scenes = scenes[a:b]
             content = render(seg_scenes)
             item_id = f"{imdb_id}-s{seg_scenes[0].index:04d}-{seg_scenes[-1].index:04d}"
-            st = segment_stats(seg_scenes, content)
+            st = segment_stats(seg_scenes, content, vocab)
             reasons = segment_rejections(st, validate_cml(content), cfg)
             gt_ov = overlap(shingles(words_of(content), cfg["ngram"]), gt_seg_shingles)
             if gt_ov > cfg["max_gt_segment_overlap"]:
