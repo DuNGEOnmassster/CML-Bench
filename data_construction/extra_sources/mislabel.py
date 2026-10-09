@@ -1,6 +1,6 @@
 """CML-only speaker/action mislabel signatures, measured the same way on any build (MovieSum or extra sources).
 
-  python data_construction/extra_sources/mislabel.py --segments BUILD/segments.jsonl [--sample_mod 1] [--out report.json]
+  python data_construction/extra_sources/mislabel.py --segments BUILD/segments.jsonl [--out report.json]
 
 Signatures per window (speaker names are taken from the whole film's <character> tags in the build, so a name that is
 not tagged inside the window still counts):
