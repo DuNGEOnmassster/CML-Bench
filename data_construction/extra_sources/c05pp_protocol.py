@@ -63,14 +63,16 @@ def draw(args) -> None:
     def fresh(s):
         return s["item_id"] not in used and s.get("content_sha1") not in used
 
-    src = [s for s in load(args.sources) if fresh(s)]
+    release = load(args.sources)
+    share = Counter(s["source_dataset"] for s in release)  # P3: proportional to each source's released segments
     by_src = defaultdict(list)
-    for s in src:
-        by_src[s["source_dataset"]].append(s)
-    total = sum(len(v) for v in by_src.values())
+    for s in release:
+        if fresh(s):
+            by_src[s["source_dataset"]].append(s)
+    total = sum(share.values())
     n = args.n_sources
     while True:
-        alloc = {k: max(args.min_per_source, round(n * len(v) / total)) for k, v in by_src.items()}
+        alloc = {k: max(args.min_per_source, round(n * share[k] / total)) for k in by_src}
         picks = {k: rng.sample(sorted(v, key=lambda s: s["item_id"]), min(alloc[k], len(v))) for k, v in by_src.items()}
         if sum(dialogue_count(s) for v in picks.values() for s in v) >= args.min_dialogue or n > total:
             break
