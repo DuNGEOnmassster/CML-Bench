@@ -13,15 +13,23 @@ is gitignored; releases go only to a private Hugging Face dataset.
 |---|---|---|
 | 0. IMDb metadata | `python data_construction/imdb_meta.py` | `work/sources/imdb_meta.json` (rating, votes, genres, year) |
 | 1. Segments | `python data_construction/build_segments.py` | `work/build/segments.jsonl` + rejection logs + `build_stats.json` |
-| 2. Batches | `python data_construction/make_abstract_batches.py --run_dir RUN [--sample N --one_per_movie] --batch_size 10` | `RUN/items.jsonl`, `RUN/batches/batch_XXXX/{manifest.json,items/*.xml}` |
+| 2. Batches | `python data_construction/make_abstract_batches.py --segments SEG --run_dir RUN [--sample N --one_per_movie \| --item_ids F] --batch_size 10` | `RUN/{items.jsonl,batches.jsonl,run.json}`, `RUN/batches/<batch_id>/{manifest.json,items/*.xml}` |
 | 3. Abstracts | agents, one batch each (see below) | `RUN/abstracts/<item_id>.json` |
-| 4. Checks | `python data_construction/check_abstracts.py --run_dir RUN` | `RUN/abstract_checks.jsonl`, `RUN/abstract_checks_summary.json` |
+| 4. Checks | `python data_construction/check_abstracts.py --run_dir RUN` (`--batch DIR` for one batch); merge gate: `validate_batch.py` | `RUN/abstract_checks.jsonl`, `RUN/abstract_checks_summary.json` |
 | 5. Assemble | `python data_construction/assemble.py --run_dir RUN --out REL` | `REL/data/*.jsonl`, `REL/info.json`, `REL/stats.json`, `REL/README.md` |
-| 6. Upload | `HF_TOKEN=... python data_construction/upload_hf.py --folder REL --repo_id USER/NAME` | private HF dataset |
-| Contract | `python data_construction/contract_checks.py --release REL --run_dir RUN --out report.json` | automated assertions C01–C24, C30 |
+| 6. Sync | `HF_TOKEN=... python data_construction/hf_sync.py sync --run_dir RUN` (also `pilot`, `status`) | private HF dataset `${HF_ACCOUNT}/CML-Dataset-Expanded` |
+| Contract | `python data_construction/contract_checks.py --release REL --run_dir RUN --out report.json` | automated contract assertions |
 
-Stage 1 downloads MovieSum (`rohitsaxena/MovieSum`) and CML-Bench `gt_100.json` if they are missing.
+Stage 1 downloads MovieSum (`rohitsaxena/MovieSum`) and CML-Bench `gt_100.json` if they are missing; run
+`imdb_meta.py` after it (it reads the MovieSum ids) and rebuild so `imdb_rating`/`genres` are filled.
+`gt_related.json` lists movies related to the GT movies by story or franchise: remakes are excluded, the rest are
+flagged (`gt_related`, `eval_safe`). Item schema: `dataset_schema.py` (v1.0, frozen).
 Requirements: Python 3.10+, `tiktoken` (stages 1/4/5), `huggingface_hub` (stage 6).
+
+`hf_sync.py sync` reconciles one source from its run dir: content shards, batch index, every batch that passes
+`validate_batch.py` (merged into `data/`), per-source status, then `build_status.json` and the dataset card. It diffs
+file hashes against the hub and commits only changes against the current head, so it is safe to re-run after every
+abstract batch and from several workers at once.
 
 ## Stage 3: abstract writing by agents
 
