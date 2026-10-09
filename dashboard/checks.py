@@ -55,9 +55,9 @@ GROUPS = {
 }
 
 CONTRACT = [
-    Assertion("C01", "A", "First four fields are movie_name, imdb_id, script_segment, summary (non-empty)", "100%", "c01"),
+    Assertion("C01", "A", "First four fields are movie_name, imdb_id, script_segment, summary (summary may be \"\" until merged)", "100%", "c01"),
     Assertion("C02", "A", "movie_name is Title_YYYY and imdb_id is tt + 7-8 digits", "100%", "c02"),
-    Assertion("C03", "A", "Provenance fields present (ids, source, split, url, file, scene range, sha1, prompt, author)", "100%", "c03"),
+    Assertion("C03", "A", "Provenance fields present (ids, source, split, url, file, scene range, sha1; prompt/author once merged)", "100%", "c03"),
     Assertion("C04", "A", "item_id and content_sha1 unique; content_sha1 = sha1(script_segment)", "100%", "c04"),
     Assertion("C05", "A", "20 random items re-cut from the source byte-for-byte", "20/20", None),
     Assertion("C06", "A", "info.json has the gt_100_info layout and agrees with the data", "agree", None),
@@ -131,9 +131,13 @@ def metadata_checks(rec: dict, gt_ids: frozenset, gt_titles: frozenset) -> dict:
     """Checks that need only the record's fields (no content parsing)."""
     related, kind, _ = gt_relation(rec)
     first = list(rec)[:4]
-    c01 = first == FIRST and all(isinstance(rec.get(k), str) and rec[k].strip() for k in FIRST)
+    # Schema 1.0: summary is "" and the abstract fields are null until the item's batch is merged.
+    pending = isinstance(rec.get("summary"), str) and not rec["summary"].strip()
+    required = FIRST[:3] if pending else FIRST
+    c01 = first == FIRST and isinstance(rec.get("summary"), str) and all(isinstance(rec.get(k), str) and rec[k].strip() for k in required)
     name, imdb = str(rec.get("movie_name") or ""), str(rec.get("imdb_id") or "")
-    c03 = all(rec.get(k) not in (None, "") for k in PROVENANCE) and (
+    prov = [k for k in PROVENANCE if not (pending and k.startswith("abstract_"))]
+    c03 = all(rec.get(k) not in (None, "") for k in prov) and (
         isinstance(rec.get("scene_start"), int) and isinstance(rec.get("scene_end"), int) and rec["scene_start"] <= rec["scene_end"]
     )
     return {

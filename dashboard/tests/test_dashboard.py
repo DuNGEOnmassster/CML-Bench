@@ -100,14 +100,27 @@ class DashboardTests(unittest.TestCase):
         self.assertFalse(s.refresh())  # unchanged head: no work
 
     def test_pilot_release_and_progress(self):
-        write_jsonl(f"{self.root}/pilot/data/p.jsonl", [make_item("tt0000003", 0)])
-        with open(f"{self.root}/pilot/build_status.json", "w") as f:
-            json.dump({"total_items": 10, "batches_done": 1, "batches_total": 2}, f)
+        write_jsonl(f"{self.root}/pilots/v9/data/p.jsonl", [make_item("tt0000003", 0)])
+        with open(f"{self.root}/pilots/v9/pilot.json", "w") as f:
+            json.dump({"prompt_version": "abstract_v9", "status": "audited"}, f)
         s = self.store()
-        rv = s.snapshot.releases["pilot"]
+        self.assertEqual(list(s.snapshot.releases), ["pilot:v9"])
+        banner = views.banner_html(s.snapshot, "pilot:v9")
+        self.assertIn("Showing the pilot release", banner)
+        self.assertIn("audited", banner)
+
+        write_jsonl(f"{self.root}/content/src/part-00000.jsonl", [make_item("tt0000013", 0, summary=""), make_item("tt0000014", 0, summary="")])
+        write_jsonl(f"{self.root}/data/src/src-b0001.safe.jsonl", [make_item("tt0000013", 0)])
+        write_jsonl(f"{self.root}/manifests/src/batches.jsonl", [{"batch_id": "src-b0001", "item_ids": ["tt0000013-s0000-0015"]}])
+        with open(f"{self.root}/build_status.json", "w") as f:
+            json.dump({"status_format": 1, "totals": {"items_total": 10, "items_with_abstract": 3, "items_merged": 1,
+                                                       "batches_total": 2, "batches_merged": 1}}, f)
+        s.refresh()
+        rv = s.snapshot.releases["main"]
+        self.assertEqual(len(rv.df), 2)  # merged row replaces its content row; manifests are not items
+        self.assertEqual(int(rv.df["has_abstract"].sum()), 1)
         p = views.progress_numbers(rv, env_target=13904)
-        self.assertEqual((p["with_abstract"], p["target"], p["batches_total"]), (1, 10, 2))
-        self.assertIn("Showing the pilot release", views.banner_html(s.snapshot, "pilot"))
+        self.assertEqual((p["with_abstract"], p["merged"], p["target"], p["batches_total"]), (3, 1, 10, 2))
 
     def test_item_checks_and_verdicts(self):
         bad = make_item("tt0000004", 0, n_scenes=8, summary="Here is the summary of this excerpt.")

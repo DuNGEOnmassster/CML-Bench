@@ -23,7 +23,7 @@ import pandas as pd
 import checks
 import itemview
 import views
-from dataio import DataStore, ReleaseView
+from dataio import DataStore, ReleaseView, release_label
 
 STORE: DataStore | None = None
 TICK_SECONDS = 20
@@ -55,13 +55,13 @@ FORCE_LIGHT = """() => {
 
 
 def release_choices(snap) -> list[tuple[str, str]]:
-    return [(views.RELEASE_LABEL[r], r) for r in ("main", "pilot") if r in snap.releases]
+    return [(release_label(r), r) for r in snap.releases]
 
 
 def pick_release(snap, current: str | None) -> str | None:
     if current in snap.releases:
         return current
-    return "main" if "main" in snap.releases else ("pilot" if "pilot" in snap.releases else None)
+    return next(iter(snap.releases), None)
 
 
 def has_subsets(rv: ReleaseView | None) -> bool:
@@ -111,7 +111,7 @@ def _render_dashboard(snap, release: str | None, subset: str | None) -> tuple:
                 empty("Segments per film"), empty("Content length"), empty("Scenes per segment"), empty("Abstract length"),
                 empty("IMDb rating"), empty("Release year"), empty("Dialogue turns"), empty("Genres"), waiting, waiting,
                 empty("Abstract check flags"), views.gt_table_html(pd.DataFrame(), gt, "Expanded"), empty("Expanded vs GT-100"))
-    label = views.RELEASE_LABEL.get(release, release) + ("" if eff == "all" else f" · {views.SUBSETS[eff]}")
+    label = release_label(release) + ("" if eff == "all" else f" · {views.SUBSETS[eff]}")
     full = snap.releases[release]
     figs = views.distribution_figs(rv.df, gt, label)
     return (

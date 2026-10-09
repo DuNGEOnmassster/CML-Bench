@@ -11,6 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from checks import CONTRACT, GROUPS
+from dataio import release_label
 
 C_EXP = "#4f46e5"
 C_EXP_LIGHT = "#c7d2fe"
@@ -19,7 +20,6 @@ C_OK = "#059669"
 C_BAD = "#dc2626"
 C_MUTED = "#94a3b8"
 FONT = "Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif"
-RELEASE_LABEL = {"main": "Full build", "pilot": "Pilot"}
 
 
 def esc(x) -> str:
@@ -94,9 +94,19 @@ def banner_html(snap, release: str | None) -> str:
         parts.append(('warn', esc(snap.message)))
     elif snap.status == "error":
         parts.append(('bad', esc(snap.message) + " Showing the last good snapshot."))
-    if release == "pilot" and "main" not in snap.releases and snap.releases:
+    is_pilot = bool(release) and release.startswith("pilot")
+    if is_pilot and "main" not in snap.releases and snap.releases:
         parts.append(('info', "<b>Showing the pilot release.</b> The full build has not landed in the dataset repo yet; "
                               "the dashboard switches to it automatically when it does."))
+    rv = snap.releases.get(release) if release else None
+    pilot_meta = (rv.aux.get("pilot.json") or {}) if (is_pilot and rv is not None) else {}
+    if pilot_meta:
+        bits = [f"<b>{esc(release_label(release))}</b>: {esc(pilot_meta.get('prompt_version'))}, {esc(pilot_meta.get('content_normalization'))}"]
+        if pilot_meta.get("status"):
+            bits.append(esc(pilot_meta["status"]))
+        if pilot_meta.get("note"):
+            bits.append(f"<span class='muted'>{esc(pilot_meta['note'])}</span>")
+        parts.append(('info', " · ".join(bits)))
     if snap.checks_total and snap.checks_done < snap.checks_total:
         pct = snap.checks_done / snap.checks_total
         parts.append(('info', f"Running contract checks on new items: {snap.checks_done:,} / {snap.checks_total:,} ({pct:.0%}). "
@@ -156,59 +166,91 @@ def _first(d: dict, keys: tuple, kind=int):
     return None
 
 
+TOTAL_KEYS = ("items_total", "total_items", "target_items", "total", "target")
+
+
 def progress_numbers(rv, env_target: int | None) -> dict:
+    """Progress from build_status.json (status_format 1: nested `totals`) cross-checked with the loaded rows."""
     df = rv.df
     bs = rv.aux.get("build_status.json") or {}
+    tot = bs.get("totals") if isinstance(bs.get("totals"), dict) else bs
     n = len(df)
-    n_abs = int(df["has_abstract"].sum()) if n else 0
-    target = _first(bs, ("total_items", "target_items", "items_total", "total", "target", "segments_total"))
-    if rv.name == "pilot":
-        target = target or n
-    target = target or env_target or n
+    merged_seen = int(df["has_abstract"].sum()) if n else 0
+    status_total = _first(tot, TOTAL_KEYS)
+    if rv.name.startswith("pilot"):
+        target, source = n, "items in the pilot"
+    elif status_total:
+        target, source = status_total, "build_status.json"
+    elif env_target:
+        target, source = env_target, "configured TARGET_ITEMS"
+    else:
+        target, source = n, "items uploaded"
+    written = _first(tot, ("items_with_abstract",))
     return {
         "uploaded": n,
-        "with_abstract": n_abs,
+        "merged": max(merged_seen, _first(tot, ("items_merged",)) or 0),
+        "with_abstract": max(written or 0, merged_seen),
+        "checks_passed": _first(tot, ("items_checks_passed",)),
         "target": max(target, 1),
-        "target_source": "build_status.json" if _first(bs, ("total_items", "target_items", "items_total", "total", "target", "segments_total")) else ("configured" if env_target and rv.name == "main" else "items uploaded"),
-        "batches_done": _first(bs, ("batches_done", "batches_complete", "completed_batches")),
-        "batches_total": _first(bs, ("batches_total", "total_batches", "batches")),
-        "status_updated": bs.get("updated_at") or bs.get("timestamp") or bs.get("last_updated"),
-        "phase": bs.get("phase") or bs.get("status") or bs.get("stage"),
-        "build_status": bs,
+        "target_source": source,
+        "batches_done": _first(tot, ("batches_merged", "batches_done", "batches_complete")),
+        "batches_rejected": _first(tot, ("batches_rejected",)),
+        "batches_total": _first(tot, ("batches_total", "total_batches")),
+        "status_updated": bs.get("updated_at") or bs.get("timestamp"),
+        "phase": bs.get("phase"),
+        "gates": bs.get("gates") if isinstance(bs.get("gates"), dict) else {},
+        "per_source": bs.get("per_source") if isinstance(bs.get("per_source"), dict) else {},
     }
 
 
 def progress_html(rv, env_target: int | None) -> str:
     p = progress_numbers(rv, env_target)
     t = p["target"]
+    m = min(p["merged"] / t, 1.0)
+    w = min(max(p["with_abstract"] - p["merged"], 0) / t, 1.0 - m)
     a = min(p["with_abstract"] / t, 1.0)
-    u = min(max(p["uploaded"] - p["with_abstract"], 0) / t, 1.0 - a)
-    extras = []
+    chips = []
     if p["batches_total"]:
-        extras.append(f'<span class="chip">batches {fmt_int(p["batches_done"])} / {fmt_int(p["batches_total"])}</span>')
-    if p["phase"] and isinstance(p["phase"], str):
-        extras.append(f'<span class="chip">phase: {esc(p["phase"])}</span>')
+        rej = f" · {p['batches_rejected']:,} rejected" if p["batches_rejected"] else ""
+        chips.append(f'<span class="chip">batches merged {fmt_int(p["batches_done"])} / {fmt_int(p["batches_total"])}{rej}</span>')
     if p["status_updated"]:
-        extras.append(f'<span class="chip">status file: {esc(str(p["status_updated"])[:19])}</span>')
-    by_src = ""
+        chips.append(f'<span class="chip">status {esc(str(p["status_updated"])[:16].replace("T", " "))} UTC</span>')
+    stages = (f'<div class="stages"><span>uploaded <b>{p["uploaded"]:,}</b></span><span>abstract written <b>{p["with_abstract"]:,}</b></span>'
+              + (f'<span>checks passed <b>{p["checks_passed"]:,}</b></span>' if p["checks_passed"] is not None else "")
+              + f'<span>merged into data/ <b>{p["merged"]:,}</b></span></div>')
+    notes = []
+    if p["phase"]:
+        notes.append(f'<div class="phase"><span class="muted">Phase</span> {esc(p["phase"])}</div>')
+    for gate, state in p["gates"].items():
+        cls = "gate-bad" if "block" in str(state).lower() else "gate-ok"
+        notes.append(f'<div class="gate {cls}"><span class="mono">{esc(gate)}</span> {esc(state)}</div>')
     df = rv.df
+    by_src = ""
     if len(df):
         g = df.groupby("source").agg(n=("item_id", "size"), abstracts=("has_abstract", "sum"), films=("film_key", "nunique"),
-                                     tokens=("script_tokens", "median")).sort_values("n", ascending=False)
-        rows = "".join(
-            f"<tr><td>{esc(s)}</td><td class='num'>{int(r['n']):,}</td><td class='num'>{int(r['abstracts']):,}</td>"
-            f"<td class='num'>{int(r['films']):,}</td><td class='num'>{int(r['tokens']):,}</td></tr>" for s, r in g.iterrows())
-        by_src = (f'<table class="tbl compact"><thead><tr><th>Source</th><th class="num">Items</th><th class="num">With abstract</th>'
-                  f'<th class="num">Films</th><th class="num">Median tokens</th></tr></thead><tbody>{rows}</tbody></table>')
+                                     safe=("eval_safe", lambda s: int((s == True).sum())),  # noqa: E712
+                                     related=("gt_related", lambda s: int((s == True).sum()))).sort_values("n", ascending=False)  # noqa: E712
+        rows = []
+        for s, r in g.iterrows():
+            ps = p["per_source"].get(s, {})
+            build = (f"<div class='muted small mono'>{esc(ps.get('build_id', ''))} · {esc(ps.get('prompt_version', ''))}</div>"
+                     if ps else "")
+            rows.append(f"<tr><td>{esc(s)}{build}</td><td class='num'>{int(r['n']):,}</td><td class='num'>{int(r['safe']):,}</td>"
+                        f"<td class='num'>{int(r['related']):,}</td><td class='num'>{int(r['abstracts']):,}</td>"
+                        f"<td class='num'>{int(r['films']):,}</td></tr>")
+        by_src = (f'<table class="tbl compact"><thead><tr><th>Source</th><th class="num">Items</th><th class="num">Eval-safe</th>'
+                  f'<th class="num">GT-related</th><th class="num">With abstract</th><th class="num">Films</th></tr></thead>'
+                  f'<tbody>{"".join(rows)}</tbody></table>')
     return f"""
 <div class="card">
-  <div class="card-head"><div class="card-title">Build progress</div><div class="chips">{''.join(extras)}</div></div>
+  <div class="card-head"><div class="card-title">Build progress</div><div class="chips">{''.join(chips)}</div></div>
   <div class="prog-figure"><span class="prog-big">{a:.1%}</span>
     <span class="prog-text"><b>{p['with_abstract']:,}</b> of <b>{t:,}</b> items have abstracts
-    <span class="muted">(target from {esc(p['target_source'])})</span></span></div>
-  <div class="prog-track"><div class="prog-fill" style="width:{a * 100:.2f}%"></div><div class="prog-pend" style="width:{u * 100:.2f}%"></div></div>
-  <div class="prog-legend"><span><i class="sw sw-exp"></i>with abstract</span><span><i class="sw sw-pend"></i>uploaded, abstract pending</span>
-  <span><i class="sw sw-rest"></i>not uploaded yet ({max(t - p['uploaded'], 0):,})</span></div>
+    <span class="muted">(total from {esc(p['target_source'])})</span></span></div>
+  <div class="prog-track"><div class="prog-fill" style="width:{m * 100:.2f}%"></div><div class="prog-pend" style="width:{w * 100:.2f}%"></div></div>
+  <div class="prog-legend"><span><i class="sw sw-exp"></i>merged into data/</span><span><i class="sw sw-pend"></i>abstract written, not merged</span>
+  <span><i class="sw sw-rest"></i>no abstract yet ({max(t - p['with_abstract'], 0):,})</span></div>
+  {stages}{''.join(notes)}
   {by_src}
 </div>"""
 

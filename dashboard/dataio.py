@@ -1,9 +1,11 @@
 """Data access for the CML dataset dashboard.
 
 Reads a private Hugging Face dataset repo (DATASET_REPO + HF_TOKEN) or, for development, a local folder
-with the same layout (DATA_DIR). Layout: item files (*.jsonl, *.jsonl.gz, *.parquet) anywhere in the repo,
-plus optional build_status.json / info.json / stats.json / contract_report.json next to them. Files under
-`pilot/` form the "pilot" release, everything else the "main" release.
+with the same layout (DATA_DIR). Layout (schema 1.0, internal/dataset-expansion/schema.md): item files
+(*.jsonl, *.jsonl.gz, *.parquet) in `content/<slug>/` (the whole build, summary "" until merged) and
+`data/<slug>/` (merged items); `pilots/<name>/` (or `pilot/`) are separate releases; build_status.json,
+info.json, contract_report.json, pilot.json etc. sit next to them. In the main release a merged row
+replaces the content row with the same item_id.
 
 A background thread polls the repo head; only files whose blob changed are re-downloaded and re-parsed,
 and per-item contract checks are cached by (item_id, content sha1, abstract hash), so a new batch only
@@ -33,7 +35,8 @@ import checks
 log = logging.getLogger("cml-dashboard")
 
 ITEM_SUFFIXES = (".jsonl", ".jsonl.gz", ".parquet")
-AUX_FILES = ("build_status.json", "info.json", "stats.json", "contract_report.json", "abstract_checks_summary.json")
+AUX_FILES = ("build_status.json", "info.json", "stats.json", "contract_report.json", "abstract_checks_summary.json", "pilot.json")
+SKIP_DIRS = ("manifests", "status")
 AUX_MAX_BYTES = 50_000_000
 ITEM_COLUMNS = ("c01", "c02", "c03", "c04", "c07", "c08", "c09", "c10", "c11", "c12", "c13", "c14", "c15", "c16",
                 "c18", "c19", "c20", "c21", "c22", "c23", "c24")
@@ -54,7 +57,40 @@ class RepoEntry:
 
 
 def release_of(path: str) -> str:
-    return "pilot" if path.split("/")[0] == "pilot" else "main"
+    parts = path.split("/")
+    if parts[0] == "pilots" and len(parts) > 2:
+        return f"pilot:{parts[1]}"
+    return "pilot" if parts[0] == "pilot" else "main"
+
+
+def release_label(release: str | None) -> str:
+    if release == "main":
+        return "Full build"
+    if release and release.startswith("pilot:"):
+        return f"Pilot {release.split(':', 1)[1]}"
+    return "Pilot" if release == "pilot" else str(release)
+
+
+def merge_layers(rows: list[dict]) -> list[dict]:
+    """One row per item_id across layers (content/ vs data/): the merged row wins. Same-layer duplicates are kept
+    so the uniqueness check (C04) still sees them."""
+    def layer(r):
+        return r["path"].split("/")[0]
+
+    def rank(r):
+        return (bool(r["has_abstract"]), layer(r) == "data")
+
+    by_id: dict[str, list[dict]] = {}
+    for r in rows:
+        by_id.setdefault(r["item_id"], []).append(r)
+    out = []
+    for group in by_id.values():
+        if len(group) == 1 or len({layer(r) for r in group}) == 1:
+            out.extend(group)
+            continue
+        best = max(group, key=rank)
+        out.extend([best] + [r for r in group if layer(r) == layer(best) and r is not best])
+    return out
 
 
 def is_subset_file(path: str) -> bool:
@@ -65,15 +101,16 @@ def is_subset_file(path: str) -> bool:
 
 def is_item_file(path: str) -> bool:
     name = path.rsplit("/", 1)[-1]
-    return name.endswith(ITEM_SUFFIXES) and not name.startswith((".", "abstract_checks")) and not is_subset_file(path)
+    return (name.endswith(ITEM_SUFFIXES) and not name.startswith((".", "abstract_checks")) and not is_subset_file(path)
+            and path.split("/")[0] not in SKIP_DIRS)
 
 
-def read_subset_ids(local_path: str) -> set[str]:
+def read_subset_ids(local_path: str, rel_path: str) -> set[str]:
     with open(local_path, encoding="utf-8") as f:
         text = f.read()
-    if local_path.endswith(".txt"):
+    if rel_path.endswith(".txt"):
         return {line.strip() for line in text.splitlines() if line.strip()}
-    if local_path.endswith(".json"):
+    if rel_path.endswith(".json"):
         data = json.loads(text)
         if isinstance(data, dict):
             data = data.get("item_ids") or data.get("items") or data.get("eval_safe") or []
@@ -274,7 +311,7 @@ class ParsedFile:
 def parse_item_file(local_path: str, rel_path: str, gt_ids: frozenset, gt_titles: frozenset) -> ParsedFile:
     release = release_of(rel_path)
     rows: list[dict] = []
-    if local_path.endswith(".jsonl"):
+    if rel_path.endswith(".jsonl"):  # the HF cache keeps blobs without extensions, so go by the repo path
         with open(local_path, "rb") as fh:
             idx = 0
             while True:
@@ -295,7 +332,7 @@ def parse_item_file(local_path: str, rel_path: str, gt_ids: frozenset, gt_titles
                 idx += 1
         return ParsedFile(rows, local_path)
 
-    if local_path.endswith(".gz"):
+    if rel_path.endswith(".gz"):
         with gzip.open(local_path, "rt", encoding="utf-8") as fh:
             recs = [json.loads(line) for line in fh if line.strip()]
     else:
@@ -554,7 +591,7 @@ class DataStore:
             for e in entries:
                 if is_subset_file(e.path):
                     try:
-                        subsets.setdefault(release_of(e.path), set()).update(read_subset_ids(self.source.fetch(e, rev)))
+                        subsets.setdefault(release_of(e.path), set()).update(read_subset_ids(self.source.fetch(e, rev), e.path))
                     except (OSError, ValueError, AttributeError) as exc:
                         log.warning("could not read subset file %s: %s", e.path, exc)
             self._subsets = subsets
@@ -584,10 +621,9 @@ class DataStore:
     def _publish(self, status: str | None = None, message: str | None = None) -> None:
         rows = self._rows()
         releases = {}
-        for name in ("main", "pilot"):
-            rel_rows = [r for r in rows if r["release"] == name]
-            if not rel_rows:
-                continue
+        names = sorted({r["release"] for r in rows}, key=lambda n: (n != "main", n))
+        for name in names:
+            rel_rows = merge_layers([r for r in rows if r["release"] == name])
             df = build_frame(rel_rows, self._checks, self._subsets.get(name))
             aux = self._aux.get(name, {})
             releases[name] = ReleaseView(name, df, aux, checks.release_verdicts(df, aux.get("info.json")))
@@ -637,10 +673,19 @@ class DataStore:
                     last = time.time()
         else:
             ctx = mp.get_context("spawn")
-            with cf.ProcessPoolExecutor(self.workers, mp_context=ctx, initializer=checks.init_worker, initargs=(gt_sh,)) as ex:
-                for fut in cf.as_completed([ex.submit(checks.check_chunk, t) for t in tasks]):
-                    self._checks.update(fut.result())
-                    if time.time() - last > PUBLISH_EVERY_S:
-                        self._publish()
-                        last = time.time()
+            try:
+                with cf.ProcessPoolExecutor(self.workers, mp_context=ctx, initializer=checks.init_worker, initargs=(gt_sh,)) as ex:
+                    for fut in cf.as_completed([ex.submit(checks.check_chunk, t) for t in tasks], timeout=3600):
+                        self._checks.update(fut.result())
+                        if time.time() - last > PUBLISH_EVERY_S:
+                            self._publish()
+                            last = time.time()
+            except (cf.process.BrokenProcessPool, cf.TimeoutError, OSError) as exc:
+                log.warning("check pool failed (%s); checking the rest in-process", exc)
+                checks.init_worker(gt_sh)
+                for t in tasks:
+                    path, entries = t
+                    rest = [e for e in entries if e[0] not in self._checks]
+                    if rest:
+                        self._checks.update(checks.check_chunk((path, rest)))
         log.info("checked %d items in %.1fs", n, time.time() - t0)

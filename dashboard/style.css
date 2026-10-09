@@ -64,6 +64,12 @@
 .prog-fill { background: linear-gradient(90deg, #4f46e5, #6366f1); }
 .prog-pend { background: #c7d2fe; }
 .prog-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: #64748b; margin: 8px 0 12px; }
+.stages { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: #475569; margin: 0 0 8px; }
+.stages b { color: #0f172a; font-variant-numeric: tabular-nums; }
+.phase { font-size: 12.5px; color: #334155; margin: 4px 0; }
+.gate { font-size: 12.5px; padding: 6px 10px; border-radius: 10px; margin: 6px 0 10px; border: 1px solid; }
+.gate-bad { background: #fff7ed; border-color: #fed7aa; color: #9a3412; }
+.gate-ok { background: #ecfdf5; border-color: #a7f3d0; color: #065f46; }
 .sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
 .sw-exp { background: #4f46e5; } .sw-pend { background: #c7d2fe; } .sw-rest { background: #eef2f7; border: 1px solid #e2e8f0; }
 
