@@ -474,19 +474,32 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     targeted_meta = {i: {"tier": targeted_tier(rs, notes.get(i, "")), "reasons": rs} for i, rs in routed.items()}
     rule = stop_rule(verdicts, {x["item_id"] for x in sample}, targeted_meta)
     files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**rule["targeted_alarm"], "targeted_pool": rule["targeted_pool"]})
-    audited_batches, seen_b = [], set()
+    # Pause counts only revocations a random-sample verdict caused; targeted-pool revocations run through the same
+    # last-20 window but raise the targeted alarm instead (coordinator decision with the C31 urgent addendum).
+    sample_ids = {x["item_id"] for x in sample}
+    order, trig = [], {}
     for v in verdicts:
-        if v["batch_id"] not in seen_b:
-            seen_b.add(v["batch_id"])
-            audited_batches.append((v["batch_id"], any(x["batch_id"] == v["batch_id"] and (x.get("major", 0) or x.get("outside", 0))
-                                                        for x in verdicts)))
+        if v["batch_id"] not in trig:
+            order.append(v["batch_id"])
+            trig[v["batch_id"]] = set()
+        if v.get("major", 0) or v.get("outside", 0):
+            trig[v["batch_id"]].add("sample" if v["item_id"] in sample_ids else "targeted")
+    paused = paused_orchestrators([(b, "sample" in trig[b]) for b in order], ranges)
+    targeted_heavy = paused_orchestrators([(b, "targeted" in trig[b]) for b in order], ranges)
+    if targeted_heavy:
+        ta = rule["targeted_alarm"]
+        ta["reason"] = "; ".join(filter(None, [ta["reason"], f"{', '.join(targeted_heavy)}: >= 2 targeted-pool revocations among "
+                                                               f"the orchestrator's last 20 audited batches (not a pause)"]))
+        ta["fired"], ta["orchestrators"] = True, targeted_heavy
+        files[f"audit/{slug}/targeted_alarm.json"] = json_bytes({**ta, "targeted_pool": rule["targeted_pool"]})
+    revoked_list = [{"batch_id": b, "orchestrator": orchestrator_of(b, ranges), "trigger": sorted(trig.get(b) or {"manual"})}
+                    for b, s in sorted(states.items()) if s == "revoked"]
     tiers = {k: sum(t["tier"] == k for t in selected) for k in ("A", "B", "C")}
     audit = {"targeted_items": len(targeted), "targeted_selected": len(selected), "targeted_tiers": tiers,
              "targeted_selected_share": round(len(selected) / merged_items, 4) if merged_items else None,
              "sample_items": len(sample), **rule,
-             "revoked_batches": [{"batch_id": b, "orchestrator": orchestrator_of(b, ranges)}
-                                 for b, s in sorted(states.items()) if s == "revoked"],
-             "paused_orchestrators": paused_orchestrators(audited_batches, ranges), "orchestrators": ranges}
+             "revoked_batch_ids": [r["batch_id"] for r in revoked_list], "revoked_batches": revoked_list,
+             "paused_orchestrators": paused, "orchestrators": ranges}
 
     checks_path = os.path.join(run_dir, "content_checks.json")
     content_checks = None

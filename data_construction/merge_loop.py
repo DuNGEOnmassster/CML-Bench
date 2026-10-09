@@ -116,7 +116,7 @@ def main() -> None:
     summary["items_excluded_from_merged"] = src.get("items_excluded_from_merged")
     summary["audit"] = {k: src["audit"].get(k) for k in ("targeted_items", "targeted_selected", "sample_items", "audited",
                                                          "major_or_outside", "stop", "reason", "targeted_alarm",
-                                                         "paused_orchestrators", "revoked_batches")}
+                                                         "paused_orchestrators", "revoked_batch_ids")}
     summary["gate"] = st["gates"].get("mass_abstract_writing")
     if summary["sync_ops"]:
         summary["dashboard"] = dashboard()

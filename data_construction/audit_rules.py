@@ -18,7 +18,8 @@ Rules (evaluator-repilot-report.md 5):
              when >= 3 major (not outside) fall within any 50 consecutive targeted verdicts, or when the targeted
              major+outside rate exceeds 25% after >= 40 targeted verdicts (urgent addendum, 2026-10-09 13:46 UTC)
   complete   the Wilson 95% upper bound of the major+outside rate over the random sample only must be <= 3%
-  pause      an orchestrator with >= 2 revoked batches among its last 20 audited batches is paused
+  pause      an orchestrator with >= 2 batches revoked by random-sample verdicts among its last 20 audited batches is
+             paused; >= 2 revoked by targeted verdicts in the same window raise the targeted alarm instead
 """
 from __future__ import annotations
 
