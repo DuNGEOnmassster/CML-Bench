@@ -25,6 +25,7 @@ _SLUG_TOD_RE = re.compile(
     r"^(?:\d{1,4}[A-Z]{0,3}[.)]?\s+)?([A-Z0-9][A-Z0-9 .,'&/()\-]{2,60}?\s*(?:-|--|\u2013|\u2014)\s*"
     r"(?:DAY|NIGHT|DAWN|DUSK|MORNING|AFTERNOON|EVENING|SUNSET|SUNRISE|LATER|CONTINUOUS|SAME|MOMENTS LATER|SAME TIME)\.?)$"
 )
+_TOD_END_RE = re.compile(r"(DAY|NIGHT|DAWN|DUSK|MORNING|AFTERNOON|EVENING|SUNSET|SUNRISE|LATER|CONTINUOUS|SAME|FLASHBACK)\W*$")
 _TRAILING_SCENE_NO_RE = re.compile(r"\s+\d{1,4}[A-Z]{0,3}\.?\s*$")
 TRANSITION_LINE_RE = re.compile(
     r"^((FADE|IRIS) (IN|OUT|UP|TO BLACK|TO WHITE)|((QUICK|SLOW|MATCH|SMASH|JUMP|HARD|STRAIGHT|FLASH) )?CUT( BACK)?( TO)?|"
@@ -175,6 +176,17 @@ def looks_like_cue(s: str) -> bool:
     return len(letters) >= 2 and sum(c.isupper() for c in letters) / len(letters) >= 0.8
 
 
+def join_lines(parts: list[str]) -> str:
+    """Join wrapped lines; a single hyphen at a line end before a lowercase word is a wrap ("black-and-" + "white")."""
+    out = ""
+    for p in parts:
+        if out.endswith("-") and not out.endswith("--") and out[-2:-1].isalpha() and p[:1].islower():
+            out += p
+        else:
+            out = f"{out} {p}" if out else p
+    return out
+
+
 def _mode(xs, default=0):
     return Counter(xs).most_common(1)[0][0] if xs else default
 
@@ -221,7 +233,7 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
     def flush_para():
         nonlocal para
         if para and cur is not None:
-            cur.append(("scene_description", " ".join(para)))
+            cur.append(("scene_description", join_lines(para)))
         para = []
 
     i, n = 0, len(lines)
@@ -235,6 +247,12 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
         h = heading_text(s)
         if h:
             flush_para()
+            # a heading broken over two lines: "INT. DRUG STORE, GARY, INDIANA - PHONEBOOTH -" / "DILLINGER - NIGHT"
+            nxt2 = lines[i + 1].strip() if i + 1 < n else ""
+            if (nxt2 and not _TOD_END_RE.search(h) and nxt2.upper() == nxt2 and len(nxt2) <= 60
+                    and _TOD_END_RE.search(_TRAILING_SCENE_NO_RE.sub("", nxt2)) and not HEADING_LINE_RE.match(nxt2)):
+                h = f"{h.rstrip(' -,')} - {heading_text(nxt2) or _TRAILING_SCENE_NO_RE.sub('', nxt2).strip()}"
+                i += 1
             cur = [("stage_direction", h)]
             scenes_raw.append(cur)
             i += 1
@@ -278,7 +296,7 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
                 break
             if paren or t.startswith("("):
                 if dlg and not paren:
-                    cur.append(("dialogue", " ".join(dlg)))
+                    cur.append(("dialogue", join_lines(dlg)))
                     dlg = []
                 paren.append(t)
                 if ")" in t:
@@ -290,7 +308,7 @@ def text_to_scenes(text: str, detok: bool = True) -> tuple[list[Scene], dict]:
         if paren:
             cur.append(("parenthetical", " ".join(paren)))
         if dlg:
-            cur.append(("dialogue", " ".join(dlg)))
+            cur.append(("dialogue", join_lines(dlg)))
     flush_para()
 
     scenes, orphan_cues = [], 0

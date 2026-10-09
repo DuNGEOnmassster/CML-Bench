@@ -26,6 +26,9 @@ WHITELIST = re.compile(
 )
 
 
+PAGE_FURNITURE = re.compile(r"\b(continued|revised|revision|rev|draft|omitted|more|progress|pink|blue|yellow|green|goldenrod|buff|salmon|cherry)\b")
+
+
 def raw_words(path: str, fmt: str) -> list[str]:
     with open(path, "rb") as f:
         body = f.read()
@@ -58,20 +61,26 @@ def check(item: dict, cache_dir: str) -> dict:
     raw = raw_words(os.path.join(cache_dir, item.get("source_cache_file") or item["source_file"]), item["source_format"])
     seg_scenes = segment_scene_words(item["script_segment"])
     seg = [w for s in seg_scenes for w in s]
-    anchor = seg[:12]
-    start = -1
-    for i in range(len(raw) - len(anchor)):
-        if raw[i : i + len(anchor)] == anchor:
-            start = i
-            break
-    if start < 0:
-        sm = difflib.SequenceMatcher(None, raw, anchor, autojunk=False)
-        start = sm.find_longest_match(0, len(raw), 0, len(anchor)).a
-    end_anchor = seg[-12:]
-    end = start + len(seg)
-    for j in range(start, min(len(raw), start + 3 * len(seg))):
-        if raw[j : j + len(end_anchor)] == end_anchor:
-            end = j + len(end_anchor)
+    # anchor on number-free words (margin scene/page numbers interrupt the raw word stream), align in full
+    num = re.compile(r"\d+[a-z]{0,3}")
+    raw_pos = [i for i, w in enumerate(raw) if not num.fullmatch(w)]
+    raw_f = [raw[i] for i in raw_pos]
+    seg_f = [w for w in seg if not num.fullmatch(w)]
+    anchor, end_anchor = seg_f[:12], seg_f[-12:]
+    starts = [i for i in range(len(raw_f) - len(anchor) + 1) if raw_f[i : i + len(anchor)] == anchor]
+    if not starts:
+        sm = difflib.SequenceMatcher(None, raw_f, anchor, autojunk=False)
+        starts = [sm.find_longest_match(0, len(raw_f), 0, len(anchor)).a]
+    best = None
+    for st in starts:  # tightest span that starts at an anchor occurrence and ends at the end anchor
+        end = min(len(raw_f), st + len(seg_f))
+        for j in range(st, min(len(raw_f), st + 3 * len(seg_f))):
+            if raw_f[j : j + len(end_anchor)] == end_anchor:
+                end = j + len(end_anchor)
+                break
+        if best is None or end - st < best[1] - best[0]:
+            best = (st, end)
+    start, end = raw_pos[best[0]], raw_pos[best[1] - 1] + 1
     region = raw[start:end]
     speakers = {w for c in re.findall(r"<character>(.*?)</character>", item["script_segment"]) for w in words(html.unescape(c))}
     sm = difflib.SequenceMatcher(None, region, seg, autojunk=False)
@@ -85,6 +94,9 @@ def check(item: dict, cache_dir: str) -> dict:
             del_white += len(run) - len(other)
             if other and all(w in speakers for w in other):
                 del_declared += len(other)  # bare speaker-name line without dialogue (removed by design, C12c)
+                continue
+            if other and len(run) <= 20 and PAGE_FURNITURE.search(" ".join(run)):
+                del_declared += len(other)  # page header/footer ("CONTINUED", revision colour and date, page no.)
                 continue
             del_other += len(other)
             if other:

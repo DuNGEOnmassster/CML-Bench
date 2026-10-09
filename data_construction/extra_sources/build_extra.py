@@ -234,6 +234,8 @@ def main() -> None:
             match = offer["match"]
             verified = verify_match(scenes, characters.get(match["imdb_id"]), need=2 if match.get("confidence") == "low" else 1)
             info["imdb_match"] = {k: match.get(k) for k in ("imdb_id", "title", "year", "confidence", "matched_title")} | {"verified": verified}
+            if not reasons and verified is False and match.get("confidence") not in ("low", "medium"):
+                reasons.append("imdb_cast_mismatch")  # e.g. a catalog link labelled with the wrong film
             if not reasons and match.get("confidence") == "low" and match.get("ambiguous"):
                 reasons.append("imdb_match_ambiguous")  # several popular films share the title and no year is known
             if not reasons and match.get("confidence") in ("low", "medium") and verified is not True:
