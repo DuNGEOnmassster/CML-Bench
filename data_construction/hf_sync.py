@@ -550,6 +550,9 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
              "targeted_selected_share": round(len(selected) / merged_items, 4) if merged_items else None,
              "sample_items": len(sample), **rule,
              "revoked_batch_ids": [r["batch_id"] for r in revoked_list], "revoked_batches": revoked_list,
+             # merger-side rejections the orchestrators' local check cannot see (G6 against all merged abstracts)
+             "rejected_batches": [{"batch_id": b, "orchestrator": orchestrator_of(b, ranges), "failures": new_cache[b]["res"]["failures"][:10]}
+                                  for b, s in sorted(states.items()) if s == "rejected"],
              "paused_orchestrators": paused, "orchestrators": ranges}
 
     checks_path = os.path.join(run_dir, "content_checks.json")
