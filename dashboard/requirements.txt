@@ -1,0 +1,8 @@
+gradio==6.30.0
+plotly>=5.20
+pandas>=2.1
+numpy
+pyarrow
+huggingface_hub>=0.24
+tiktoken>=0.7
+jinja2>=3.1.5
