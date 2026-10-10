@@ -25,6 +25,7 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from dataset_schema import build_id, source_slug  # noqa: E402
+from validate_batch import DEFAULT_CONTENT_EXCLUSIONS, content_excluded, load_content_exclusions  # noqa: E402
 
 DEFAULT_PROMPT = os.path.join(HERE, "prompts", "abstract_prompt_v1_5.md")
 
@@ -73,6 +74,7 @@ def main() -> None:
     ap.add_argument("--allowed_authors", default="claude-opus-5.5", help="comma-separated author values merge gate G1 accepts")
     ap.add_argument("--orchestrators", type=int, default=4, help="fan-out partitions written to fanout.json (main batches only)")
     ap.add_argument("--batches_from", help="an earlier run's batches.jsonl: keep its batch ids and membership (rebuild of a written run)")
+    ap.add_argument("--content_exclusions", default=DEFAULT_CONTENT_EXCLUSIONS, help="C35 list: listed items get no manifest entry ('' for none)")
     args = ap.parse_args()
 
     run_dir = os.path.abspath(args.run_dir)
@@ -140,15 +142,22 @@ def main() -> None:
         index += [(f"{slug}-hold-b{n:04d}", held[b : b + bs]) for n, b in enumerate(range(0, len(held), bs), start=1)]
 
     os.makedirs(os.path.join(run_dir, "abstracts"), exist_ok=True)
+    # C35: listed items stay members of their batch (batches.jsonl, so the batch design does not move), but they are
+    # never offered to a writer: no content file, no manifest entry, only an "excluded_items" record.
+    c35 = load_content_exclusions(args.content_exclusions)
+    listed = content_excluded([it["item_id"] for it in items], {it["item_id"]: it for it in items}, c35)
     rows = []
     for batch_id, batch_items in index:
         bdir = os.path.join(run_dir, "batches", batch_id)
         os.makedirs(os.path.join(bdir, "items"), exist_ok=True)
         os.makedirs(os.path.join(bdir, "scratch"), exist_ok=True)
-        entries = []
+        entries, excluded = [], []
         for it in batch_items:
             it["batch_id"] = batch_id
             it["build_id"] = build
+            if it["item_id"] in listed:
+                excluded.append({"item_id": it["item_id"], "reason": "C35 content-safety exclusion: do not open, write or summarize"})
+                continue
             content_path = os.path.join(bdir, "items", f"{it['item_id']}.xml")
             with open(content_path, "w", encoding="utf-8") as f:
                 f.write(it["script_segment"])
@@ -177,11 +186,12 @@ def main() -> None:
             "num_items": len(entries),
             "total_content_tokens": sum(e["content_tokens"] for e in entries),
             "items": entries,
+            **({"excluded_items": excluded} if excluded else {}),
         }
         with open(os.path.join(bdir, "manifest.json"), "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2, ensure_ascii=False)
-        rows.append({"batch_id": batch_id, "item_ids": [e["item_id"] for e in entries],
-                     "content_sha1s": [e["content_sha1"] for e in entries]})
+        rows.append({"batch_id": batch_id, "item_ids": [it["item_id"] for it in batch_items],
+                     "content_sha1s": [it["content_sha1"] for it in batch_items]})
 
     with open(os.path.join(run_dir, "items.jsonl"), "w", encoding="utf-8") as f:
         for it in items:
