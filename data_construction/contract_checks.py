@@ -118,6 +118,19 @@ def c34_assertion(recs: list[dict], record, content_only: bool) -> None:
            f"score>={THRESHOLD}_not_excluded={len(unlisted)} {unlisted[:5]}")
 
 
+def c35_assertion(recs: list[dict], record, content_only: bool) -> None:
+    """C35: no item on the content-safety list and no window of a listed film is released (ids only in the detail)."""
+    from validate_batch import content_excluded, load_content_exclusions
+
+    c35 = load_content_exclusions()
+    hits = sorted(content_excluded([r["item_id"] for r in recs], {r["item_id"]: r for r in recs}, c35))
+    if content_only:
+        record("C35", True, f"listed_items={len(c35['items'])}, listed_films={len(c35['films'])}, in_this_content_set={len(hits)} "
+                            f"(dropped at merge and from the published content config)")
+    else:
+        record("C35", not hits, f"listed_items={len(c35['items'])}, listed_films={len(c35['films'])}, released={len(hits)}")
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--release", required=True)
@@ -161,6 +174,7 @@ def main() -> None:
         record("C04", max(ids.values()) == 1 and max(shas.values()) == 1, f"dup_ids={sum(v > 1 for v in ids.values())}")
         abstract_assertions(recs, record)
         c34_assertion(recs, record, content_only=False)
+        c35_assertion(recs, record, content_only=False)
         summary = {"items": n, "release_gates": True, "automated_pass": sum(v["pass"] is True for v in results.values()),
                    "automated_fail": sum(v["pass"] is False for v in results.values()),
                    "failed": sorted(k for k, v in results.items() if v["pass"] is False)}
@@ -437,6 +451,7 @@ def main() -> None:
            f"duplicate_keeps={sorted(set(dup_keeps))}, keep_metadata_mismatch={dup_bad[:3]}, "
            f"items_with_title_year_vs_imdb_year_gap>1={len(year_off)}")
     c34_assertion(recs, record, args.content_only)
+    c35_assertion(recs, record, args.content_only)
 
     summary = {"items": n, "content_only": args.content_only, "build_id": recs[0].get("build_id") if recs else None,
                "automated_pass": sum(v["pass"] is True for v in results.values()),

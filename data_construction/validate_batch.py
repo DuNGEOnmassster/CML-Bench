@@ -15,6 +15,8 @@ Non-blocking G8 (audit routing, C31): an item goes to the targeted audit pool, o
 abstract names the film's title (not as words of the excerpt), has 1-2 ungrounded proper nouns, misses the top speaker
 or the last third, or the writer reported a source problem for it (batches/<id>/writer_report.json).
 Faithfulness/coverage (C25'-C28') are judged by the audit; a major or outside error revokes the batch (C31).
+Items on the C35 content-safety list (content_exclusions.json: listed items and every window of a listed film) are not
+part of any batch for G1-G7: they need no abstract, an abstract written for one is ignored, and G5 counts without them.
 """
 from __future__ import annotations
 
@@ -32,6 +34,7 @@ from dataset_schema import make_record, validate_record  # noqa: E402
 MIN_IN_TARGET = 0.7
 MIN_GROUNDING = 0.35
 DEFAULT_AUTHORS = ["claude-opus-5.5"]
+DEFAULT_CONTENT_EXCLUSIONS = "/cursor/stores/bc-36270f16-3cac-4d49-8f64-7dfb9bff8601/internal/dataset-expansion/content_exclusions.json"
 G8_SOFT = {"some_ungrounded_proper_nouns": "ungrounded_names", "top_speaker_missing": "top_speaker_missing",
            "last_third_not_covered": "last_third_not_covered"}
 
@@ -45,6 +48,22 @@ def title_mention(abstract: str, movie_name: str, content: str) -> bool:
         return False
     pat = r"\b" + r"\W+".join(map(re.escape, words)) + r"\b"
     return bool(re.search(pat, abstract, re.I)) and not re.search(pat, content, re.I)
+
+
+def load_content_exclusions(path: str | None = DEFAULT_CONTENT_EXCLUSIONS) -> dict:
+    """C35 list: {"items": {item_id: content_sha1}, "films": {imdb_id}}; empty when the file is absent."""
+    if not path or not os.path.exists(path):
+        return {"items": {}, "films": set()}
+    with open(path, encoding="utf-8") as f:
+        spec = json.load(f)
+    return {"items": {x["item_id"]: x.get("content_sha1") for x in spec.get("items", [])},
+            "films": {x["imdb_id"] for x in spec.get("films", [])}}
+
+
+def content_excluded(item_ids, items_by_id: dict, c35: dict) -> set[str]:
+    """The given items that C35 excludes: listed by item_id (whatever their content now is), or a window of a listed film."""
+    return {i for i in item_ids if i in c35["items"] or (items_by_id.get(i) or {}).get("imdb_id") in c35["films"]
+            or i.split("-s")[0] in c35["films"]}
 
 
 def writer_issues(batch_dir: str) -> set[str]:
@@ -72,9 +91,13 @@ def abstract_set_hash(manifest: dict) -> str:
     return h.hexdigest()
 
 
-def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_tokens=None) -> dict:
+def validate(manifest: dict, items_by_id: dict, merged_first8: set[str], count_tokens=None, skip: set[str] | None = None) -> dict:
     from make_abstract_batches import target_center  # noqa: PLC0415
 
+    if skip:
+        manifest = {**manifest, "items": [e for e in manifest["items"] if e["item_id"] not in skip]}
+        if not manifest["items"]:  # every item is C35-listed: nothing to write, nothing to merge
+            return {"state": "passed", "failures": [], "soft": [], "records": [], "items": [], "audit_targets": []}
     failures, soft, records, per_item, targets = [], [], [], [], []
     present = [os.path.exists(e["abstract_path"]) for e in manifest["items"]]
     if not any(present):
@@ -148,13 +171,15 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--run_dir", required=True)
     ap.add_argument("--batch", required=True)
+    ap.add_argument("--content_exclusions", default=DEFAULT_CONTENT_EXCLUSIONS, help="C35 list ('' for none)")
     args = ap.parse_args()
     with open(os.path.join(args.run_dir, "items.jsonl"), encoding="utf-8") as f:
         items = {it["item_id"]: it for it in map(json.loads, f)}
     with open(os.path.join(args.batch, "manifest.json"), encoding="utf-8") as f:
         manifest = json.load(f)
-    res = validate(manifest, items, set())
-    print(json.dumps({k: res[k] for k in ("state", "failures", "soft", "audit_targets")}, indent=2))
+    skip = content_excluded([e["item_id"] for e in manifest["items"]], items, load_content_exclusions(args.content_exclusions))
+    res = validate(manifest, items, set(), skip=skip)
+    print(json.dumps({k: res[k] for k in ("state", "failures", "soft", "audit_targets")} | {"c35_skipped": sorted(skip)}, indent=2))
     sys.exit(0 if res["state"] == "passed" else 1)
 
 

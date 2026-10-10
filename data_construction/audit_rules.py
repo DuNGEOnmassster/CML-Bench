@@ -8,14 +8,21 @@ Audit verdicts are one JSON line per audited item (written by the evaluator / re
 Rules (evaluator-repilot-report.md 5):
   sample     per block of 10 consecutive main batches, the 2 batches with the lowest sha1(seed+batch_id) are sampled and
              the item with the lowest sha1(seed+item_id) of each is audited (2%; independent of merge order)
-  targeted   every merged item routed by merge gate G8 is audited in full, outside the 2% sample
-  revoke     a batch with any major or outside verdict on its current abstracts leaves data/ and is rewritten
+  targeted   items routed by merge gate G8 are audited outside the 2% sample, by tier (targeted_rule.py)
+  revoke     a batch with any major or outside verdict on its current abstracts (sample or targeted) leaves data/ and
+             is rewritten
   dedupe     one verdict per (item_id, summary_sha1), the stricter one wins; major and outside always count together
-  stop       issuing stops for everyone when any 50 consecutive verdicts hold >= 2 major/outside, or when, after >= 60
-             verdicts, the observed major+outside rate exceeds 3% (all verdicts)
-  complete   the Wilson 95% upper bound of the major+outside rate over the random sample only must be <= 3%; the
-             targeted pool is reported separately (evaluator's final verdict, condition 3)
-  pause      an orchestrator with >= 2 revoked batches among its last 20 audited batches is paused
+  stop       random-sample verdicts only: issuing stops for everyone when any 50 consecutive ones hold >= 2
+             major/outside, or when, after >= 60, the observed major+outside rate exceeds 3%
+  alarm      targeted verdicts never stop issuing; they raise a targeted alarm for the evaluator and the coordinator
+             when >= 3 major (not outside) fall within any 50 consecutive targeted verdicts, or when the targeted
+             major+outside rate exceeds 25% after >= 40 targeted verdicts (urgent addendum, 2026-10-09 13:46 UTC)
+  complete   the Wilson 95% upper bound of the major+outside rate over the random sample only must be <= 3%
+  pause      an orchestrator is paused when >= 2 of its last 20 random-sample-audited batches were revoked by a sample
+             verdict. Targeted revocations never pause; they are reported per orchestrator, and an orchestrator whose
+             targeted revocations are concentrated (>= 3 among its last 20 targeted-audited batches and >= 2x the
+             targeted revocation rate of the other orchestrators combined) raises the targeted alarm, so the evaluator
+             can decide on a pause
 """
 from __future__ import annotations
 
@@ -27,6 +34,8 @@ SEED = "c31-20261009"
 WINDOW, WINDOW_MAX_BAD = 50, 2
 MIN_FOR_WILSON, MAX_MAJOR_UPPER = 60, 0.03
 PAUSE_LAST, PAUSE_REVOKED = 20, 2
+CONCENTRATED_REVOKED, CONCENTRATED_RATIO = 3, 2.0
+ALARM_WINDOW, ALARM_MAX_MAJOR, ALARM_MIN, ALARM_MAX_RATE = 50, 3, 40, 0.25
 
 
 def _h(s: str) -> str:
@@ -89,26 +98,47 @@ def _counts(vs: list[dict]) -> dict:
             "claims": sum(v.get("claims", 0) for v in vs)}
 
 
-def stop_rule(verdicts: list[dict], sample_items: set[str] | None = None) -> dict:
-    """verdicts: deduped, in audit order. Major and outside count together everywhere. The stop rule looks at every
-    verdict (random sample and targeted pool); the completion criterion (Wilson 95% upper bound <= 3%) uses the random
-    sample only, and the targeted pool is reported on its own."""
-    bad = [1 if _bad(v) else 0 for v in verdicts]
-    worst = max((sum(bad[i : i + WINDOW]) for i in range(max(1, len(bad) - WINDOW + 1))), default=0)
-    n, k = len(verdicts), sum(bad)
-    reasons = []
-    if worst >= WINDOW_MAX_BAD:
-        reasons.append(f"{worst} major/outside within {WINDOW} consecutive audited items")
-    if n >= MIN_FOR_WILSON and k / n > MAX_MAJOR_UPPER:
-        reasons.append(f"major+outside rate {k}/{n} > {MAX_MAJOR_UPPER} after >= {MIN_FOR_WILSON} audited items")
+def _worst_window(flags: list[int], width: int) -> int:
+    return max((sum(flags[i : i + width]) for i in range(max(1, len(flags) - width + 1))), default=0)
+
+
+def stop_rule(verdicts: list[dict], sample_items: set[str] | None = None, targeted_meta: dict[str, dict] | None = None) -> dict:
+    """verdicts: deduped, in audit order. Major and outside count together except in the targeted alarm's window clause.
+    A verdict on an item of the random sample is a sample verdict even when G8 also routed the item. The stop rule and
+    the completion criterion use sample verdicts only; targeted verdicts feed the targeted alarm and are reported per
+    tier and per G8 reason (targeted_meta: item_id -> {"tier", "reasons"})."""
     sample_items = sample_items or set()
+    targeted_meta = targeted_meta or {}
     rand = [v for v in verdicts if v["item_id"] in sample_items]
     targ = [v for v in verdicts if v["item_id"] not in sample_items]
+    worst = _worst_window([1 if _bad(v) else 0 for v in rand], WINDOW)
     rc = _counts(rand)
+    reasons = []
+    if worst >= WINDOW_MAX_BAD:
+        reasons.append(f"{worst} major/outside within {WINDOW} consecutive random-sample verdicts")
+    if rc["audited"] >= MIN_FOR_WILSON and rc["major_or_outside"] / rc["audited"] > MAX_MAJOR_UPPER:
+        reasons.append(f"random-sample major+outside rate {rc['major_or_outside']}/{rc['audited']} > {MAX_MAJOR_UPPER} "
+                       f"after >= {MIN_FOR_WILSON} verdicts")
+    tc = _counts(targ)
+    worst_major = _worst_window([1 if v.get("major", 0) else 0 for v in targ], ALARM_WINDOW)
+    alarm = []
+    if worst_major >= ALARM_MAX_MAJOR:
+        alarm.append(f"{worst_major} major within {ALARM_WINDOW} consecutive targeted verdicts")
+    if tc["audited"] >= ALARM_MIN and tc["major_or_outside"] / tc["audited"] > ALARM_MAX_RATE:
+        alarm.append(f"targeted major+outside rate {tc['major_or_outside']}/{tc['audited']} > {ALARM_MAX_RATE} after >= {ALARM_MIN} verdicts")
+    by_tier, by_reason = {}, {}
+    for v in targ:
+        meta = targeted_meta.get(v["item_id"], {})
+        by_tier.setdefault(meta.get("tier", "unknown"), []).append(v)
+        for r in meta.get("reasons") or ["unknown"]:
+            by_reason.setdefault(r, []).append(v)
     upper = wilson_upper(rc["major_or_outside"], rc["audited"])
     return {"stop": bool(reasons), "reason": "; ".join(reasons), **_counts(verdicts), "worst_window_bad": worst,
             "random_sample": {**rc, "upper95": round(upper, 4) if rc["audited"] else None},
-            "targeted_pool": _counts(targ),
+            "targeted_pool": {**tc, "worst_window_major": worst_major,
+                              "by_tier": {k: _counts(vs) for k, vs in sorted(by_tier.items())},
+                              "by_reason": {k: _counts(vs) for k, vs in sorted(by_reason.items())}},
+            "targeted_alarm": {"fired": bool(alarm), "reason": "; ".join(alarm)},
             "release_criterion_upper95_le_3pct": bool(rc["audited"]) and upper <= MAX_MAJOR_UPPER}
 
 
@@ -128,3 +158,31 @@ def paused_orchestrators(audited_batches: list[tuple[str, bool]], ranges: list[d
         if o:
             per.setdefault(o, []).append(revoked)
     return sorted(o for o, flags in per.items() if sum(flags[-PAUSE_LAST:]) >= PAUSE_REVOKED)
+
+
+def orchestrator_audit(verdicts: list[dict], sample_items: set[str], ranges: list[dict]) -> dict:
+    """verdicts: deduped, in audit order. Two per-orchestrator windows of batches in first-audit order: batches audited
+    by a random-sample verdict (revoked = a sample verdict on it is major/outside) and batches audited by a targeted
+    verdict (revoked = a targeted verdict on it is major/outside)."""
+    windows = {"sample": {}, "targeted": {}}
+    for v in verdicts:
+        kind = "sample" if v["item_id"] in sample_items else "targeted"
+        w = windows[kind].setdefault(v["batch_id"], False)
+        windows[kind][v["batch_id"]] = w or _bad(v)
+    flags = {k: [(b, bad) for b, bad in w.items()] for k, w in windows.items()}
+    per = {}
+    for b, bad in flags["targeted"]:
+        o = orchestrator_of(b, ranges)
+        if o:
+            per.setdefault(o, []).append(bad)
+    targeted = {o: {"audited_batches": len(f), "revoked": sum(f), "last20_audited": len(f[-PAUSE_LAST:]),
+                    "last20_revoked": sum(f[-PAUSE_LAST:])} for o, f in sorted(per.items())}
+    concentrated = []
+    for o, t in targeted.items():
+        others = [x for p, x in targeted.items() if p != o]
+        other_rate = sum(x["revoked"] for x in others) / max(1, sum(x["audited_batches"] for x in others))
+        own_rate = t["last20_revoked"] / max(1, t["last20_audited"])
+        if t["last20_revoked"] >= CONCENTRATED_REVOKED and own_rate >= CONCENTRATED_RATIO * other_rate:
+            concentrated.append(o)
+    return {"paused": paused_orchestrators(flags["sample"], ranges), "targeted_by_orchestrator": targeted,
+            "targeted_concentrated": concentrated}

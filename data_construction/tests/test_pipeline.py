@@ -122,13 +122,49 @@ class FormatTests(unittest.TestCase):
 class AuditRuleTests(unittest.TestCase):
     def test_stop_rule(self):
         ok = [{"item_id": f"i{i}", "major": 0, "outside": 0} for i in range(100)]
-        self.assertFalse(stop_rule(ok)["stop"])
+        sample = {f"i{i}" for i in range(100)} | {"m", "m1", "o1"}
+        self.assertFalse(stop_rule(ok, sample)["stop"])
         two_close = ok[:20] + [{"item_id": "m1", "major": 1}] + ok[:10] + [{"item_id": "o1", "outside": 1}] + ok[:20]
-        self.assertTrue(stop_rule(two_close)["stop"])
+        self.assertTrue(stop_rule(two_close, sample)["stop"])
         spread = ([{"item_id": "m", "major": 1}] + ok[:59]) * 2
-        self.assertFalse(stop_rule(spread)["stop"])
-        self.assertTrue(stop_rule(([{"item_id": "m", "major": 1}] + ok[:24]) * 4)["stop"])
+        self.assertFalse(stop_rule(spread, sample)["stop"])
+        self.assertTrue(stop_rule(([{"item_id": "m", "major": 1}] + ok[:24]) * 4, sample)["stop"])
         self.assertLess(wilson_upper(0, 261), 0.015)
+
+    def test_orchestrator_pause_and_concentration(self):
+        from audit_rules import orchestrator_audit
+
+        ranges = [{"name": "O1", "first": 1, "last": 50}, {"name": "O2", "first": 51, "last": 100}]
+
+        def v(b, item, bad=0):
+            return {"item_id": item, "batch_id": f"moviesum-b{b:04d}", "outside": bad, "major": 0}
+
+        two_targeted = [v(18, "t18", 1), v(20, "t20", 1)] + [v(60 + i, f"u{i}") for i in range(5)]
+        r = orchestrator_audit(two_targeted, set(), ranges)
+        self.assertEqual(r["paused"], [])
+        self.assertEqual(r["targeted_concentrated"], [])
+        self.assertEqual(r["targeted_by_orchestrator"]["O1"]["revoked"], 2)
+        three = two_targeted + [v(22, "t22", 1)]
+        self.assertEqual(orchestrator_audit(three, set(), ranges)["targeted_concentrated"], ["O1"])
+        spread = three + [v(30, "c30"), v(31, "c31"), v(32, "c32"), v(61, "w1", 1), v(62, "w2", 1)]
+        self.assertEqual(orchestrator_audit(spread, set(), ranges)["targeted_concentrated"], [])
+        sampled = [v(3, "s3", 1), v(4, "s4"), v(5, "s5", 1)]
+        self.assertEqual(orchestrator_audit(sampled, {"s3", "s4", "s5"}, ranges)["paused"], ["O1"])
+
+    def test_targeted_verdicts_alarm_but_never_stop(self):
+        ok = [{"item_id": f"t{i}", "major": 0, "outside": 0} for i in range(38)]
+        outs = [{"item_id": f"o{i}", "major": 0, "outside": 1} for i in range(3)]
+        r = stop_rule(ok + outs, sample_items=set(), targeted_meta={"o0": {"tier": "A", "reasons": ["ungrounded_names"]}})
+        self.assertFalse(r["stop"])
+        self.assertFalse(r["targeted_alarm"]["fired"])
+        self.assertEqual(r["targeted_pool"]["by_tier"]["A"]["outside"], 1)
+        majors = [{"item_id": f"m{i}", "major": 1, "outside": 0} for i in range(3)]
+        r = stop_rule(ok[:10] + majors, sample_items=set())
+        self.assertFalse(r["stop"])
+        self.assertTrue(r["targeted_alarm"]["fired"])
+        r = stop_rule(ok[:29] + [{"item_id": f"x{i}", "outside": 1} for i in range(11)], sample_items=set())
+        self.assertTrue(r["targeted_alarm"]["fired"])
+        self.assertFalse(r["stop"])
 
     def test_dedupe_and_sample_only_completion(self):
         v = [{"item_id": "a", "summary_sha1": "x", "auditor": "claude", "major": 0, "outside": 0, "minor": 1},
@@ -158,6 +194,46 @@ class AuditRuleTests(unittest.TestCase):
         out = [t for scene in strip_page_furniture(els) for _, t in scene]
         self.assertEqual(out[:4], ["He runs.", "She waits.", "They talk.", "Arlo smiles."])
         self.assertEqual(out[4], "INT. MOTEL ROOM 12 - NIGHT")
+
+    def test_targeted_tiers_and_budget(self):
+        from targeted_rule import h, select
+
+        pool = [{"item_id": f"t{i:03d}", "batch_id": f"b{i // 10:02d}", "reasons": ["writer_source_issue"]} for i in range(200)]
+        pool[0]["reasons"] = ["title_mention"]
+        notes = {t["item_id"]: ("Page missing in the bar scene." if i % 2 else "OCR typos; cues tagged as action.")
+                 for i, t in enumerate(pool)}
+        notes["t004"] = "This is a different film's script."
+        sel = {r["item_id"]: r["tier"] for r in select(pool, notes)}
+        self.assertEqual(sel["t000"], "A")
+        self.assertEqual(sel["t004"], "A")
+        self.assertTrue(all(sum(1 for i, k in sel.items() if k == "B" and i[1:3] == f"{b:02d}") <= 1 for b in range(20)))
+        self.assertTrue(all(h(i) < 1 / 20 for i, k in sel.items() if k == "C"))
+        cov = [{"item_id": f"c{i:03d}", "batch_id": "b99", "reasons": ["last_third_not_covered"]} for i in range(400)]
+        picked = select(cov, {})
+        self.assertTrue(all(r["tier"] == "A4" and h(r["item_id"]) < 1 / 4 for r in picked))
+        self.assertTrue(60 < len(picked) < 140)
+        both = select([{"item_id": "x1", "batch_id": "b98", "reasons": ["top_speaker_missing", "ungrounded_names"]}], {})
+        self.assertEqual([r["tier"] for r in both], ["A"])
+        capped = select(pool, notes, merged_items=200)
+        self.assertLessEqual(sum(r["tier"] != "A" for r in capped), sum(r["tier"] != "A" for r in select(pool, notes)))
+        self.assertFalse(any(r["tier"] == "C" for r in capped))
+
+    def test_c35_content_exclusions(self):
+        import json
+        import tempfile
+
+        from validate_batch import content_excluded, load_content_exclusions
+
+        self.assertEqual(load_content_exclusions(""), {"items": {}, "films": set()})
+        with tempfile.TemporaryDirectory() as d:
+            p = os.path.join(d, "c35.json")
+            with open(p, "w") as f:
+                json.dump({"films": [{"imdb_id": "tt9"}], "items": [{"item_id": "tt1-s0001-0015", "content_sha1": "x"}]}, f)
+            c35 = load_content_exclusions(p)
+        items = {"tt1-s0001-0015": {"imdb_id": "tt1"}, "tt1-s0016-0030": {"imdb_id": "tt1"},
+                 "tt9-s0100-0115": {"imdb_id": "tt9"}, "tt2-s0001-0015": {"imdb_id": "tt2"}}
+        self.assertEqual(content_excluded(items, items, c35), {"tt1-s0001-0015", "tt9-s0100-0115"})
+        self.assertEqual(content_excluded(["tt9-s0200-0215"], {}, c35), {"tt9-s0200-0215"})
 
     def test_c34_window_score(self):
         from mislabel_gate import score_items
