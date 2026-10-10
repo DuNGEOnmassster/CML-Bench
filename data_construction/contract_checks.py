@@ -41,6 +41,19 @@ LLM_RESIDUE_RE = re.compile(
 C12B_RE = re.compile(r"-[LR][RSC]B-|\*|\\|\bCONT\s*['\u2019]?\s*D\b|\(CONTINUED\)|\bOMITTED\b")
 QUOTE_SPACE_RE = re.compile(r'(?:^|[\s>])" [A-Za-z]|[a-z.!?,] "(?=[\s<])')
 CODE_SUFFIXES = (".py", ".md", ".sh", ".json")
+EXTRA_SOURCES = ("IMSDb", "DailyScript", "AwesomeFilm", "SimplyScripts")
+
+
+def imdb_names(index_path: str, ids: set[str]) -> dict[str, str]:
+    """imdb_id -> "Title_Year" from the extra_sources IMDb title index (reference for non-MovieSum items)."""
+    out = {}
+    if ids and os.path.exists(index_path):
+        with open(index_path, encoding="utf-8") as f:
+            for cands in json.load(f).values():
+                for c in cands:
+                    if c[0] in ids:
+                        out[c[0]] = f"{c[6]}_{c[1]}"
+    return out
 
 
 def median(xs):
@@ -144,6 +157,8 @@ def main() -> None:
     ap.add_argument("--excluded", default="data_construction/work/build_v31/excluded_movies.jsonl",
                     help="build's excluded_movies.jsonl (C32 duplicate-screenplay keeps)")
     ap.add_argument("--imdb_dir", default="data_construction/work/sources/imdb")
+    ap.add_argument("--extra_cache", default="data_construction/work/sources/extra/raw", help="extra-source fetch cache")
+    ap.add_argument("--imdb_index", default="data_construction/work/sources/imdb/title_index.json")
     ap.add_argument("--workers", type=int, default=os.cpu_count() or 2)
     ap.add_argument("--out")
     args = ap.parse_args()
@@ -197,16 +212,24 @@ def main() -> None:
                 if cur is None or len(row["script"]) > len(cur["script"]):
                     ms[row["imdb_id"]][split] = row
     # Relabelled items (C33) are checked against the MovieSum row named by their source_label.
-    bad_ids = [r["item_id"] for r in recs
-               if ms.get((r.get("source_label") or r)["imdb_id"], {}).get(r["source_split"], {}).get("movie_name")
-               != (r.get("source_label") or r)["movie_name"]]
+    extra_names = imdb_names(args.imdb_index, {r["imdb_id"] for r in recs if r["source_dataset"] != "MovieSum"})
+
+    def name_mismatch(r):
+        if r["source_dataset"] != "MovieSum":  # extra sources: IMDb title of record, never a MovieSum id
+            return r["imdb_id"] in ms or extra_names.get(r["imdb_id"]) != r["movie_name"]
+        return (ms.get((r.get("source_label") or r)["imdb_id"], {}).get(r["source_split"], {}).get("movie_name")
+                != (r.get("source_label") or r)["movie_name"])
+
+    bad_ids = [r["item_id"] for r in recs if name_mismatch(r)]
     relabelled = sum(1 for r in recs if r.get("source_label"))
     record("C02", not bad_ids, f"mismatches={bad_ids[:5]}, relabelled_items={relabelled}")
 
     schema_bad = Counter(p for r in recs for p in validate_record(r))
     if args.content_only:
         schema_bad = Counter({k: v for k, v in schema_bad.items() if k != "summary_fields_inconsistent"})
-    bad_prov = sum(1 for r in recs if r["source_dataset"] != "MovieSum" or r["source_split"] not in ("train", "val", "test"))
+    bad_prov = sum(1 for r in recs if not (
+        (r["source_dataset"] == "MovieSum" and r["source_split"] in ("train", "val", "test"))
+        or (r["source_dataset"] in EXTRA_SOURCES and r["source_split"] is None and r["source_file"].startswith("http"))))
     record("C03", not schema_bad and not bad_prov, f"schema_problems={dict(schema_bad)}, bad_values={bad_prov}")
 
     ids, shas = Counter(r["item_id"] for r in recs), Counter(r["content_sha1"] for r in recs)
@@ -214,11 +237,31 @@ def main() -> None:
     record("C04", max(ids.values()) == 1 and max(shas.values()) == 1 and not sha_mismatch,
            f"dup_ids={sum(v > 1 for v in ids.values())}, dup_sha={sum(v > 1 for v in shas.values())}, sha_mismatch={sha_mismatch}")
 
-    align, align_fails = verify(recs, args.moviesum_dir, args.gt_path, args.workers)
-    dp, dp_bad = dialogue_check(recs, args.moviesum_dir, args.workers)
-    record("C05''", dp["c05pp_pass"], f"raw_lines={dp['totals'].get('raw_lines')}, lost_lines={dp['lost_lines']}, "
+    ms_recs = [r for r in recs if r["source_dataset"] == "MovieSum"]
+    extra_recs = [r for r in recs if r["source_dataset"] != "MovieSum"]
+    parts = []
+    if ms_recs:
+        parts.append(verify(ms_recs, args.moviesum_dir, args.gt_path, args.workers))
+    if extra_recs:
+        from extra_sources.verbatim_check import verify_extra  # independent of the extra-source parser
+
+        parts.append(verify_extra(extra_recs, args.extra_cache, args.gt_path))
+    align = {k: sum(p[0][k] for p in parts) for k in ("items", "c05_pass", "c05_fail", "inserted_words", "deleted_words", "raw_words")}
+    align["problem_kinds"] = dict(sum((Counter(p[0]["problem_kinds"]) for p in parts), Counter()))
+    align["c16b_max_gt_8gram_overlap"] = max(p[0]["c16b_max_gt_8gram_overlap"] for p in parts)
+    align["c16b_pass"] = all(p[0]["c16b_pass"] for p in parts)
+    align_fails = [f for p in parts for f in p[1]]
+    # C05'' re-reads MovieSum's raw <dialogue> elements; extra sources have no raw CML, so their speaker preservation
+    # comes from verbatim_check's raw-layout tag check (each raw cue's speech under the same speaker)
+    dp, dp_bad = dialogue_check(ms_recs, args.moviesum_dir, args.workers) if ms_recs else (
+        {"c05pp_pass": True, "totals": {"raw_lines": 0}, "lost_lines": 0, "speaker_changed_share": 0.0}, [])
+    extra_tags = parts[-1][0] if extra_recs else {"cues_checked": 0, "tag_errors": 0, "tag_error_examples": []}
+    record("C05''", dp["c05pp_pass"] and extra_tags["tag_errors"] == 0,
+           f"raw_lines={dp['totals'].get('raw_lines')}, lost_lines={dp['lost_lines']}, "
            f"speaker_changed={dp['totals'].get('speaker_changed', 0)} ({dp['speaker_changed_share']:.5%}), "
-           f"examples={[(b['item_id'], {k: v for k, v in b['examples'].items() if not k.startswith('expected')}) for b in dp_bad if b.get('missing') or b.get('speaker_changed') or any(k.startswith('moved_to') and not k.endswith('_short') for k in b)][:3]}")
+           f"examples={[(b['item_id'], {k: v for k, v in b['examples'].items() if not k.startswith('expected')}) for b in dp_bad if b.get('missing') or b.get('speaker_changed') or any(k.startswith('moved_to') and not k.endswith('_short') for k in b)][:3]}, "
+           f"extra_raw_cues={extra_tags['cues_checked']}, extra_tag_errors={extra_tags['tag_errors']} "
+           f"{extra_tags['tag_error_examples'][:2]}")
     record("C05'", align["c05_fail"] == 0,
            f"aligned={align['items']}, fail={align['c05_fail']}, inserted_words={align['inserted_words']}, "
            f"deleted_words={align['deleted_words']}/{align['raw_words']}, kinds={align['problem_kinds']}, "
