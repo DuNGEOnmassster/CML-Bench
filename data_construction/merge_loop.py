@@ -338,11 +338,11 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
     # a rebuilt run also reads the hand-off folders of the builds it replaced (run.json "handoff_builds"): purge those too
     folders = [build] + list(json.load(open(os.path.join(run_dir, "run.json"))).get("handoff_builds", []))
     for folder in folders:
-        key = (lambda bid: bid) if folder == build else (lambda bid, f=folder: f"{f}/{bid}")
+        skey = (lambda bid: bid) if folder == build else (lambda bid, f=folder: f"{f}/{bid}")
         src = os.path.join(STORE, "abstracts", folder)
         stamps = bundle_stamps(src, [b["batch_id"] for b, _ in todo])
         for b, ids_sorted in todo:
-            if state.get(key(b["batch_id"])) == {"stamp": stamps[b["batch_id"]], "ids": ids_sorted}:
+            if state.get(skey(b["batch_id"])) == {"stamp": stamps[b["batch_id"]], "ids": ids_sorted}:
                 stats["bundles_unchanged"] += 1
                 continue
             ids = set(ids_sorted)
@@ -387,7 +387,7 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
                     stats["run_abstracts_removed"] += 1
             if cache.pop(b["batch_id"], None) is not None:
                 stats["cache_entries_dropped"] += 1
-            state[key(b["batch_id"])] = {"stamp": bundle_stamps(src, [b["batch_id"]])[b["batch_id"]], "ids": ids_sorted}
+            state[skey(b["batch_id"])] = {"stamp": bundle_stamps(src, [b["batch_id"]])[b["batch_id"]], "ids": ids_sorted}
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(cache, f)
     with open(state_path, "w", encoding="utf-8") as f:
