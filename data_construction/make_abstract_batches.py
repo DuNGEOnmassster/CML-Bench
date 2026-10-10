@@ -72,6 +72,7 @@ def main() -> None:
     ap.add_argument("--prompt_version", default="abstract_v1.5")
     ap.add_argument("--allowed_authors", default="claude-opus-5.5", help="comma-separated author values merge gate G1 accepts")
     ap.add_argument("--orchestrators", type=int, default=4, help="fan-out partitions written to fanout.json (main batches only)")
+    ap.add_argument("--batches_from", help="an earlier run's batches.jsonl: keep its batch ids and membership (rebuild of a written run)")
     args = ap.parse_args()
 
     run_dir = os.path.abspath(args.run_dir)
@@ -100,9 +101,43 @@ def main() -> None:
     main_items = [it for it in items if it.get("identity_decision") != "hold"]
     items = main_items + held
     bs = args.batch_size
-    index = [(f"{prefix}{n:04d}", main_items[b : b + bs]) for n, b in enumerate(range(0, len(main_items), bs), start=1)]
-    n_main = len(index)
-    index += [(f"{slug}-hold-b{n:04d}", held[b : b + bs]) for n, b in enumerate(range(0, len(held), bs), start=1)]
+    old_ranges, handoff_builds = None, []
+    if args.batches_from:
+        # A rebuild of a written run: every old batch keeps its id and its items that are still in the build, so
+        # abstracts, audit verdicts and the C31 sample design carry over; items new to the build get new batches.
+        by_id = {it["item_id"]: it for it in items}
+        with open(args.batches_from, encoding="utf-8") as f:
+            old = [json.loads(line) for line in f]
+        placed = set()
+        index = []
+        for row in old:
+            kept = [by_id[i] for i in row["item_ids"] if i in by_id]
+            placed.update(it["item_id"] for it in kept)
+            if kept:
+                index.append((row["batch_id"], kept))
+        index.sort(key=lambda x: ("-hold-" in x[0], x[0]))
+        last = max((int(b.rsplit("b", 1)[1]) for b, _ in index if "-hold-" not in b), default=0)
+        rest = [it for it in main_items if it["item_id"] not in placed]
+        main_index = [x for x in index if "-hold-" not in x[0]]
+        main_index += [(f"{prefix}{last + n:04d}", rest[b : b + bs]) for n, b in enumerate(range(0, len(rest), bs), start=1)]
+        rest_held = [it for it in held if it["item_id"] not in placed]
+        hold_index = [x for x in index if "-hold-" in x[0]]
+        last_h = max((int(b.rsplit("b", 1)[1]) for b, _ in hold_index), default=0)
+        hold_index += [(f"{slug}-hold-b{last_h + n:04d}", rest_held[b : b + bs]) for n, b in enumerate(range(0, len(rest_held), bs), start=1)]
+        index = main_index + hold_index
+        n_main = len(main_index)
+        old_dir = os.path.dirname(os.path.abspath(args.batches_from))
+        if os.path.exists(os.path.join(old_dir, "fanout.json")):
+            with open(os.path.join(old_dir, "fanout.json"), encoding="utf-8") as f:
+                old_ranges = json.load(f)["orchestrators"]
+        if os.path.exists(os.path.join(old_dir, "run.json")):
+            with open(os.path.join(old_dir, "run.json"), encoding="utf-8") as f:
+                old_run = json.load(f)
+            handoff_builds = [b for b in old_run.get("handoff_builds", []) + [old_run["build_id"]] if b != build]
+    else:
+        index = [(f"{prefix}{n:04d}", main_items[b : b + bs]) for n, b in enumerate(range(0, len(main_items), bs), start=1)]
+        n_main = len(index)
+        index += [(f"{slug}-hold-b{n:04d}", held[b : b + bs]) for n, b in enumerate(range(0, len(held), bs), start=1)]
 
     os.makedirs(os.path.join(run_dir, "abstracts"), exist_ok=True)
     rows = []
@@ -156,15 +191,16 @@ def main() -> None:
             f.write(json.dumps(row) + "\n")
     # Contiguous partitions of the main batches, cut at multiples of 10 so each C31 sampling block has one owner.
     per = -(-n_main // (args.orchestrators * 10)) * 10
-    ranges = [{"name": f"O{i + 1}", "first": i * per + 1, "last": min(n_main, (i + 1) * per)}
-              for i in range(args.orchestrators) if i * per < n_main]
+    ranges = old_ranges or [{"name": f"O{i + 1}", "first": i * per + 1, "last": min(n_main, (i + 1) * per)}
+                            for i in range(args.orchestrators) if i * per < n_main]
     with open(os.path.join(run_dir, "fanout.json"), "w", encoding="utf-8") as f:
         json.dump({"build_id": build, "batch_prefix": prefix, "main_batches": n_main, "hold_batches": len(rows) - n_main,
                    "orchestrators": ranges}, f, indent=2)
     with open(os.path.join(run_dir, "run.json"), "w", encoding="utf-8") as f:
         json.dump({"build_id": build, "source_slug": slug, "seed": args.seed, "batch_size": args.batch_size,
                    "prompt_version": args.prompt_version, "items": len(items), "batches": len(rows),
-                   "main_batches": n_main, "held_items": len(held)}, f, indent=2)
+                   "main_batches": n_main, "held_items": len(held),
+                   **({"handoff_builds": handoff_builds} if handoff_builds else {})}, f, indent=2)
     print(f"{len(items)} items -> {len(rows)} batches of <= {args.batch_size} ({n_main} main, {len(rows) - n_main} hold) "
           f"in {run_dir} (build {build})")
 
