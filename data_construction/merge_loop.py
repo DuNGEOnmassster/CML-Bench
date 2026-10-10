@@ -155,6 +155,7 @@ def _unpack_folder(run_dir: str, src: str, seen_name: str, skip: set[str], sha: 
 def dashboard() -> str:
     """Re-export the static dashboard in the background (it takes minutes); one export at a time, the previous one's
     outcome is reported."""
+    os.makedirs(os.path.join(HERE, "work", "logs"), exist_ok=True)
     log = os.path.join(HERE, "work", "logs", "dashboard_export.log")
     last = open(log, encoding="utf-8").read()[-2000:] if os.path.exists(log) else ""
     previous = "deployed" if "deployed" in last else ("failed" if last.strip() else "none")
