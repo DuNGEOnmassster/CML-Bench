@@ -445,7 +445,7 @@ def source_round(run_dir: str, draft: str = "", full: bool = False) -> tuple[dic
     after = released_shas(run_dir)
     replaced = sorted(i for i in set(before) & set(after) if before[i][1] != after[i][1])
     if replaced:  # rewritten abstracts of already-released items (same content); audit verdicts bind to the new sha1
-        out["abstracts_replaced"] = {"items": len(replaced), "batches": sorted({after[i][0] for i in replaced})}
+        out["abstracts_replaced"] = {"items": len(replaced), "batches": sorted({after[i][0] for i in replaced}), "item_ids": replaced}
     if listed:
         out["c35"]["still_in_data"] = len(set(after) & listed)
     out["audit"] = {k: src["audit"].get(k) for k in ("targeted_items", "targeted_selected", "sample_items", "audited",
