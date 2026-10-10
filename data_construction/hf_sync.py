@@ -160,6 +160,12 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
             "items_checks_passed", "items_merged", "batches_total", "batches_merged", "batches_rejected", "content_tokens_total")
     totals = {k: sum(s.get(k, 0) for s in sources.values()) for k in keys}
     totals["items_merged_draft"] = sum(s.get("items_merged", 0) for s in sources.values() if s.get("abstracts_draft"))
+    # C31 completion criterion (contract v2.6): random-sample verdicts pooled across released sources
+    from audit_rules import MAX_MAJOR_UPPER, wilson_upper
+    samples = [s.get("audit", {}).get("random_sample") or {} for s in sources.values() if not s.get("abstracts_draft")]
+    n, k = sum(r.get("audited", 0) for r in samples), sum(r.get("major_or_outside", 0) for r in samples)
+    pooled = {"audited": n, "major_or_outside": k, "upper95": round(wilson_upper(k, n), 4) if n else None,
+              "release_criterion_upper95_le_3pct": bool(n) and wilson_upper(k, n) <= MAX_MAJOR_UPPER}
     updated = max([s["updated_at"] for s in sources.values()] + [control.get("updated_at", "")] +
                   [m.get("uploaded_at", "") for m in pilots.values()] or [now()])
     return {
@@ -170,6 +176,7 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
         "phase": control.get("phase", ""),
         "gates": control.get("gates", {}),
         "totals": totals,
+        "pooled_random_sample": pooled,
         "per_source": sources,
         "pilots": pilots,
         "definitions": {
