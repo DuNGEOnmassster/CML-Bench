@@ -247,6 +247,26 @@ class AuditRuleTests(unittest.TestCase):
         sig = score_items([{"item_id": "w", "imdb_id": "f", "script_segment": cml}])["w"]
         self.assertEqual((sig["paren_only"], sig["cue_as_dlg"], sig["bad_cue"], sig["fused"], sig["score"]), (1, 1, 1, 1, 4))
 
+    def test_v32_furniture_and_speaker_kept(self):
+        import re
+
+        from cml_format import _WATERMARK_RE
+        from verify_alignment import FURN_WATERMARK
+
+        self.assertEqual(_WATERMARK_RE.pattern, FURN_WATERMARK.pattern)
+        strip = lambda t: re.sub(r"\s+", " ", _WATERMARK_RE.sub(" ", t)).strip()  # noqa: E731
+        for junk in ("Converted to PDF by www.screentalk.org", "Continued: 12A", "Prod. 0233 - 8/24/81 2.", "8FLiX.com FYC",
+                     "CONTINUATION SCENE 160", "orchid revisions 28 june - p.77A",
+                     "Script provided for educational purposes. More scripts can be found here: http://www.sellingyourscreenplay.com/library"):
+            self.assertEqual(strip(junk), "", junk)
+        for keep in ("the bar continued: 3 men left", "Production 12 starts", "INT. ROOM 12 - NIGHT"):
+            self.assertEqual(strip(keep), keep)
+        out = strip_page_furniture([[("character", "PHILIP"), ("parenthetical", "(How would you like to be Queen?)"),
+                                     ("dialogue", "orchid revision 28 June -p. 77")],
+                                    [("character", "W"), ("dialogue", "orchid revision 28 June -p. 77A")]])
+        self.assertEqual(out[0], [("character", "PHILIP"), ("parenthetical", "(How would you like to be Queen?)")])
+        self.assertEqual(out[1], [("character", "W"), ("dialogue", "")])
+
     def test_merge_exclusions_bind_to_build_and_content(self):
         import json
         import tempfile

@@ -39,12 +39,13 @@ from cml_format import (  # noqa: E402
     validate_cml,
 )
 from dataset_schema import gt_relation, load_gt_related, load_identity_table  # noqa: E402
+from mislabel_gate import score_items as c34_scores  # noqa: E402
 
 MOVIESUM_URL = "https://huggingface.co/datasets/rohitsaxena/MovieSum/resolve/main/{split}.jsonl"
 MOVIESUM_PAGE = "https://huggingface.co/datasets/rohitsaxena/MovieSum"
 GT_URL = "https://huggingface.co/datasets/songdj/CML-Bench/resolve/main/ground_truth/gt_100.json"
 SPLITS = ("train", "val", "test")
-NORMALIZATION_VERSION = "moviesum_clean_detok_v3_1"
+NORMALIZATION_VERSION = "moviesum_clean_detok_v3_2"
 
 CONFIG = {
     "scenes_preferred": [15, 20],
@@ -66,6 +67,8 @@ CONFIG = {
     "max_gt_segment_overlap": 0.02,
     "max_gt_movie_overlap": 0.20,
     "max_duplicate_movie_overlap": 0.30,
+    # C34: paren_only + cue_as_dlg + bad_cue + fused per window, speakers pooled over the film's accepted windows
+    "max_mislabel_score": 3,
 }
 
 
@@ -313,6 +316,7 @@ def main() -> None:
         stats["movies_windowed"] += 1
         meta = imdb_meta.get(out_id, {})
         kept = 0
+        film_start = len(accepted)
         for wi, (a, b) in enumerate(windows):
             seg_scenes = scenes[a:b]
             content = render(seg_scenes)
@@ -363,6 +367,19 @@ def main() -> None:
                 }
             )
             kept += 1
+        if kept:
+            sig = c34_scores(accepted[film_start:])
+            keep = []
+            for it in accepted[film_start:]:
+                s = sig[it["item_id"]]
+                if s["score"] > cfg["max_mislabel_score"]:
+                    rejected.append({"item_id": it["item_id"], "movie_name": out_name, "reasons": ["mislabel_structure"],
+                                     "content_tokens": it["content_tokens"], "c34": s})
+                    stats["reject:mislabel_structure"] += 1
+                else:
+                    keep.append({**it, "segment_index": len(keep)})
+            accepted[film_start:] = keep
+            kept = len(keep)
         if kept:
             stats["movies_with_segments"] += 1
         if (mi + 1) % 200 == 0:

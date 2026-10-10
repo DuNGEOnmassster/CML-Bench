@@ -75,13 +75,28 @@ def bundle_stamps(src: str, names: list[str]) -> dict[str, list]:
 
 def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
     """Copy hand-off bundles into the run dir; a file is only rewritten when its content differs. Items in `skip` (C35)
-    are never copied: neither their abstracts nor their writer notes."""
-    src = os.path.join(STORE, "abstracts", build_id)
-    stats = {"bundles": 0, "abstracts_written": 0, "reports_written": 0, "foreign": 0}
+    are never copied: neither their abstracts nor their writer notes. A rebuilt run (run.json "handoff_builds") also
+    reads the hand-off folders of the builds it replaced, since its batch ids are the same; an abstract is only taken
+    when its content_sha1 is the item's in this build, so a stale abstract never replaces a rewritten one."""
+    run_info = json.load(open(os.path.join(run_dir, "run.json")))
+    stats = {"bundles": 0, "abstracts_written": 0, "reports_written": 0, "foreign": 0, "stale_skipped": 0}
+    sha = {}
+    for line in open(os.path.join(run_dir, "items.jsonl"), encoding="utf-8"):
+        it = json.loads(line)
+        sha[it["item_id"]] = it["content_sha1"]
+    for b in list(run_info.get("handoff_builds", [])) + [build_id]:
+        s = _unpack_folder(run_dir, os.path.join(STORE, "abstracts", b), f"unpacked{'' if b == build_id else '-' + b}.json", skip, sha)
+        for k, v in s.items():
+            stats[k] = stats.get(k, 0) + v if not isinstance(v, list) else stats.get(k, []) + v
+    return stats
+
+
+def _unpack_folder(run_dir: str, src: str, seen_name: str, skip: set[str], sha: dict[str, str]) -> dict:
+    stats = {"bundles": 0, "abstracts_written": 0, "reports_written": 0, "foreign": 0, "stale_skipped": 0}
     if not os.path.isdir(src):
         return stats
     batches = {json.loads(l)["batch_id"]: json.loads(l) for l in open(os.path.join(run_dir, "batches.jsonl"), encoding="utf-8")}
-    seen_path = os.path.join(run_dir, "unpacked.json")  # (size, mtime) of each bundle file already copied
+    seen_path = os.path.join(run_dir, seen_name)  # (size, mtime) of each bundle file already copied
     seen = json.load(open(seen_path)) if os.path.exists(seen_path) else {}
     names = sorted(os.listdir(src))
     stats["foreign"] = sum(1 for n in names if not n.startswith("_") and n not in batches)
@@ -111,6 +126,9 @@ def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
         for ab in rows:
             if ab.get("item_id") not in allowed or ab.get("item_id") in skip:
                 continue
+            if ab.get("content_sha1") != sha.get(ab.get("item_id")):
+                stats["stale_skipped"] += 1
+                continue
             data = json.dumps(ab, ensure_ascii=False)
             out = os.path.join(run_dir, "abstracts", f"{ab['item_id']}.json")
             if not os.path.exists(out) or open(out, encoding="utf-8").read() != data:
@@ -137,6 +155,7 @@ def unpack(run_dir: str, build_id: str, skip: set[str] = frozenset()) -> dict:
 def dashboard() -> str:
     """Re-export the static dashboard in the background (it takes minutes); one export at a time, the previous one's
     outcome is reported."""
+    os.makedirs(os.path.join(HERE, "work", "logs"), exist_ok=True)
     log = os.path.join(HERE, "work", "logs", "dashboard_export.log")
     last = open(log, encoding="utf-8").read()[-2000:] if os.path.exists(log) else ""
     previous = "deployed" if "deployed" in last else ("failed" if last.strip() else "none")
@@ -316,56 +335,60 @@ def purge_c35(run_dir: str) -> tuple[set[str], dict]:
         ids = sorted(listed & set(b["item_ids"]))
         if ids:
             todo.append((b, ids))
-    src = os.path.join(STORE, "abstracts", build)
-    stamps = bundle_stamps(src, [b["batch_id"] for b, _ in todo])
     stats["bundles_unchanged"] = 0
-    for b, ids_sorted in todo:
-        if state.get(b["batch_id"]) == {"stamp": stamps[b["batch_id"]], "ids": ids_sorted}:
-            stats["bundles_unchanged"] += 1
-            continue
-        ids = set(ids_sorted)
-        bdir = os.path.join(src, b["batch_id"])
-        changed = False
-        try:
-            for name in ("abstracts.jsonl.c35tmp", "writer_report.json.c35tmp"):
-                if os.path.exists(os.path.join(bdir, name)):
-                    os.remove(os.path.join(bdir, name))
-            p = os.path.join(bdir, "abstracts.jsonl")
-            if os.path.exists(p):
-                text = _read(p)
-                if text is None:
-                    raise OSError(f"unreadable {p}")
-                lines = [l for l in text.splitlines() if l.strip()]
-                keep = [l for l in lines if json.loads(l).get("item_id") not in ids]
-                if len(keep) < len(lines):
-                    _rewrite(p, "".join(l + "\n" for l in keep))
-                    stats["bundle_abstracts_removed"] += len(lines) - len(keep)
-                    changed = True
-            for p, key in ((os.path.join(bdir, "writer_report.json"), "bundle_notes_removed"),
-                           (os.path.join(run_dir, "batches", b["batch_id"], "writer_report.json"), "run_notes_removed")):
+    # a rebuilt run also reads the hand-off folders of the builds it replaced (run.json "handoff_builds"): purge those too
+    folders = [build] + list(json.load(open(os.path.join(run_dir, "run.json"))).get("handoff_builds", []))
+    for folder in folders:
+        skey = (lambda bid: bid) if folder == build else (lambda bid, f=folder: f"{f}/{bid}")
+        src = os.path.join(STORE, "abstracts", folder)
+        stamps = bundle_stamps(src, [b["batch_id"] for b, _ in todo])
+        for b, ids_sorted in todo:
+            if state.get(skey(b["batch_id"])) == {"stamp": stamps[b["batch_id"]], "ids": ids_sorted}:
+                stats["bundles_unchanged"] += 1
+                continue
+            ids = set(ids_sorted)
+            bdir = os.path.join(src, b["batch_id"])
+            changed = False
+            try:
+                for name in ("abstracts.jsonl.c35tmp", "writer_report.json.c35tmp"):
+                    if os.path.exists(os.path.join(bdir, name)):
+                        os.remove(os.path.join(bdir, name))
+                p = os.path.join(bdir, "abstracts.jsonl")
                 if os.path.exists(p):
                     text = _read(p)
                     if text is None:
                         raise OSError(f"unreadable {p}")
-                    rep = json.loads(text)
-                    issues = rep.get("source_issues", [])
-                    kept = [x for x in issues if x.get("item_id") not in ids]
-                    if len(kept) < len(issues):
-                        _rewrite(p, json.dumps({**rep, "source_issues": kept}, ensure_ascii=False))
-                        stats[key] += len(issues) - len(kept)
-                        changed |= key.startswith("bundle")
-        except (OSError, ValueError):
-            stats.setdefault("read_errors", []).append(b["batch_id"])  # retried next round: its state stays unrecorded
-            continue
-        stats["bundles_rewritten"] += changed
-        for iid in ids:
-            p = os.path.join(run_dir, "abstracts", f"{iid}.json")
-            if os.path.exists(p):
-                os.remove(p)
-                stats["run_abstracts_removed"] += 1
-        if cache.pop(b["batch_id"], None) is not None:
-            stats["cache_entries_dropped"] += 1
-        state[b["batch_id"]] = {"stamp": bundle_stamps(src, [b["batch_id"]])[b["batch_id"]], "ids": ids_sorted}
+                    lines = [l for l in text.splitlines() if l.strip()]
+                    keep = [l for l in lines if json.loads(l).get("item_id") not in ids]
+                    if len(keep) < len(lines):
+                        _rewrite(p, "".join(l + "\n" for l in keep))
+                        stats["bundle_abstracts_removed"] += len(lines) - len(keep)
+                        changed = True
+                for p, key in ((os.path.join(bdir, "writer_report.json"), "bundle_notes_removed"),
+                               (os.path.join(run_dir, "batches", b["batch_id"], "writer_report.json"), "run_notes_removed")):
+                    if os.path.exists(p):
+                        text = _read(p)
+                        if text is None:
+                            raise OSError(f"unreadable {p}")
+                        rep = json.loads(text)
+                        issues = rep.get("source_issues", [])
+                        kept = [x for x in issues if x.get("item_id") not in ids]
+                        if len(kept) < len(issues):
+                            _rewrite(p, json.dumps({**rep, "source_issues": kept}, ensure_ascii=False))
+                            stats[key] += len(issues) - len(kept)
+                            changed |= key.startswith("bundle")
+            except (OSError, ValueError):
+                stats.setdefault("read_errors", []).append(b["batch_id"])  # retried next round: its state stays unrecorded
+                continue
+            stats["bundles_rewritten"] += changed
+            for iid in ids:
+                p = os.path.join(run_dir, "abstracts", f"{iid}.json")
+                if os.path.exists(p):
+                    os.remove(p)
+                    stats["run_abstracts_removed"] += 1
+            if cache.pop(b["batch_id"], None) is not None:
+                stats["cache_entries_dropped"] += 1
+            state[skey(b["batch_id"])] = {"stamp": bundle_stamps(src, [b["batch_id"]])[b["batch_id"]], "ids": ids_sorted}
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(cache, f)
     with open(state_path, "w", encoding="utf-8") as f:

@@ -180,7 +180,17 @@ FURN_WATERMARK = re.compile(
     r"(?:\s*\((?:\d(?:st|nd|rd|th)\s+)?[A-Za-z]+\))*(?:\s+'?\s*\d{1,3}[A-Z]?\s*\.)?|"
     r"(?:\)[A-Z]\(\s*)?\b(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\s+'?\d{1,2}/\d{1,2}/\d{2,4}(?:\s*')?(?:\s*\(\s*\d+\s*\))?(?:\s+'?\s*\d{1,3}[A-Z]?\s*\.)?|"
     r"(?:\)[A-Z]\(\s*)?\b\d{1,2}/\d{1,2}/\d{2,4}\s+\(?(?:\d(?:st|nd|rd|th)\s+)?(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\)?(?:\s*\(\s*\d+\s*\))?(?:\s+\d{1,3}[A-Z]?\s*\.)?|"
-    r"\b(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\s+Rev(?:ision|\.)?\s*\([^)]{3,20}\)(?:\s*-\s*\d{1,3}[A-Z]?\.?)?|©",
+    r"\b(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER)\s+Rev(?:ision|\.)?\s*\([^)]{3,20}\)(?:\s*-\s*\d{1,3}[A-Z]?\.?)?|"
+    # v3.2: "orchid revisions 28 June - p. 77A", "Script provided for educational purposes. More scripts can be found here:
+    # http://www.sellingyourscreenplay.com/library", "Converted to PDF by www.screentalk.org", "Continued: 12A",
+    # "Prod. 0233 - 8/24/81 2.", "8FLiX.com FYC", "CONTINUATION SCENE 160"
+    r"\b(?:WHITE|BLUE|PINK|YELLOW|GREEN|GOLDENROD|BUFF|SALMON|CHERRY|TAN|GREY|GRAY|IVORY|LAVENDER|ORCHID)\s+revisions?\s+\d{1,2}\s+[A-Za-z]{3,9}\s*-\s*p\.\s*\d{1,3}[A-Z]?\b|"
+    r"\bScript provided for educational purposes\.?(?:\s*More scripts can be found here:?(?:\s*(?:https?\s*:\s*//\s*)?(?:www\.)?sellingyourscreenplay\.com(?:\s*/\s*library)?/?)?)?|"
+    r"\bConverted to PDF by\s+(?:www\.screentalk\.org|ScreenTalk\S*(?:\s+Online)?(?:\s+https?://\S+)?)|"
+    r"\b(?-i:Continued):\s*\d{1,3}[A-Z]?\b|"
+    r"\bProd\.\s*\d{3,5}\s*-\s*\d{1,2}/\d{1,2}/\d{2,4}(?:\s+\d{1,3}[A-Z]?\s*\.)?(?:\s*\(\s*\d(?:st|nd|rd|th)\s*\))?|"
+    r"\b\d?FLIX\.COM\b(?:\s+FYC\b)?|"
+    r"\bCONTINUATION SCENE\s+\d{1,3}[A-Z]?\b|©",
     re.I,
 )
 FURN_SIGNAL_WORDS = {"draft", "rev", "revised", "revision", "final", "script", "screenplay", "adapted", "copyright",

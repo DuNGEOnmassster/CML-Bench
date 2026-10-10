@@ -157,7 +157,8 @@ def aggregate(repo: Repo, head: str, tree: dict, override: dict[str, bytes]) -> 
         meta = get(p)
         pilots[meta["name"]] = meta
     keys = ("items_total", "items_releasable", "movies", "items_eval_safe", "items_gt_related", "items_with_abstract",
-            "items_checks_passed", "items_merged", "batches_total", "batches_merged", "batches_rejected", "content_tokens_total")
+            "items_checks_passed", "items_merged", "items_merged_eval_safe", "items_merged_gt_related", "batches_total",
+            "batches_merged", "batches_rejected", "content_tokens_total")
     totals = {k: sum(s.get(k, 0) for s in sources.values()) for k in keys}
     totals["items_merged_draft"] = sum(s.get("items_merged", 0) for s in sources.values() if s.get("abstracts_draft"))
     # C31 completion criterion (contract v2.6): random-sample verdicts pooled across released sources
@@ -218,15 +219,30 @@ def card(status: dict, tree_paths: set[str]) -> bytes:
                            if s.get("abstracts_draft")) or "- none"
     t = status["totals"]
     rows = "\n".join(
-        f"| {src} | {s['build_id']} | {s['items_total']:,} | {s.get('items_releasable', s['items_total']):,} | {s['movies']:,} | "
-        f"{s['items_eval_safe']:,} | {s['items_with_abstract']:,} | {s['items_merged']:,} |"
+        f"| {src} | {s['build_id']} | {s['items_merged']:,} | {s.get('items_merged_eval_safe', 0):,} | "
+        f"{s.get('items_merged_gt_related', 0):,} | {s.get('items_releasable', s['items_total']):,} | {s['items_total']:,} | {s['movies']:,} |"
         for src, s in sorted(status["per_source"].items())
     )
-    exclusions = "\n".join(
-        f"- {src}: " + ", ".join(f"{n:,} `{r}`" for r, n in s["items_excluded"].items())
-        + (f" (list `{s['merge_exclusion_list']['file']}`: {s['merge_exclusion_list']['rule']})" if s.get("merge_exclusion_list") else "")
-        for src, s in sorted(status["per_source"].items()) if s.get("items_excluded")
-    ) or "- none"
+    def excl_line(src, s):
+        parts = [f"{n:,} `{r}`" for r, n in s.get("items_excluded", {}).items()]
+        build_c34 = (s.get("build_window_rejections") or {}).get("mislabel_structure")
+        if build_c34:
+            parts.append(f"{build_c34:,} `C34` windows rejected at build time (not in the content build)")
+        return f"- {src}: " + ", ".join(parts) if parts else None
+
+    exclusions = "\n".join(x for x in (excl_line(src, s) for src, s in sorted(status["per_source"].items())) if x) or "- none"
+    pooled = status.get("pooled_random_sample") or {}
+    per_src = "; ".join(
+        f"{src} {a['random_sample']['major_or_outside']}/{a['random_sample']['audited']} random, "
+        f"{a['targeted_pool']['major_or_outside']}/{a['targeted_pool']['audited']} targeted"
+        for src, a in ((src, s.get("audit") or {}) for src, s in sorted(status["per_source"].items()))
+        if a.get("random_sample") and a.get("targeted_pool"))
+    quality = (f"- **Audit (C31).** Random-sample verdicts pooled across released sources: {pooled.get('major_or_outside', 0)} "
+               f"major/outside in {pooled.get('audited', 0):,}; Wilson 95% upper bound "
+               f"{(pooled.get('upper95') or 0):.2%} (completion criterion <= 3%: "
+               f"{'PASS' if pooled.get('release_criterion_upper95_le_3pct') else 'not met'}). Per source (major+outside / "
+               f"audited): {per_src}. Any major or outside verdict revoked its batch, which was rewritten and audited again."
+               ) if pooled else "- **Audit (C31).** no verdicts yet."
     n_gaps = sum((s.get("writer_notes") or {}).get("source_gaps_released", 0) for s in status["per_source"].values())
     gaps = (f"{n_gaps:,} released windows have a gap in the source screenplay reported by the abstract writer (a missing page, an "
             f"omitted sequence, dialogue \"on a separate document\"); they stay in the release, their abstracts are audited "
@@ -247,7 +263,7 @@ configs:
 {yaml_cfg}
 ---
 
-# CML-Dataset Expanded (private, work in progress)
+# CML-Dataset Expanded (private)
 
 Expansion of the CML-Dataset used by [CML-Bench](https://github.com/DuNGEOnmassster/CML-Bench) (arXiv:2510.06231):
 contiguous excerpts of human-written screenplays (`script_segment`, Cinematic Markup Language) paired with
@@ -255,10 +271,13 @@ AI-written abstracts (`summary`). Built by `data_construction/` in the CML-Bench
 
 **Phase:** {status['phase'] or 'n/a'}
 
-| Source | Build | Items | Releasable | Movies | Eval-safe | With abstract | Merged |
+| Source | Build | Released | Eval-safe | GT-related | Releasable | Content items | Movies |
 |---|---|---|---|---|---|---|---|
 {rows}
-| **Total** | | {t['items_total']:,} | {t.get('items_releasable', t['items_total']):,} | {t['movies']:,} | {t['items_eval_safe']:,} | {t['items_with_abstract']:,} | {t['items_merged']:,} |
+| **Total** | | {t['items_merged']:,} | {t.get('items_merged_eval_safe', 0):,} | {t.get('items_merged_gt_related', 0):,} | {t.get('items_releasable', t['items_total']):,} | {t['items_total']:,} | {t['movies']:,} |
+
+*Released* = items in `data/` (config `release`); *eval-safe* = released items with no story/franchise relation to the
+100 CML-Bench GT movies (config `eval_safe`); *releasable* = content items minus the exclusions below.
 
 Items in the content build that are never released (abstracts may still be written; they are dropped at merge, and
 audit sampling and release statistics are computed without them):
@@ -268,6 +287,16 @@ audit sampling and release statistics are computed without them):
 speaker name tagged as dialogue, a heading/shot/action tagged as a speaker, speech fused into action) at least 4 times.
 `identity_hold` films await a human read of their identity (C33) and stay out of the release until it is done.
 `C35` removes windows, or whole films, on content-safety grounds; they are also left out of the `content` config.
+
+## Quality summary
+
+- **Contract v2.6 (frozen).** `contract_checks.py` runs every automated assertion on each content build (alignment
+  with the source text, dialogue preservation, page furniture, identity, leakage and dedupe) and the release-level
+  gates on the merged items (schema, abstract checks, length, coverage, grounding, C34, C35).
+{quality}
+- **Mislabel gate (C34).** Windows with at least 4 structural speaker/action label errors are not released.
+- **Content safety (C35).** Windows that depict or explicitly describe sexual activity involving anyone under 18, and every
+  window of films where this is central, are excluded from every config. They are counted above, never described.
 
 ## Configs
 
@@ -440,6 +469,7 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
     merged_first8: set[str] = set()
     states, with_abstract, checks_passed, merged_items, prompt_versions = {}, 0, 0, 0, {}
     excluded_from_merged: dict[str, int] = {}
+    merged_safe = merged_related = 0
     new_cache = {}
     rec_dir = os.path.join(run_dir, "merge_records")
     os.makedirs(rec_dir, exist_ok=True)
@@ -503,6 +533,8 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
                 prompt_versions[r["abstract_prompt_version"]] = prompt_versions.get(r["abstract_prompt_version"], 0) + 1
             safe = [r for r in rec_list if r["eval_safe"]]
             related = [r for r in rec_list if not r["eval_safe"]]
+            merged_safe += len(safe)
+            merged_related += len(related)
             if safe:
                 files[f"data/{slug}/{b['batch_id']}.safe.jsonl"] = jsonl_bytes(safe)
             if related:
@@ -585,6 +617,10 @@ def source_state(run_dir: str, verdicts_path: str | None = None, exclusions_dir:
         "items_with_abstract": with_abstract,
         "items_checks_passed": checks_passed,
         "items_merged": merged_items,
+        "items_merged_eval_safe": merged_safe,
+        "items_merged_gt_related": merged_related,
+        "build_window_rejections": (json.load(open(os.path.join(run_dir, "build_stats.json"))).get("window_rejections")
+                                    if os.path.exists(os.path.join(run_dir, "build_stats.json")) else None),
         "batches_total": len(batches),
         "batches_merged": count("passed"),
         "batches_rejected": count("rejected"),
