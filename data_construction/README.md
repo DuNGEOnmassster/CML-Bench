@@ -1,0 +1,54 @@
+# CML-Dataset expansion pipeline
+
+Builds more `(script_segment, summary)` items in the CML-Bench format, following the paper's construction
+(MovieSum screenplay -> contiguous 15-20 scene excerpt -> AI-written abstract) at the scale of the whole
+MovieSum corpus instead of 100 hand-picked films.
+
+**The GitHub repo is public. Never commit screenplay text.** Everything under `data_construction/work/`
+is gitignored; releases go only to a private Hugging Face dataset.
+
+## Stages
+
+| Stage | Command | Output |
+|---|---|---|
+| 0. IMDb metadata | `python data_construction/imdb_meta.py` | `work/sources/imdb_meta.json` (rating, votes, genres, year) |
+| 1. Segments | `python data_construction/build_segments.py` | `work/build/segments.jsonl` + rejection logs + `build_stats.json` |
+| 2. Batches | `python data_construction/make_abstract_batches.py --segments SEG --run_dir RUN [--sample N --one_per_movie \| --item_ids F] --batch_size 10` | `RUN/{items.jsonl,batches.jsonl,run.json}`, `RUN/batches/<batch_id>/{manifest.json,items/*.xml}` |
+| 3. Abstracts | agents, one batch each (see below) | `RUN/abstracts/<item_id>.json` |
+| 4. Checks | `python data_construction/check_abstracts.py --run_dir RUN` (`--batch DIR` for one batch); merge gate: `validate_batch.py` | `RUN/abstract_checks.jsonl`, `RUN/abstract_checks_summary.json` |
+| 5. Assemble | `python data_construction/assemble.py --run_dir RUN --out REL` | `REL/data/*.jsonl`, `REL/info.json`, `REL/stats.json`, `REL/README.md` |
+| 6. Sync | `HF_TOKEN=... python data_construction/hf_sync.py sync --run_dir RUN` (also `pilot`, `status`) | private HF dataset `${HF_ACCOUNT}/CML-Dataset-Expanded` |
+| Contract | `python data_construction/contract_checks.py --release REL [--content_only] --out report.json` | automated contract v2 assertions |
+| — | `python data_construction/verify_alignment.py --items JSONL` | C05′: word alignment of every item with raw MovieSum, sharing no code with the cleaner |
+| — | `python data_construction/residue_scan.py JSONL` | counts of cleaning residue (brackets, `\`, CONT'D, quote spaces, orphan speaker lines, numbered headings) |
+| — | `python data_construction/select_pilot.py --segments SEG --carry IDS... --previous OLD.jsonl --out ids.txt` | re-pilot sample: audited items mapped to the current build + seeded new movies |
+
+Stage 1 downloads MovieSum (`rohitsaxena/MovieSum`) and CML-Bench `gt_100.json` if they are missing; run
+`imdb_meta.py` after it (it reads the MovieSum ids) and rebuild so `imdb_rating`/`genres` are filled.
+`gt_related.json` lists movies related to the GT movies by story or franchise: remakes are excluded, the rest are
+flagged (`gt_related`, `eval_safe`). Item schema: `dataset_schema.py` (v1.0, frozen).
+Requirements: Python 3.10+, `tiktoken` (stages 1/4/5), `huggingface_hub` (stage 6).
+
+`hf_sync.py sync` reconciles one source from its run dir: content shards, batch index, every batch that passes
+`validate_batch.py` (merged into `data/`), per-source status, then `build_status.json` and the dataset card. It diffs
+file hashes against the hub and commits only changes against the current head, so it is safe to re-run after every
+abstract batch and from several workers at once.
+
+## Stage 3: abstract writing by agents
+
+No LLM API is used. An agent (or several in parallel, one per batch) is given a batch manifest and:
+
+1. reads `prompt_path` (default `prompts/abstract_prompt_v1_5.md`) once;
+2. for each item: reads `content_path`, writes `{"item_id", "content_sha1", "abstract", "prompt_version", "author"}`
+   to `abstract_path`, following the prompt's length rule (aim just under `target_center`, stay inside `target_words`);
+3. skips items whose `abstract_path` already exists (resumable), and keeps any temp files in the
+   manifest's `scratch_dir` (parallel agents share `/tmp` and have deleted each other's drafts);
+4. runs `python data_construction/check_abstracts.py --batch <batch_dir>` and
+   `python data_construction/validate_batch.py --run_dir RUN --batch <batch_dir>`, and rewrites only items with
+   mechanical hard failures (length, markdown, meta phrases, all-caps names, ungrounded names, merge gates G1–G7).
+
+Writers do not judge their own quality; an independent evaluator audits samples against the contract.
+
+## Tests
+
+`python data_construction/tests/test_pipeline.py`
