@@ -1,0 +1,478 @@
+{
+  "schema_version": "1.0",
+  "policy": "worldwide-open-training-and-evaluation",
+  "sources": [
+    {
+      "id": "gutenberg",
+      "name": "Project Gutenberg",
+      "kinds": [
+        "novel",
+        "prose_fiction",
+        "stage_play",
+        "screenplay"
+      ],
+      "route": "review",
+      "priority": "P0",
+      "rights_summary": "Predominantly US public-domain text; individual copyrighted exceptions. Catalog metadata public domain.",
+      "access_method": "Official bulk CSV/RDF and designated mirrors/robot interface; do not crawl ebook landing pages.",
+      "evidence_urls": [
+        "https://www.gutenberg.org/policy/permission",
+        "https://www.gutenberg.org/policy/license",
+        "https://www.gutenberg.org/policy/robot_access.html",
+        "https://www.gutenberg.org/ebooks/offline_catalogs.html"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Check original, translation, edition and jurisdiction. Issued date is ebook release date, not original publication.",
+      "implemented_discovery": true
+    },
+    {
+      "id": "dracor",
+      "name": "DraCor (24 live corpora observed; per-corpus licenses)",
+      "kinds": [
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P0",
+      "rights_summary": "Most corpora advertise CC0; exceptions include Folger-derived CC BY-NC material. Encoding license does not settle all underlying rights.",
+      "access_method": "Official API v1 /corpora and /corpora/{name}; reviewed TEI from pinned repositories.",
+      "evidence_urls": [
+        "https://dracor.org/doc/corpora",
+        "https://github.com/dracor-org/dracor-api/blob/main/api.yaml",
+        "https://github.com/dracor-org/shakedracor"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Resolve every corpus and play license; never inherit the platform default blindly. Live French corpus declares CC BY-NC-SA 4.0; keep it out of the default open training track.",
+      "implemented_discovery": true
+    },
+    {
+      "id": "eltec",
+      "name": "European Literary Text Collection",
+      "kinds": [
+        "novel"
+      ],
+      "route": "review",
+      "priority": "P0",
+      "rights_summary": "English corpus states original texts public domain, markup CC BY 4.0; inspect each language collection and edition.",
+      "access_method": "Official per-language GitHub metadata TSV; pin commit before text ingestion.",
+      "evidence_urls": [
+        "https://www.distant-reading.net/eltec/",
+        "https://github.com/COST-ELTeC/ELTeC-eng"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Curated multilingual novels. Existing digitizations include different providers; avoid double counting Gutenberg/other mirrors.",
+      "implemented_discovery": true
+    },
+    {
+      "id": "standardebooks",
+      "name": "Standard Ebooks",
+      "kinds": [
+        "novel",
+        "prose_fiction",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P0",
+      "rights_summary": "Source text believed public domain in US; producer dedicates its own work to public domain.",
+      "access_method": "Official GitHub source repositories and authorized download routes.",
+      "evidence_urls": [
+        "https://standardebooks.org/about"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "High-quality editions; often same works as Gutenberg. Global underlying copyright still needs assessment.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "wikisource",
+      "name": "Wikisource (including Chinese and multilingual editions)",
+      "kinds": [
+        "novel",
+        "prose_fiction",
+        "stage_play",
+        "screenplay"
+      ],
+      "route": "review",
+      "priority": "P0",
+      "rights_summary": "Public-domain works and individually licensed contributions/translations; not one license for every text.",
+      "access_method": "Wikimedia dumps/MediaWiki APIs; versioned page and scan provenance.",
+      "evidence_urls": [
+        "https://wikisource.org/wiki/Help:Copyright",
+        "https://dumps.wikimedia.org/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Record original and translation licenses separately, proofread status, revision, scan and exact edition.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "aozora",
+      "name": "Aozora Bunko",
+      "kinds": [
+        "novel",
+        "prose_fiction",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P1",
+      "rights_summary": "Copyright-expired works and works made available with author permission coexist.",
+      "access_method": "Official catalog and sanctioned source files.",
+      "evidence_urls": [
+        "https://www.aozora.gr.jp/guide/kijyunn.html",
+        "https://www.aozora.gr.jp/guide/shuuroku.html"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Japanese public-domain determination is not worldwide clearance; author permission to host is not permission to redistribute.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "textgrid",
+      "name": "TextGrid Repository",
+      "kinds": [
+        "novel",
+        "prose_fiction",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P1",
+      "rights_summary": "Per-object licensing and upstream edition review required; no platform-wide text clearance assumed.",
+      "access_method": "Repository metadata and TEI export.",
+      "evidence_urls": [
+        "https://www.textgridrep.org/?lang=en",
+        "https://sandbox.textgridrep.org/docs/shelf"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "About 600 authors in its German Digital Library description is inventory, not cleared-work yield.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "dta",
+      "name": "Deutsches Textarchiv",
+      "kinds": [
+        "novel",
+        "prose_fiction",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P1",
+      "rights_summary": "Inspect each TEI availability statement; no inferred license from documentation or repository code.",
+      "access_method": "DTA/TEI downloads after per-edition access and license review.",
+      "evidence_urls": [
+        "https://www.deutschestextarchiv.de/",
+        "https://deutschestextarchiv.github.io/dtabf/einfuehrung.html"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Discovery lead; current text reuse policy requires item-level verification before ingestion.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "blender",
+      "name": "Blender Studio open films",
+      "kinds": [
+        "screenplay"
+      ],
+      "route": "review",
+      "priority": "P0",
+      "rights_summary": "Studio content generally CC BY; exact script asset, credits and exceptions must be checked.",
+      "access_method": "Official film project and script asset download, where available.",
+      "evidence_urls": [
+        "https://studio.blender.org/remixing/",
+        "https://studio.blender.org/projects/sintel/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Modern authored film material, small yield. A film license or visible Script tab is not proof of an accessible licensed screenplay. Some access may require subscription.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "rightsholder",
+      "name": "Direct rightsholder/film-school/playwright contributions",
+      "kinds": [
+        "screenplay",
+        "stage_play",
+        "novel"
+      ],
+      "route": "permission",
+      "priority": "P0",
+      "rights_summary": "Obtain worldwide public license from all necessary owners for the exact edition, translations and contributions.",
+      "access_method": "Voluntary delivered files with hash-bound public grant; no outreach sent by this tool.",
+      "evidence_urls": [
+        "https://creativecommons.org/licenses/by/4.0/",
+        "https://creativecommons.org/publicdomain/zero/1.0/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Priority route for contemporary screenplays and new unseen evaluation works; commissioning and incentives require separate budget.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "loc",
+      "name": "Library of Congress / National Screening Room",
+      "kinds": [
+        "film",
+        "screenplay",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P1",
+      "rights_summary": "Item-specific rights; no known US restrictions on much of the film collection, with exceptions and possible foreign rights.",
+      "access_method": "Official JSON API/catalog and authorized assets.",
+      "evidence_urls": [
+        "https://www.loc.gov/collections/national-screening-room/about-this-collection/rights-and-access/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Film is not screenplay. Keep derived ASR/subtitles and original script assets separate; do not infer script rights from film rights.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "internet_archive",
+      "name": "Internet Archive / Prelinger and text collections",
+      "kinds": [
+        "film",
+        "screenplay",
+        "novel",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P1",
+      "rights_summary": "Uploader license declarations are not guaranteed by the Archive.",
+      "access_method": "Official metadata API; open files only after independent provenance review.",
+      "evidence_urls": [
+        "https://archivesupport.zendesk.com/hc/en-us/articles/360014759692-Rights"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "No borrowing, DRM, controlled lending or login-gated copies in this pipeline. Film/subtitle content is a separate auxiliary track.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "gallica",
+      "name": "BnF / Gallica",
+      "kinds": [
+        "novel",
+        "stage_play",
+        "screenplay"
+      ],
+      "route": "review",
+      "priority": "P2",
+      "rights_summary": "Metadata open-license terms and digitized-document reuse conditions are different; commercial reuse may require permission/fees.",
+      "access_method": "BnF metadata API/OAI; item-level rights and acquisition review before text.",
+      "evidence_urls": [
+        "https://www.bnf.fr/fr/conditions-de-reutilisations-des-donnees-de-la-bnf",
+        "https://www.bnf.fr/fr/faire-une-utilisation-commerciale-dune-reproduction"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "No blanket public-domain-to-global-reuse conversion.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "hathitrust",
+      "name": "HathiTrust / HTRC",
+      "kinds": [
+        "novel",
+        "stage_play"
+      ],
+      "route": "review",
+      "priority": "P2",
+      "rights_summary": "Rights and access depend on volume, geography, digitizer and institution; research access is not redistribution permission.",
+      "access_method": "Bibliographic metadata; approved dataset request/API where eligible.",
+      "evidence_urls": [
+        "https://htrc.atlassian.net/wiki/spaces/COM/pages/43293057/HTRC%20data%20access"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Non-consumptive or institution-only access cannot be exported as open text.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "folger",
+      "name": "Folger Digital Texts / ShakeDraCor",
+      "kinds": [
+        "stage_play"
+      ],
+      "route": "permission",
+      "priority": "P2",
+      "rights_summary": "CC BY-NC 3.0 for these edited Shakespeare texts.",
+      "access_method": "Obtain a different applicable grant or choose another independently cleared edition.",
+      "evidence_urls": [
+        "https://www.folger.edu/copyright-policy/",
+        "https://github.com/dracor-org/shakedracor"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Not eligible for the default commercial-capable open track; do not strip edition license because Shakespeare is old.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "imsdb",
+      "name": "IMSDb",
+      "kinds": [
+        "screenplay"
+      ],
+      "route": "permission",
+      "priority": "P2",
+      "rights_summary": "No general worldwide redistribution/training grant established.",
+      "access_method": "Discovery and rightsholder permission only; no default crawler.",
+      "evidence_urls": [
+        "https://imsdb.com/",
+        "https://imsdb.com/submit.html"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "A public reading copy does not establish ownership or onward dataset rights.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "dailyscript",
+      "name": "Daily Script",
+      "kinds": [
+        "screenplay"
+      ],
+      "route": "permission",
+      "priority": "P2",
+      "rights_summary": "Homepage limits scripts to educational purposes.",
+      "access_method": "Contact rightsholder for suitable grant; no default crawler.",
+      "evidence_urls": [
+        "https://www.dailyscript.com/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Excluded from open training/full-text release absent a separate grant.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "simplyscripts",
+      "name": "SimplyScripts",
+      "kinds": [
+        "screenplay",
+        "stage_play"
+      ],
+      "route": "permission",
+      "priority": "P2",
+      "rights_summary": "Links to professional, amateur, unproduced scripts and transcripts; permissions vary per author/host.",
+      "access_method": "Find authors/official studio assets; obtain exact-edition grant.",
+      "evidence_urls": [
+        "https://www.simplyscripts.com/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Potential author recruitment channel, not a globally licensed corpus.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "scriptslug",
+      "name": "Script Slug",
+      "kinds": [
+        "screenplay"
+      ],
+      "route": "excluded",
+      "priority": "P2",
+      "rights_summary": "Current Terms sections 2 and 9 restrict copying and prohibit automated collection/AI dataset creation without written permission.",
+      "access_method": "No automated collection.",
+      "evidence_urls": [
+        "https://www.scriptslug.com/legal"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Checked current terms, not merely ai.txt. Reconsider only through a documented policy change and explicit grant.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "wikidata",
+      "name": "Wikidata",
+      "kinds": [
+        "metadata"
+      ],
+      "route": "metadata",
+      "priority": "P0",
+      "rights_summary": "Structured entity data CC0; no screenplay/novel text rights.",
+      "access_method": "SPARQL, entity APIs or dumps.",
+      "evidence_urls": [
+        "https://www.wikidata.org/wiki/Wikidata:Licensing",
+        "https://www.wikidata.org/wiki/Help:Data_access"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Identity and film–novel–play adaptation graph; do not use descriptions as script targets.",
+      "implemented_discovery": true
+    },
+    {
+      "id": "openlibrary",
+      "name": "Open Library",
+      "kinds": [
+        "metadata"
+      ],
+      "route": "metadata",
+      "priority": "P1",
+      "rights_summary": "Bibliographic discovery; book-file rights independent.",
+      "access_method": "Official APIs for limited lookups, monthly dumps for bulk.",
+      "evidence_urls": [
+        "https://openlibrary.org/developers/api"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Work/edition/author identity; a readable or borrowable book is not an open-data grant.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "europeana",
+      "name": "Europeana",
+      "kinds": [
+        "metadata"
+      ],
+      "route": "metadata",
+      "priority": "P1",
+      "rights_summary": "Metadata CC0; linked digital objects governed by their own edm:rights.",
+      "access_method": "Official API (key required); no content permission inferred.",
+      "evidence_urls": [
+        "https://www.europeana.eu/en/rights/usage-guidelines-for-metadata",
+        "https://www.europeana.eu/en/apis"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Discover institutions and authoritative item rights; partition metadata from text.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "zenodo",
+      "name": "Zenodo research deposits",
+      "kinds": [
+        "novel",
+        "stage_play",
+        "screenplay"
+      ],
+      "route": "review",
+      "priority": "P2",
+      "rights_summary": "Per-record licenses required; uploader must have underlying rights.",
+      "access_method": "Official records API and version DOI after review.",
+      "evidence_urls": [
+        "https://about.zenodo.org/policies/",
+        "https://support.zenodo.org/help/en-gb/2-content/21-can-i-get-permission-to-use-a-specific-record"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Search for deposited drama/literary corpora; a permissive dataset label cannot relicense third-party scripts.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "osf",
+      "name": "OSF research deposits",
+      "kinds": [
+        "novel",
+        "stage_play",
+        "screenplay"
+      ],
+      "route": "review",
+      "priority": "P2",
+      "rights_summary": "Project/file license and depositor authority must be reviewed independently.",
+      "access_method": "Official public project metadata; approved files only.",
+      "evidence_urls": [
+        "https://osf.io/terms-of-use/"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "Repository discovery, not a new independent source when duplicating another corpus.",
+      "implemented_discovery": false
+    },
+    {
+      "id": "moviesum",
+      "name": "MovieSum (legacy only)",
+      "kinds": [
+        "screenplay"
+      ],
+      "route": "excluded",
+      "priority": "P2",
+      "rights_summary": "Not a source for this expansion, by project scope.",
+      "access_method": "Legacy comparison/decontamination inventory only.",
+      "evidence_urls": [
+        "https://github.com/DuNGEOnmassster/CML-Bench/pull/1"
+      ],
+      "checked_on": "2026-10-12",
+      "review_note": "No new acquisition or inclusion, even if a manifest labels it approved.",
+      "implemented_discovery": false
+    }
+  ]
+}
