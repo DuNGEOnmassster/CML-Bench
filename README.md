@@ -1,5 +1,14 @@
 # CML-Bench
 
+## Dataset expansion beyond MovieSum
+
+See [`dataset_sources/`](dataset_sources/README.md) for the worldwide-open
+screenplay, stage-play and novel source registry, reproducible metadata survey,
+rights-reviewed local preparation tools, and
+[dataset/benchmark roadmap](dataset_sources/ROADMAP.zh.md).
+Candidate catalog records are not cleared full texts or a completed benchmark.
+The legacy runner below remains separate from these new corpus tracks.
+
 ## How to run
 
 ### Install the dependencies

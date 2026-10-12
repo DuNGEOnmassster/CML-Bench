@@ -1,0 +1,323 @@
+{
+  "schema_version": "1.0",
+  "status": "complete",
+  "scope": "metadata candidates, not cleared works or benchmark examples",
+  "candidate_records": 40419,
+  "distinct_work_count": null,
+  "globally_cleared_works": 0,
+  "released_segments": 0,
+  "by_source": {
+    "dracor": 4918,
+    "eltec": 300,
+    "gutenberg": 34729,
+    "wikidata": 472
+  },
+  "by_kind": {
+    "stage_play": 7597,
+    "novel": 300,
+    "prose_fiction": 32049,
+    "screenplay": 1,
+    "film_metadata": 472
+  },
+  "by_language": {
+    "und": 5390,
+    "de": 1198,
+    "eng": 73,
+    "en": 26274,
+    "en-br": 1,
+    "fr": 1849,
+    "fra": 1,
+    "sv": 146,
+    "it": 535,
+    "nl": 517,
+    "fi": 2731,
+    "es": 471,
+    "da": 56,
+    "bg": 2,
+    "sr": 2,
+    "eo": 71,
+    "en; fr": 9,
+    "no": 18,
+    "cs": 7,
+    "tl": 23,
+    "en; es": 8,
+    "en; enm": 2,
+    "ca": 73,
+    "myn": 1,
+    "pt": 169,
+    "en; la": 1,
+    "is": 1,
+    "el": 102,
+    "nap": 1,
+    "he": 3,
+    "hu": 430,
+    "ja": 17,
+    "ceb": 2,
+    "en; zh": 1,
+    "de; en": 3,
+    "zh": 179,
+    "pl": 7,
+    "fr; pl": 1,
+    "en; pt": 1,
+    "la": 12,
+    "sl": 2,
+    "te": 6,
+    "et": 1,
+    "fa": 1,
+    "ga": 3,
+    "en; nav": 1,
+    "en; hu": 1,
+    "cy": 3,
+    "fy": 8,
+    "en; it": 1,
+    "ro": 1,
+    "af": 3
+  },
+  "by_dracor_corpus": {
+    "als": 30,
+    "am": 40,
+    "ar": 16,
+    "bash": 3,
+    "cal": 205,
+    "dutch": 216,
+    "eng": 753,
+    "fre": 1940,
+    "ger": 783,
+    "gersh": 38,
+    "greek": 46,
+    "hun": 74,
+    "ibs": 37,
+    "ita": 157,
+    "pol": 50,
+    "ro": 93,
+    "rom": 36,
+    "rus": 212,
+    "shake": 37,
+    "span": 25,
+    "swe": 68,
+    "tat": 3,
+    "u": 48,
+    "yi": 8
+  },
+  "duplicate_candidate_ids": 0,
+  "requested_sources": [
+    "gutenberg",
+    "dracor",
+    "eltec",
+    "wikidata"
+  ],
+  "receipts": [
+    {
+      "url": "https://www.gutenberg.org/cache/epub/feeds/pg_catalog.csv",
+      "sha256": "3c60f0ad5181881587553d8e13925b3f862693b71854ea34261bf8a6cf3d4c1d",
+      "bytes": 21253758,
+      "retrieved_at": "2026-10-12T08:32:00.391247+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora",
+      "sha256": "d4883da38bb93f0b7779a45e3689aadf5c36e7445d78302313a33e7a09e6e780",
+      "bytes": 16154,
+      "retrieved_at": "2026-10-12T08:34:31.056095+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/als",
+      "sha256": "80cc41a1882b1083e997edd43a843e521f6bd40db2fd037aeca25a898af5055c",
+      "bytes": 31246,
+      "retrieved_at": "2026-10-12T08:34:33.257112+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/am",
+      "sha256": "faaf87629c9a056f7cb3cdd12559779bf0c5b27d62a2c8a2377605124f23a2a4",
+      "bytes": 37000,
+      "retrieved_at": "2026-10-12T08:34:35.501915+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/ar",
+      "sha256": "6abe3fbae0259717745e8141d85b448c5c9e53824371d383f6cc73fd83c29d26",
+      "bytes": 22077,
+      "retrieved_at": "2026-10-12T08:34:37.786113+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/bash",
+      "sha256": "27ac7f061203f7d24d7c9b83339497ed685eb1c64d439b1e14010574e0f246ef",
+      "bytes": 4300,
+      "retrieved_at": "2026-10-12T08:34:39.653392+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/cal",
+      "sha256": "830bd8d81824aaf01cd2b159ea92192694ad7228a23adba6946794970e2ae95c",
+      "bytes": 200762,
+      "retrieved_at": "2026-10-12T08:34:42.952539+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/dutch",
+      "sha256": "85b7053bc41076240755c6384a8376677496f7e24d1cb3cb204504617fd25d13",
+      "bytes": 215390,
+      "retrieved_at": "2026-10-12T08:34:46.199228+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/eng",
+      "sha256": "de3dd0a40c58d8322822a8bb1324eb6b78574f80f9ad20ae5b1418ae5710e5bd",
+      "bytes": 733950,
+      "retrieved_at": "2026-10-12T08:36:52.853479+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/fre",
+      "sha256": "d84f2a08170a64196b6a2341ad5f75ad105c0b51b3d8d7993ce37e26d43db3a9",
+      "bytes": 2225088,
+      "retrieved_at": "2026-10-12T08:37:02.979381+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/ger",
+      "sha256": "f9de91af8ba0b40ef16b5419dc7261051f33b783d1272af954754c2df367ddc6",
+      "bytes": 796902,
+      "retrieved_at": "2026-10-12T08:37:08.085579+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/gersh",
+      "sha256": "2ca0e1dcf463d93890bbed2e16074d1b49a3379e10b1db740a8eddbcd5354448",
+      "bytes": 47109,
+      "retrieved_at": "2026-10-12T08:37:10.527255+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/greek",
+      "sha256": "261d9d483aa731fa3ed9d468539f0ebe91c25b17d07d4ec2cc9df027610d89f2",
+      "bytes": 66779,
+      "retrieved_at": "2026-10-12T08:37:13.422551+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/hun",
+      "sha256": "627f429b509538cf5cea8c1cca8f19c5edfa8c6ff14fbb25f25224a19ff2c0f4",
+      "bytes": 65724,
+      "retrieved_at": "2026-10-12T08:37:16.710715+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/ibs",
+      "sha256": "3034edc9e428c0ad2e6fbef8e09e26cac517e8e1fd1d7d29b5024822d4a98c0c",
+      "bytes": 60018,
+      "retrieved_at": "2026-10-12T08:37:19.161861+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/ita",
+      "sha256": "2faf735bd134e6cfa7b560f985bab1f687ec052e13708b11a13e80809e3a5918",
+      "bytes": 139194,
+      "retrieved_at": "2026-10-12T08:37:22.199689+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/pol",
+      "sha256": "1fe588cb8a910d8f7545bc0f3791aedb59e4e1f0f36854199aadc9c421179699",
+      "bytes": 51588,
+      "retrieved_at": "2026-10-12T08:37:24.916405+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/ro",
+      "sha256": "919bedf497ba8554eaac1aa657cb66d320058a18b8cef7226a17b33f40125cab",
+      "bytes": 87264,
+      "retrieved_at": "2026-10-12T08:37:27.691322+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/rom",
+      "sha256": "2a42ee9d6c1dba55e6a952b6ab4e263986e2a1f31c70ab58efbfac1f8f1deebe",
+      "bytes": 44056,
+      "retrieved_at": "2026-10-12T08:37:30.132577+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/rus",
+      "sha256": "dbb8b1a554e2f1ab6363cdebd808ddfb41a9221d2ce2922d26947a914043a626",
+      "bytes": 277256,
+      "retrieved_at": "2026-10-12T08:37:33.719149+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/shake",
+      "sha256": "cada4635e4bebb482a23c89ca4c78ad7378a9333614d3e82f98529a4b9412ea9",
+      "bytes": 38549,
+      "retrieved_at": "2026-10-12T08:37:36.405827+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/span",
+      "sha256": "7d7accd0546768394a1cd8e4c70fbfe470a20e9b31508e68ac89056192d3beac",
+      "bytes": 23284,
+      "retrieved_at": "2026-10-12T08:37:38.706833+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/swe",
+      "sha256": "70c8df3445e6e1b48250ac5feb034172c1f61c7a77983a2cdda82648d83fcbeb",
+      "bytes": 80837,
+      "retrieved_at": "2026-10-12T08:40:50.241585+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/tat",
+      "sha256": "19fe76b0e32bf304bf0a098c7c5aebec6e65c2f347f23e2fe875d12beb5015ed",
+      "bytes": 4080,
+      "retrieved_at": "2026-10-12T08:37:42.827875+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/u",
+      "sha256": "ae269616d835a9c0635357375e8157970fcc5dfbb1cd21b14809e95882d549c8",
+      "bytes": 61211,
+      "retrieved_at": "2026-10-12T08:37:45.356187+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://dracor.org/api/v1/corpora/yi",
+      "sha256": "55bc54cd63d75841c024060952a23eab2e0cf6116710f7b96ae2aa5f8a352eaf",
+      "bytes": 9869,
+      "retrieved_at": "2026-10-12T08:37:47.387886+00:00",
+      "etag": null
+    },
+    {
+      "url": "https://raw.githubusercontent.com/COST-ELTeC/ELTeC-eng/master/ELTeC-eng_metadata.tsv",
+      "sha256": "6e6b560785c7e07eecb07e9a36565deecc1ffd34cc0fe0cc0aee5984aae241d8",
+      "bytes": 19491,
+      "retrieved_at": "2026-10-12T08:32:01.294967+00:00",
+      "etag": "\"fba457491c17a4ae4f99580f0578e0dbee15fbbb7d510b4be5e55a8bea5426b9\""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/COST-ELTeC/ELTeC-fra/master/ELTeC-fra_metadata.tsv",
+      "sha256": "4a5c322794ec019b7875dcdbb3f71f30e9a4c0c98eb9a5de6c14db9ec2d12588",
+      "bytes": 24597,
+      "retrieved_at": "2026-10-12T08:32:02.524582+00:00",
+      "etag": "\"aabdf9f31207081846a28094cd19df123e6d5f6785e1d4885023cc8b606ee4cb\""
+    },
+    {
+      "url": "https://raw.githubusercontent.com/COST-ELTeC/ELTeC-deu/master/ELTeC-deu_metadata.tsv",
+      "sha256": "ee31078a2360b104f0a8b11c0824bd669cc62b4eed5a28e7657f9dc659f77a4b",
+      "bytes": 16068,
+      "retrieved_at": "2026-10-12T08:32:03.651027+00:00",
+      "etag": "\"02c56d30abe7518b167c529a8d6b556b2f1eaf489aa9765663e45bd937e5dfb9\""
+    },
+    {
+      "url": "https://query.wikidata.org/sparql?query=SELECT+%3Ffilm+%3FfilmLabel+%3FbasedOn+%3FbasedOnLabel+WHERE+%7B%0A++%7B+SELECT+%3Ffilm+%3FbasedOn+WHERE+%7B%0A++++++%3Ffilm+wdt%3AP31+wd%3AQ11424%3B+wdt%3AP144+%3FbasedOn+.%0A++++%7D+ORDER+BY+%3Ffilm+%3FbasedOn+LIMIT+500+%7D%0A++SERVICE+wikibase%3Alabel+%7B+bd%3AserviceParam+wikibase%3Alanguage+%22en%2Czh%22.+%7D%0A%7D&format=json",
+      "sha256": "805bd66a37e732d04232c47995c372da8e9d1364c0eddbe53a450bc66f0f090c",
+      "bytes": 239483,
+      "retrieved_at": "2026-10-12T08:42:24.859603+00:00",
+      "etag": null
+    }
+  ],
+  "errors": [],
+  "candidate_manifest_sha256": "ae4a82e08ea0b659bddc1493462379004fff330e2b8101b6dbceae25603a3356"
+}
